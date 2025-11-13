@@ -217,23 +217,23 @@ Vedi cartella `/docs` per documentazione completa.
 ### 0.4 - Setup Python Virtual Environment
 
 #### 0.4.1 - Creazione venv
-- [ ] Apri Terminal in VS Code
-- [ ] Naviga in backend:
+- [x] Apri Terminal in VS Code
+- [x] Naviga in backend:
 ```bash
 cd backend
 ```
-- [ ] Crea virtual environment:
+- [x] Crea virtual environment:
 ```bash
 python3 -m venv venv
 ```
-- [ ] Attiva venv:
+- [x] Attiva venv:
 ```bash
 source venv/bin/activate
 ```
-- [ ] Verifica attivazione (dovresti vedere `(venv)` nel prompt)
+- [x] Verifica attivazione (dovresti vedere `(venv)` nel prompt)
 
 #### 0.4.2 - File requirements.txt
-- [ ] 📝 Crea `backend/requirements.txt`
+- [x] 📝 Crea `backend/requirements.txt`
 
 ```txt
 # Core Framework
@@ -271,7 +271,7 @@ mypy==1.13.0
 ```
 
 #### 0.4.3 - Installa dipendenze
-- [ ] Con venv attivo, esegui:
+- [x] Con venv attivo, esegui:
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -280,12 +280,12 @@ pip install -r requirements.txt
 ```bash
 pip list
 ```
-- [ ] Dovresti vedere tutte le librerie elencate
+- [x] Dovresti vedere tutte le librerie elencate
 
 #### 0.4.4 - Commit dependencies
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit message: `Add Python dependencies`
-  - [ ] Commit e push
+- [x] In **GitHub Desktop**:
+  - [x] Commit message: `Add Python dependencies`
+  - [x] Commit e push
 
 ---
 

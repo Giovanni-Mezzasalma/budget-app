@@ -47,12 +47,12 @@
 - [x] Primo commit pushato
 
 ### 0.4 - Python Virtual Environment
-- [ ] `venv` creato in `backend/`
-- [ ] `venv` attivato con successo
-- [ ] `requirements.txt` creato
-- [ ] Tutte le dipendenze installate
-- [ ] `pip list` verificato
-- [ ] Commit dependencies
+- [x] `venv` creato in `backend/`
+- [x] `venv` attivato con successo
+- [x] `requirements.txt` creato
+- [x] Tutte le dipendenze installate
+- [x] `pip list` verificato
+- [x] Commit dependencies
 
 ### 0.5 - Database PostgreSQL
 - [ ] pgAdmin 4 aperto
