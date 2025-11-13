@@ -1,0 +1,71 @@
+# ============================================
+# BUDGET APP - Backend Dependencies
+# Python 3.12.4
+# ============================================
+
+# ==================== CORE FRAMEWORK ====================
+# FastAPI framework per API REST
+fastapi==0.115.0
+
+# Server ASGI per FastAPI
+uvicorn[standard]==0.32.0
+
+# ==================== DATABASE ====================
+# PostgreSQL adapter per Python
+psycopg2-binary==2.9.10
+
+# ORM (Object-Relational Mapping)
+sqlalchemy==2.0.36
+
+# Database migrations
+alembic==1.14.0
+
+# ==================== AUTHENTICATION & SECURITY ====================
+# JWT token encoding/decoding
+python-jose[cryptography]==3.3.0
+
+# Password hashing
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# Form data parsing
+python-multipart==0.0.20
+
+# ==================== VALIDATION ====================
+# Data validation con Pydantic
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# Email validation
+email-validator==2.2.0
+
+# ==================== CONFIGURATION ====================
+# Environment variables management
+python-dotenv==1.0.1
+
+# ==================== TESTING ====================
+# Testing framework
+pytest==8.3.4
+
+# Async testing support
+pytest-asyncio==0.24.0
+
+# HTTP client per testing
+httpx==0.28.1
+
+# Test coverage
+pytest-cov==6.0.0
+
+# ==================== DEVELOPMENT ====================
+# Code formatter
+black==24.10.0
+
+# Linter
+flake8==7.1.1
+
+# Type checker
+mypy==1.13.0
+
+# ==================== PRODUCTION (Optional) ====================
+# Production server
+gunicorn==23.0.0
