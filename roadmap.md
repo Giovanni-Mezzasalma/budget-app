@@ -292,24 +292,24 @@ pip list
 ### 0.5 - Setup Database PostgreSQL
 
 #### 0.5.1 - Creazione Database tramite pgAdmin 4
-- [ ] Apri **pgAdmin 4**
-- [ ] Connetti al server locale (PostgreSQL 16)
-- [ ] Click destro su "Databases" → Create → Database
-- [ ] Nome: `budget_app_dev`
-- [ ] Owner: postgres (o tuo user)
-- [ ] Click "Save"
-- [ ] Verifica che database appaia nella lista
+- [x] Apri **pgAdmin 4**
+- [x] Connetti al server locale (PostgreSQL 16)
+- [x] Click destro su "Databases" → Create → Database
+- [x] Nome: `budget_app_dev`
+- [x] Owner: postgres (o tuo user)
+- [x] Click "Save"
+- [x] Verifica che database appaia nella lista
 
 #### 0.5.2 - Creazione User dedicato (opzionale ma consigliato)
-- [ ] In pgAdmin, espandi il database `budget_app_dev`
-- [ ] Click destro su "Login/Group Roles" → Create → Login/Group Role
-- [ ] General tab → Name: `budget_user`
-- [ ] Definition tab → Password: `scegli_password_sicura`
-- [ ] Privileges tab → ✅ Can login, ✅ Create databases
-- [ ] Click "Save"
+- [x] In pgAdmin, espandi il database `budget_app_dev`
+- [x] Click destro su "Login/Group Roles" → Create → Login/Group Role
+- [x] General tab → Name: `budget_user`
+- [x] Definition tab → Password: `scegli_password_sicura`
+- [x] Privileges tab → ✅ Can login, ✅ Create databases
+- [x] Click "Save"
 
 #### 0.5.3 - Configurazione .env
-- [ ] 📝 Crea `backend/.env`
+- [x] 📝 Crea `backend/.env`
 
 ```env
 # Database
@@ -337,7 +337,7 @@ PORT=8000
 ⚠️ **IMPORTANTE:** Non committare mai `.env`! È già in `.gitignore`
 
 #### 0.5.4 - File .env.example
-- [ ] 📝 Crea `backend/.env.example` (versione template da committare)
+- [x] 📝 Crea `backend/.env.example` (versione template da committare)
 
 ```env
 # Database
@@ -363,7 +363,7 @@ PORT=8000
 ```
 
 #### 0.5.5 - Test connessione database
-- [ ] 📝 Crea `backend/test_db_connection.py`
+- [x] 📝 Crea `backend/test_db_connection.py`
 
 ```python
 import psycopg2
@@ -390,17 +390,17 @@ if __name__ == "__main__":
     test_connection()
 ```
 
-- [ ] Esegui test:
+- [x] Esegui test:
 ```bash
 python test_db_connection.py
 ```
-- [ ] Dovresti vedere: `✅ Connessione database riuscita!`
+- [x] Dovresti vedere: `✅ Connessione database riuscita!`
 
 #### 0.5.6 - Commit database setup
-- [ ] In **GitHub Desktop**:
-  - [ ] Aggiungi `.env.example` e `test_db_connection.py`
-  - [ ] Commit: `Add database configuration`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Aggiungi `.env.example` e `test_db_connection.py`
+  - [x] Commit: `Add database configuration`
+  - [x] Push
 
 ---
 

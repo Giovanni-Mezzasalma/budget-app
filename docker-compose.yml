@@ -1,0 +1,120 @@
+# ============================================
+# BUDGET APP - Docker Compose Configuration
+# ============================================
+# 
+# Questo file orchestrera i seguenti servizi:
+# - db: PostgreSQL 16 database
+# - backend: FastAPI application
+#
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose down           # Stop all services
+#   docker-compose logs -f        # View logs
+#   docker-compose ps             # List running services
+
+services:
+  # ==================== DATABASE SERVICE ====================
+  db:
+    image: postgres:16-alpine
+    container_name: budget_app_db
+    restart: unless-stopped
+    
+    environment:
+      POSTGRES_USER: budget_user
+      POSTGRES_PASSWORD: budget_password
+      POSTGRES_DB: budget_app_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    
+    ports:
+      - "5433:5432"
+    
+    volumes:
+      # Persist database data
+      - pgdata:/var/lib/postgresql/data
+      # Optional: mount init SQL scripts
+      # - ./database:/docker-entrypoint-initdb.d
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U budget_user -d budget_app_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+    networks:
+      - budget-network
+
+  # ==================== BACKEND SERVICE ====================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: budget_app_backend
+    restart: unless-stopped
+    
+    environment:
+      # Database connection (points to 'db' service)
+      DATABASE_URL: postgresql://budget_user:budget_password@db:5432/budget_app_dev
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: budget_app_dev
+      DB_USER: budget_user
+      DB_PASSWORD: budget_password
+      
+      # Application settings
+      DEBUG: "True"
+      HOST: 0.0.0.0
+      PORT: 8000
+      
+      # Security (use strong values in production!)
+      SECRET_KEY: docker-dev-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 10080
+      
+      # CORS
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+    
+    ports:
+      - "8000:8000"
+    
+    volumes:
+      # Mount backend code for hot-reload in development
+      - ./backend:/app
+      # Don't mount venv (use container's Python environment)
+      - /app/venv
+    
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    networks:
+      - budget-network
+    
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ==================== PGADMIN SERVICE (Optional) ====================
+  # Uncomment to run pgAdmin in Docker
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: budget_app_pgadmin
+  #   restart: unless-stopped
+  #   
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@budget-app.local
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   
+  #   ports:
+  #     - "5050:80"
+  #   
+  #   networks:
+  #     - budget-network
+
+# ==================== VOLUMES ====================
+volumes:
+  pgdata:
+    driver: local
+
+# ==================== NETWORKS ====================
+networks:
+  budget-network:
+    driver: bridge

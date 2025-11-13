@@ -55,19 +55,19 @@
 - [x] Commit dependencies
 
 ### 0.5 - Database PostgreSQL
-- [ ] pgAdmin 4 aperto
-- [ ] Database `budget_app_dev` creato
-- [ ] User `budget_user` creato (opzionale)
-- [ ] File `.env` creato (NON committato)
-- [ ] File `.env.example` creato e committato
-- [ ] `test_db_connection.py` creato
-- [ ] Test connessione passato ✅
-- [ ] Commit database setup
+- [x] pgAdmin 4 aperto
+- [x] Database `budget_app_dev` creato
+- [x] User `budget_user` creato (opzionale)
+- [x] File `.env` creato (NON committato)
+- [x] File `.env.example` creato e committato
+- [x] `test_db_connection.py` creato
+- [x] Test connessione passato ✅
+- [x] Commit database setup
 
 ### 0.6 - Docker Setup
-- [ ] `docker-compose.yml` creato
-- [ ] `Dockerfile` backend creato
-- [ ] Commit Docker files
+- [x] `docker-compose.yml` creato
+- [x] `Dockerfile` backend creato
+- [x] Commit Docker files
 
 ### 0.7 - Documentazione
 - [ ] `docs/ARCHITECTURE.md` creato
