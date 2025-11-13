@@ -70,9 +70,10 @@
 - [x] Commit Docker files
 
 ### 0.7 - Documentazione
-- [ ] `docs/ARCHITECTURE.md` creato
-- [ ] `docs/API_SPEC.md` creato
-- [ ] Commit documentazione
+- [x] `docs/ARCHITECTURE.md` creato
+- [x] `docs/API_SPEC.md` creato
+- [x] `docs/DEVELOPMENT.md` creato
+- [x] Commit documentazione
 
 **CHECKPOINT FASE 0:**
 - [ ] ✅ Tutti i task completati

@@ -407,10 +407,9 @@ python test_db_connection.py
 ### 0.6 - Setup Docker (preparazione futura)
 
 #### 0.6.1 - Crea docker-compose.yml
-- [ ] 📝 Crea `docker/docker-compose.yml`
+- [x] 📝 Crea `docker/docker-compose.yml`
 
 ```yaml
-version: '3.8'
 
 services:
   db:
@@ -451,7 +450,7 @@ volumes:
 ```
 
 #### 0.6.2 - Crea Dockerfile backend
-- [ ] 📝 Crea `backend/Dockerfile`
+- [x] 📝 Crea `backend/Dockerfile`
 
 ```dockerfile
 FROM python:3.12-slim
@@ -481,9 +480,9 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 #### 0.6.3 - Commit Docker files
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add Docker configuration`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add Docker configuration`
+  - [x] Push
 
 💡 **Nota:** Userai Docker più avanti per deployment. Per ora continua con setup locale.
 
@@ -492,7 +491,9 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ### 0.7 - Documentazione Progetto
 
 #### 0.7.1 - Crea struttura docs
-- [ ] 📝 Crea `docs/ARCHITECTURE.md`
+- [x] 📝 Crea `docs/ARCHITECTURE.md`
+- [x] 📝 Crea `docs/API_SPEC.md`
+- [x] 📝 Crea `docs/DEVELOPMENT.md`
 
 ```markdown
 # 🏗️ Architettura Sistema
