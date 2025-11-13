@@ -25,26 +25,26 @@
 
 ## ✅ FASE 0: SETUP PROGETTO
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
+**Data Inizio:** 13/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (circa 60% completato)
 
 ### 0.1 - Configurazione Repository GitHub
-- [ ] Repository creato su GitHub
-- [ ] GitHub Desktop configurato
-- [ ] VS Code aperto sul progetto
-- [ ] Git verification ✓
+- [x] Repository creato su GitHub
+- [x] GitHub Desktop configurato
+- [x] VS Code aperto sul progetto
+- [x] Git verification ✓
 
 ### 0.2 - Struttura Cartelle
-- [ ] Cartella `backend/` creata
-- [ ] Cartella `frontend/` creata
-- [ ] Cartella `database/` creata
-- [ ] Cartella `docs/` creata
-- [ ] Cartella `docker/` creata
-- [ ] File `.gitkeep` in ogni cartella
+- [x] Cartella `backend/` creata
+- [x] Cartella `frontend/` creata
+- [x] Cartella `database/` creata
+- [x] Cartella `docs/` creata
+- [x] Cartella `docker/` creata
+- [x] File `.gitkeep` in ogni cartella
 
 ### 0.3 - File Configurazione
-- [ ] `.gitignore` creato e popolato
-- [ ] `README.md` aggiornato con tech stack
-- [ ] Primo commit pushato
+- [x] `.gitignore` creato e popolato
+- [x] `README.md` aggiornato con tech stack
+- [x] Primo commit pushato
 
 ### 0.4 - Python Virtual Environment
 - [ ] `venv` creato in `backend/`

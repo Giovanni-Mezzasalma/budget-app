@@ -46,31 +46,31 @@ Preparare ambiente di sviluppo, repository Git e struttura progetto.
 ### 0.1 - Configurazione Repository GitHub
 
 #### 0.1.1 - Creazione Repository
-- [ ] Apri **GitHub Desktop**
-- [ ] File → New Repository
-- [ ] Nome: `budget-app-saas`
-- [ ] Description: `Multi-user budget management web application`
-- [ ] Local Path: scegli cartella sul tuo Mac
-- [ ] ✅ Initialize with README
-- [ ] Git Ignore: Python
-- [ ] License: MIT (o quella che preferisci)
-- [ ] Click "Create Repository"
-- [ ] Publish repository su GitHub
+- [x] Apri **GitHub Desktop**
+- [x] File → New Repository
+- [x] Nome: `budget-app`
+- [x] Description: `Multi-user budget management web application`
+- [x] Local Path: scegli cartella sul tuo Mac
+- [x] ✅ Initialize with README
+- [x] Git Ignore: Python
+- [x] License: MIT (o quella che preferisci)
+- [x] Click "Create Repository"
+- [x] Publish repository su GitHub
 
 #### 0.1.2 - Configurazione Git
-- [ ] Apri **VS Code**
-- [ ] File → Open Folder → seleziona `budget-app-saas`
-- [ ] Verifica che Git sia attivo (icona source control laterale)
+- [x] Apri **VS Code**
+- [x] File → Open Folder → seleziona `budget-app`
+- [x] Verifica che Git sia attivo (icona source control laterale)
 
 ---
 
 ### 0.2 - Struttura Cartelle Progetto
 
 #### 0.2.1 - Crea struttura base
-- [ ] In VS Code, crea le seguenti cartelle:
+- [x] In VS Code, crea le seguenti cartelle:
 
 ```
-budget-app-saas/
+budget-app/
 ├── backend/              ← Python FastAPI
 ├── frontend/             ← React (migrazione futura)
 ├── database/             ← SQL scripts e migrations
@@ -79,8 +79,8 @@ budget-app-saas/
 ```
 
 #### 0.2.2 - Comandi per creare struttura
-- [ ] Apri Terminal in VS Code (View → Terminal)
-- [ ] Esegui:
+- [x] Apri Terminal in VS Code (View → Terminal)
+- [x] Esegui:
 ```bash
 mkdir -p backend frontend database docs docker
 touch backend/.gitkeep frontend/.gitkeep database/.gitkeep docs/.gitkeep docker/.gitkeep
@@ -91,7 +91,7 @@ touch backend/.gitkeep frontend/.gitkeep database/.gitkeep docs/.gitkeep docker/
 ### 0.3 - File Configurazione Progetto
 
 #### 0.3.1 - `.gitignore`
-- [ ] 📝 Crea file `.gitignore` nella root
+- [x] 📝 Crea file `.gitignore` nella root
 
 ```gitignore
 # Python
@@ -146,7 +146,7 @@ docker-compose.override.yml
 ```
 
 #### 0.3.2 - `README.md`
-- [ ] 📝 Aggiorna `README.md`
+- [x] 📝 Aggiorna `README.md`
 
 ```markdown
 # 💰 Budget App SaaS
@@ -206,11 +206,11 @@ Vedi cartella `/docs` per documentazione completa.
 ```
 
 #### 0.3.3 - Commit iniziale
-- [ ] In **GitHub Desktop**:
-  - [ ] Verifica file nella sezione "Changes"
-  - [ ] Scrivi commit message: `Initial project setup`
-  - [ ] Click "Commit to main"
-  - [ ] Push to origin
+- [x] In **GitHub Desktop**:
+  - [x] Verifica file nella sezione "Changes"
+  - [x] Scrivi commit message: `Initial project setup`
+  - [x] Click "Commit to main"
+  - [x] Push to origin
 
 ---
 
