@@ -547,7 +547,7 @@ User → Frontend → API (FastAPI) → Database (PostgreSQL)
 ```
 
 #### 0.7.2 - Crea API specifications
-- [ ] 📝 Crea `docs/API_SPEC.md`
+- [x] 📝 Crea `docs/API_SPEC.md`
 
 ```markdown
 # 📡 API Specifications
@@ -605,9 +605,9 @@ Crea categoria
 ```
 
 #### 0.7.3 - Commit documentazione
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add project documentation`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add project documentation`
+  - [x] Push
 
 ---
 
@@ -615,16 +615,16 @@ Crea categoria
 
 Prima di continuare, verifica:
 
-- [ ] ✅ Repository GitHub creato e configurato
-- [ ] ✅ Struttura cartelle progetto completa
-- [ ] ✅ Python venv creato e attivo
-- [ ] ✅ Dipendenze Python installate
-- [ ] ✅ Database PostgreSQL creato in pgAdmin
-- [ ] ✅ File .env configurato (non committato)
-- [ ] ✅ Test connessione database passato
-- [ ] ✅ Docker files preparati
-- [ ] ✅ Documentazione base creata
-- [ ] ✅ Tutti i commit pushati su GitHub
+- [x] ✅ Repository GitHub creato e configurato
+- [x] ✅ Struttura cartelle progetto completa
+- [x] ✅ Python venv creato e attivo
+- [x] ✅ Dipendenze Python installate
+- [x] ✅ Database PostgreSQL creato in pgAdmin
+- [x] ✅ File .env configurato (non committato)
+- [x] ✅ Test connessione database passato
+- [x] ✅ Docker files preparati
+- [x] ✅ Documentazione base creata
+- [x] ✅ Tutti i commit pushati su GitHub
 
 **Tempo stimato:** 1 giornata  
 **Prossimo:** FASE 1 - Database Foundation
