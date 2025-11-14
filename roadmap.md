@@ -641,7 +641,7 @@ Creare schema database completo, modelli SQLAlchemy e sistema di migrations.
 ### 1.1 - Schema Database SQL
 
 #### 1.1.1 - Progettazione schema
-- [ ] 📝 Crea `database/schema_design.md`
+- [x] 📝 Crea `database/schema_design.md`
 
 ```markdown
 # 🗄️ Database Schema Design
@@ -733,7 +733,7 @@ Creare schema database completo, modelli SQLAlchemy e sistema di migrations.
 ```
 
 #### 1.1.2 - Script SQL creazione tabelle
-- [ ] 📝 Crea `database/01_create_schema.sql`
+- [x] 📝 Crea `database/01_create_schema.sql`
 
 ```sql
 -- Enable UUID extension
@@ -867,26 +867,26 @@ CREATE TRIGGER update_custom_charts_updated_at BEFORE UPDATE ON custom_charts
 ```
 
 #### 1.1.3 - Esegui script in pgAdmin
-- [ ] Apri **pgAdmin 4**
-- [ ] Seleziona database `budget_app_dev`
-- [ ] Click destro → Query Tool
-- [ ] Apri file `database/01_create_schema.sql`
-- [ ] Click Execute (⚡️ icona)
-- [ ] Verifica output: tutte le tabelle create con successo
-- [ ] Refresh "Schemas" → "Tables" per vedere le nuove tabelle
+- [x] Apri **pgAdmin 4**
+- [x] Seleziona database `budget_app_dev`
+- [x] Click destro → Query Tool
+- [x] Apri file `database/01_create_schema.sql`
+- [x] Click Execute (⚡️ icona)
+- [x] Verifica output: tutte le tabelle create con successo
+- [x] Refresh "Schemas" → "Tables" per vedere le nuove tabelle
 
 #### 1.1.4 - Verifica schema creato
-- [ ] In pgAdmin, espandi `budget_app_dev` → `Schemas` → `public` → `Tables`
-- [ ] Dovresti vedere:
-  - [ ] users
-  - [ ] accounts
-  - [ ] categories
-  - [ ] transactions
-  - [ ] transfers
-  - [ ] custom_charts
+- [x] In pgAdmin, espandi `budget_app_dev` → `Schemas` → `public` → `Tables`
+- [x] Dovresti vedere:
+  - [x] users
+  - [x] accounts
+  - [x] categories
+  - [x] transactions
+  - [x] transfers
+  - [x] custom_charts
 
 #### 1.1.5 - Script categorie predefinite
-- [ ] 📝 Crea `database/02_seed_default_categories.sql`
+- [x] 📝 Crea `database/02_seed_default_categories.sql`
 
 ```sql
 -- Funzione per inserire categorie predefinite per un nuovo utente
@@ -919,21 +919,21 @@ $$ LANGUAGE plpgsql;
 ```
 
 #### 1.1.6 - Esegui script seed
-- [ ] In pgAdmin, apri ed esegui `database/02_seed_default_categories.sql`
-- [ ] Verifica che la funzione sia stata creata in `Schemas` → `public` → `Functions`
+- [x] In pgAdmin, apri ed esegui `database/02_seed_default_categories.sql`
+- [x] Verifica che la funzione sia stata creata in `Schemas` → `public` → `Functions`
 
 #### 1.1.7 - Commit database scripts
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add database schema and seed functions`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add database schema and seed functions`
+  - [x] Push
 
 ---
 
 ### 1.2 - Modelli SQLAlchemy
 
 #### 1.2.1 - Database configuration
-- [ ] 📝 Crea `backend/app/__init__.py` (vuoto)
-- [ ] 📝 Crea `backend/app/config.py`
+- [x] 📝 Crea `backend/app/__init__.py` (vuoto)
+- [x] 📝 Crea `backend/app/config.py`
 
 ```python
 """

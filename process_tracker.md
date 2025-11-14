@@ -88,14 +88,14 @@
 **Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
 
 ### 1.1 - Schema Database SQL
-- [ ] `database/schema_design.md` creato
-- [ ] `database/01_create_schema.sql` creato
-- [ ] Script eseguito in pgAdmin
-- [ ] Tutte le 6 tabelle create
-- [ ] Tabelle visibili in pgAdmin
-- [ ] `database/02_seed_default_categories.sql` creato
-- [ ] Funzione seed eseguita
-- [ ] Commit database scripts
+- [x] `database/schema_design.md` creato
+- [x] `database/01_create_schema.sql` creato
+- [x] Script eseguito in pgAdmin
+- [x] Tutte le 6 tabelle create
+- [x] Tabelle visibili in pgAdmin
+- [x] `database/02_seed_default_categories.sql` creato
+- [x] Funzione seed eseguita
+- [x] Commit database scripts
 
 ### 1.2 - Modelli SQLAlchemy
 - [ ] `backend/app/config.py` creato
