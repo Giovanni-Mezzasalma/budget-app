@@ -167,13 +167,13 @@
 - [x] Commit auth router
 
 ### 2.5 - Main Application
-- [ ] `backend/main.py` creato
-- [ ] CORS middleware configurato
-- [ ] Auth router incluso
-- [ ] `backend/run.py` creato
-- [ ] Server avviato con successo
-- [ ] Swagger UI accessibile (http://localhost:8000/docs)
-- [ ] Commit main app
+- [x] `backend/main.py` creato
+- [x] CORS middleware configurato
+- [x] Auth router incluso
+- [x] `backend/run.py` creato
+- [x] Server avviato con successo
+- [x] Swagger UI accessibile (http://localhost:8000/docs)
+- [x] Commit main app
 
 ### 2.6 - Testing Authentication
 - [ ] Test registrazione in Swagger: SUCCESS

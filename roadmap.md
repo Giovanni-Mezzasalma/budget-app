@@ -2200,16 +2200,16 @@ async def logout():
 ```
 
 #### 2.4.3 - Commit auth router
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add authentication router`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add authentication router`
+  - [x] Push
 
 ---
 
 ### 2.5 - Main Application Setup
 
 #### 2.5.1 - FastAPI main app
-- [ ] 📝 Crea `backend/main.py`
+- [x] 📝 Crea `backend/main.py`
 
 ```python
 """
@@ -2282,7 +2282,7 @@ async def health_check():
 ```
 
 #### 2.5.2 - Run script
-- [ ] 📝 Crea `backend/run.py` (script helper per avvio)
+- [x] 📝 Crea `backend/run.py` (script helper per avvio)
 
 ```python
 """
@@ -2302,7 +2302,7 @@ if __name__ == "__main__":
 ```
 
 #### 2.5.3 - Test avvio server
-- [ ] Nel terminal (con venv attivo):
+- [x] Nel terminal (con venv attivo):
 ```bash
 python run.py
 ```
@@ -2311,16 +2311,16 @@ python run.py
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     Started reloader process
 ```
-- [ ] Apri browser: http://localhost:8000
-- [ ] Dovresti vedere messaggio JSON
-- [ ] Apri: http://localhost:8000/docs
-- [ ] Dovresti vedere Swagger UI con endpoints auth
+- [x] Apri browser: http://localhost:8000
+- [x] Dovresti vedere messaggio JSON
+- [x] Apri: http://localhost:8000/docs
+- [x] Dovresti vedere Swagger UI con endpoints auth
 
 #### 2.5.4 - Commit main app
-- [ ] Ferma server (CTRL+C)
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add FastAPI main application`
-  - [ ] Push
+- [x] Ferma server (CTRL+C)
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add FastAPI main application`
+  - [x] Push
 
 ---
 
