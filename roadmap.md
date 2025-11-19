@@ -1686,16 +1686,16 @@ def verify_token(token: str) -> Optional[dict]:
 ```
 
 #### 2.1.2 - Commit security utils
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add security utilities`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add security utilities`
+  - [x] Push
 
 ---
 
 ### 2.2 - Pydantic Schemas
 
 #### 2.2.1 - Base schemas
-- [ ] 📝 Crea `backend/app/schemas/__init__.py`
+- [x] 📝 Crea `backend/app/schemas/__init__.py`
 
 ```python
 """
@@ -1718,7 +1718,7 @@ __all__ = [
 ```
 
 #### 2.2.2 - User schemas
-- [ ] 📝 Crea `backend/app/schemas/user.py`
+- [x] 📝 Crea `backend/app/schemas/user.py`
 
 ```python
 """
@@ -1786,7 +1786,7 @@ class TokenData(BaseModel):
 ```
 
 #### 2.2.3 - Account schemas (base)
-- [ ] 📝 Crea `backend/app/schemas/account.py`
+- [x] 📝 Crea `backend/app/schemas/account.py`
 
 ```python
 """
@@ -1837,9 +1837,9 @@ class AccountResponse(AccountBase):
 ```
 
 #### 2.2.4 - Category e Transaction schemas (base)
-- [ ] 📝 Crea `backend/app/schemas/category.py`
-- [ ] 📝 Crea `backend/app/schemas/transaction.py`
-- [ ] 📝 Crea `backend/app/schemas/transfer.py`
+- [x] 📝 Crea `backend/app/schemas/category.py`
+- [x] 📝 Crea `backend/app/schemas/transaction.py`
+- [x] 📝 Crea `backend/app/schemas/transfer.py`
 
 ```python
 # category.py - Versione minima
@@ -1899,9 +1899,9 @@ class TransferResponse(BaseModel):
 💡 **Nota:** Schemas completi verranno creati in FASE 3. Questi sono placeholder.
 
 #### 2.2.5 - Commit schemas
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add Pydantic schemas`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add Pydantic schemas`
+  - [x] Push
 
 ---
 

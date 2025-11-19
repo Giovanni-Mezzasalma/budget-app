@@ -130,7 +130,7 @@
 
 ## ✅ FASE 2: BACKEND API - AUTENTICAZIONE
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
+**Data Inizio:** 19/11/2025 | **Data Fine:** 19/11/2025 | **Status:** 🟡 In corso (30% completato)
 
 ### 2.1 - Security Utilities
 - [x] `backend/app/utils/security.py` creato
@@ -141,13 +141,13 @@
 - [x] Commit security utils
 
 ### 2.2 - Pydantic Schemas
-- [ ] `backend/app/schemas/__init__.py` creato
-- [ ] `backend/app/schemas/user.py` completo
-- [ ] `backend/app/schemas/account.py` creato (base)
-- [ ] `backend/app/schemas/category.py` creato (base)
-- [ ] `backend/app/schemas/transaction.py` creato (base)
-- [ ] `backend/app/schemas/transfer.py` creato (base)
-- [ ] Commit schemas
+- [x] `backend/app/schemas/__init__.py` creato
+- [x] `backend/app/schemas/user.py` completo
+- [x] `backend/app/schemas/account.py` creato (base)
+- [x] `backend/app/schemas/category.py` creato (base)
+- [x] `backend/app/schemas/transaction.py` creato (base)
+- [x] `backend/app/schemas/transfer.py` creato (base)
+- [x] Commit schemas
 
 ### 2.3 - Authentication Dependencies
 - [ ] `backend/app/dependencies.py` creato
