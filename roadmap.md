@@ -1403,8 +1403,8 @@ class CustomChart(Base):
 ### 1.3 - Alembic Migrations
 
 #### 1.3.1 - Inizializzazione Alembic
-- [ ] Nel terminal, assicurati che venv sia attivo
-- [ ] Naviga in `backend/`:
+- [x] Nel terminal, assicurati che venv sia attivo
+- [x] Naviga in `backend/`:
 ```bash
 cd backend
 ```
@@ -1412,19 +1412,19 @@ cd backend
 ```bash
 alembic init alembic
 ```
-- [ ] Dovresti vedere cartella `alembic/` creata
+- [x] Dovresti vedere cartella `alembic/` creata
 
 #### 1.3.2 - Configurazione Alembic
-- [ ] 📝 Modifica `backend/alembic.ini`
-- [ ] Trova la riga `sqlalchemy.url = ...`
-- [ ] Cambiala in:
+- [x] 📝 Modifica `backend/alembic.ini`
+- [x] Trova la riga `sqlalchemy.url = ...`
+- [x] Cambiala in:
 ```ini
 # sqlalchemy.url = driver://user:pass@localhost/dbname
 # Commenta la riga sopra, useremo .env invece
 ```
 
-- [ ] 📝 Modifica `backend/alembic/env.py`
-- [ ] Sostituisci l'intero contenuto con:
+- [x] 📝 Modifica `backend/alembic/env.py`
+- [x] Sostituisci l'intero contenuto con:
 
 ```python
 """
@@ -1499,26 +1499,26 @@ else:
 ```
 
 #### 1.3.3 - Prima migration
-- [ ] Genera prima migration:
+- [x] Genera prima migration:
 ```bash
 alembic revision --autogenerate -m "Initial database schema"
 ```
-- [ ] Dovresti vedere messaggio tipo: `Generating .../alembic/versions/xxxx_initial_database_schema.py`
-- [ ] Apri il file migration generato e verifica contenuto
+- [x] Dovresti vedere messaggio tipo: `Generating .../alembic/versions/xxxx_initial_database_schema.py`
+- [x] Apri il file migration generato e verifica contenuto
 
 ⚠️ **NOTA:** Se hai già creato le tabelle manualmente con SQL (step 1.1.3), Alembic potrebbe non rilevare cambiamenti. In tal caso:
 - Opzione A: Droppa tutte le tabelle in pgAdmin e rifa migration
 - Opzione B: Continua con migration vuota (Alembic non cambierà nulla ma terrà traccia versione)
 
 #### 1.3.4 - Applica migration
-- [ ] Esegui migration:
+- [x] Esegui migration:
 ```bash
 alembic upgrade head
 ```
-- [ ] Verifica in pgAdmin che sia stata creata tabella `alembic_version`
+- [x] Verifica in pgAdmin che sia stata creata tabella `alembic_version`
 
 #### 1.3.5 - Script helper per reset database
-- [ ] 📝 Crea `backend/reset_db.py` (utile in development)
+- [x] 📝 Crea `backend/reset_db.py` (utile in development)
 
 ```python
 """
@@ -1553,9 +1553,9 @@ if __name__ == "__main__":
 ```
 
 #### 1.3.6 - Commit migrations
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add Alembic migrations`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add Alembic migrations`
+  - [x] Push
 
 ---
 
@@ -1563,14 +1563,14 @@ if __name__ == "__main__":
 
 Prima di continuare, verifica:
 
-- [ ] ✅ Schema database progettato e documentato
-- [ ] ✅ Tabelle create in PostgreSQL (via SQL o Alembic)
-- [ ] ✅ Tutti i modelli SQLAlchemy creati e funzionanti
-- [ ] ✅ Alembic configurato e prima migration applicata
-- [ ] ✅ Relazioni tra modelli verificate
-- [ ] ✅ Funzione seed categorie predefinite creata
-- [ ] ✅ Database.py e config.py funzionanti
-- [ ] ✅ Tutti i commit pushati su GitHub
+- [x] ✅ Schema database progettato e documentato
+- [x] ✅ Tabelle create in PostgreSQL (via SQL o Alembic)
+- [x] ✅ Tutti i modelli SQLAlchemy creati e funzionanti
+- [x] ✅ Alembic configurato e prima migration applicata
+- [x] ✅ Relazioni tra modelli verificate
+- [x] ✅ Funzione seed categorie predefinite creata
+- [x] ✅ Database.py e config.py funzionanti
+- [x] ✅ Tutti i commit pushati su GitHub
 
 **Test rapido:**
 ```python
