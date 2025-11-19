@@ -979,7 +979,7 @@ settings = Settings()
 ```
 
 #### 1.2.2 - Database connection
-- [ ] 📝 Crea `backend/app/database.py`
+- [x] 📝 Crea `backend/app/database.py`
 
 ```python
 """
@@ -1019,7 +1019,7 @@ def get_db():
 ```
 
 #### 1.2.3 - Base models
-- [ ] 📝 Crea `backend/app/models/__init__.py`
+- [x] 📝 Crea `backend/app/models/__init__.py`
 
 ```python
 """
@@ -1044,7 +1044,7 @@ __all__ = [
 ```
 
 #### 1.2.4 - User model
-- [ ] 📝 Crea `backend/app/models/user.py`
+- [x] 📝 Crea `backend/app/models/user.py`
 
 ```python
 """
@@ -1094,7 +1094,7 @@ class User(Base):
 ```
 
 #### 1.2.5 - Account model
-- [ ] 📝 Crea `backend/app/models/account.py`
+- [x] 📝 Crea `backend/app/models/account.py`
 
 ```python
 """
@@ -1168,7 +1168,7 @@ class Account(Base):
 ```
 
 #### 1.2.6 - Category model
-- [ ] 📝 Crea `backend/app/models/category.py`
+- [x] 📝 Crea `backend/app/models/category.py`
 
 ```python
 """
@@ -1226,7 +1226,7 @@ class Category(Base):
 ```
 
 #### 1.2.7 - Transaction model
-- [ ] 📝 Crea `backend/app/models/transaction.py`
+- [x] 📝 Crea `backend/app/models/transaction.py`
 
 ```python
 """
@@ -1279,7 +1279,7 @@ class Transaction(Base):
 ```
 
 #### 1.2.8 - Transfer model
-- [ ] 📝 Crea `backend/app/models/transfer.py`
+- [x] 📝 Crea `backend/app/models/transfer.py`
 
 ```python
 """
@@ -1339,7 +1339,7 @@ class Transfer(Base):
 ```
 
 #### 1.2.9 - CustomChart model
-- [ ] 📝 Crea `backend/app/models/custom_chart.py`
+- [x] 📝 Crea `backend/app/models/custom_chart.py`
 
 ```python
 """
@@ -1394,9 +1394,9 @@ class CustomChart(Base):
 ```
 
 #### 1.2.10 - Commit models
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add SQLAlchemy models`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add SQLAlchemy models`
+  - [x] Push
 
 ---
 

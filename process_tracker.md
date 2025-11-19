@@ -25,7 +25,7 @@
 
 ## ✅ FASE 0: SETUP PROGETTO
 
-**Data Inizio:** 13/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (circa 60% completato)
+**Data Inizio:** 13/11/2025 | **Data Fine:** 15/11/2025 | **Status:** ✅ Completato
 
 ### 0.1 - Configurazione Repository GitHub
 - [x] Repository creato su GitHub
@@ -85,7 +85,7 @@
 
 ## ✅ FASE 1: DATABASE FOUNDATION
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
+**Data Inizio:** 15/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (30% completato)
 
 ### 1.1 - Schema Database SQL
 - [x] `database/schema_design.md` creato
@@ -98,16 +98,16 @@
 - [x] Commit database scripts
 
 ### 1.2 - Modelli SQLAlchemy
-- [ ] `backend/app/config.py` creato
-- [ ] `backend/app/database.py` creato
-- [ ] `backend/app/models/__init__.py` creato
-- [ ] `backend/app/models/user.py` creato
-- [ ] `backend/app/models/account.py` creato
-- [ ] `backend/app/models/category.py` creato
-- [ ] `backend/app/models/transaction.py` creato
-- [ ] `backend/app/models/transfer.py` creato
-- [ ] `backend/app/models/custom_chart.py` creato
-- [ ] Commit models
+- [x] `backend/app/config.py` creato
+- [x] `backend/app/database.py` creato
+- [x] `backend/app/models/__init__.py` creato
+- [x] `backend/app/models/user.py` creato
+- [x] `backend/app/models/account.py` creato
+- [x] `backend/app/models/category.py` creato
+- [x] `backend/app/models/transaction.py` creato
+- [x] `backend/app/models/transfer.py` creato
+- [x] `backend/app/models/custom_chart.py` creato
+- [x] Commit models
 
 ### 1.3 - Alembic Migrations
 - [ ] Alembic inizializzato (`alembic init`)
