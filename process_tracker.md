@@ -130,7 +130,7 @@
 
 ## ✅ FASE 2: BACKEND API - AUTENTICAZIONE
 
-**Data Inizio:** 19/11/2025 | **Data Fine:** 19/11/2025 | **Status:** 🟡 In corso (30% completato)
+**Data Inizio:** 19/11/2025 | **Data Fine:** 19/11/2025 | **Status:** 🟡 In corso (60% completato)
 
 ### 2.1 - Security Utilities
 - [x] `backend/app/utils/security.py` creato
