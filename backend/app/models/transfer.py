@@ -1,54 +1,123 @@
 """
-Transfer Model
-Gestisce trasferimenti tra account
+Transfer database model.
 """
-from sqlalchemy import Column, String, Numeric, Date, DateTime, ForeignKey, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+
+from datetime import datetime, date
+from decimal import Decimal
+from typing import Optional, TYPE_CHECKING
+from sqlalchemy import String, DateTime, Date, Numeric, ForeignKey, Index
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.database import Base
 import uuid
-from ..database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.account import Account
 
 
 class Transfer(Base):
-    """Modello Transfer per movimenti tra account"""
+    """Transfer model for moving money between accounts."""
     
     __tablename__ = "transfers"
     
     # Primary Key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        index=True
+    )
     
     # Foreign Keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    from_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
-    to_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     
-    # Transfer details
-    amount = Column(Numeric(12, 2), nullable=False)
-    date = Column(Date, nullable=False)
-    description = Column(String(255))
+    from_account_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     
-    # Timestamp
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    to_account_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    # Transfer Information
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2),
+        nullable=False
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    
+    # Exchange Rate (for transfers between different currencies)
+    exchange_rate: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(15, 6),
+        nullable=True
+    )
+    
+    # Transfer Fee
+    fee: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2),
+        nullable=False,
+        default=Decimal("0.00")
+    )
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
     
     # Relationships
-    user = relationship("User", back_populates="transfers")
-    from_account = relationship(
+    user: Mapped["User"] = relationship("User", back_populates="transfers")
+    
+    from_account: Mapped["Account"] = relationship(
         "Account",
         foreign_keys=[from_account_id],
         back_populates="transfers_from"
     )
-    to_account = relationship(
+    
+    to_account: Mapped["Account"] = relationship(
         "Account",
         foreign_keys=[to_account_id],
         back_populates="transfers_to"
     )
     
-    # Constraints
+    # Indexes
     __table_args__ = (
-        CheckConstraint('from_account_id != to_account_id', name='different_accounts'),
-        CheckConstraint('amount > 0', name='amount_positive'),
+        Index('ix_transfers_user_date', 'user_id', 'date'),
+        Index('ix_transfers_from_account', 'from_account_id'),
+        Index('ix_transfers_to_account', 'to_account_id'),
+        Index('ix_transfers_accounts', 'from_account_id', 'to_account_id'),
     )
     
-    def __repr__(self):
-        return f"<Transfer {self.amount} on {self.date}>"
+    def __repr__(self) -> str:
+        return f"<Transfer(id={self.id}, amount={self.amount}, date={self.date})>"
+    
+    @property
+    def converted_amount(self) -> Decimal:
+        """
+        Calculate the amount received in destination account.
+        If exchange_rate is set, multiply amount by rate.
+        Otherwise, return the same amount.
+        """
+        if self.exchange_rate:
+            return self.amount * self.exchange_rate
+        return self.amount

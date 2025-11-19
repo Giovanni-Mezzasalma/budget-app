@@ -1,13 +1,12 @@
 """
-SQLAlchemy Models
-Importa tutti i modelli per Alembic autogenerate
+SQLAlchemy database models.
 """
-from .user import User
-from .account import Account
-from .category import Category
-from .transaction import Transaction
-from .transfer import Transfer
-from .custom_chart import CustomChart
+
+from app.models.user import User
+from app.models.account import Account
+from app.models.category import Category
+from app.models.transaction import Transaction
+from app.models.transfer import Transfer
 
 __all__ = [
     "User",
@@ -15,5 +14,4 @@ __all__ = [
     "Category",
     "Transaction",
     "Transfer",
-    "CustomChart"
 ]

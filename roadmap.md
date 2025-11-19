@@ -1908,7 +1908,7 @@ class TransferResponse(BaseModel):
 ### 2.3 - Authentication Dependencies
 
 #### 2.3.1 - Auth dependencies
-- [ ] 📝 Crea `backend/app/dependencies.py`
+- [x] 📝 Crea `backend/app/dependencies.py`
 
 ```python
 """
@@ -1991,9 +1991,9 @@ async def get_current_active_user(
 ```
 
 #### 2.3.2 - Commit dependencies
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add authentication dependencies`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add authentication dependencies`
+  - [x] Push
 
 ---
 

@@ -1,47 +1,110 @@
 """
-Transaction Model
-Gestisce entrate e uscite
+Transaction database model.
 """
-from sqlalchemy import Column, String, Text, Numeric, Date, DateTime, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+
+from datetime import datetime, date
+from decimal import Decimal
+from typing import Optional, TYPE_CHECKING
+from sqlalchemy import String, DateTime, Date, Numeric, Boolean, ForeignKey, Index, ARRAY
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.database import Base
 import uuid
-from ..database import Base
-from .category import TransactionType
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.account import Account
+    from app.models.category import Category
 
 
 class Transaction(Base):
-    """Modello Transaction per movimenti finanziari"""
+    """Transaction model for income and expense tracking."""
     
     __tablename__ = "transactions"
     
     # Primary Key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        index=True
+    )
     
     # Foreign Keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     
-    # Transaction details
-    amount = Column(Numeric(12, 2), nullable=False)
-    type = Column(Enum(TransactionType), nullable=False)
-    date = Column(Date, nullable=False)
-    description = Column(String(255))
-    notes = Column(Text)
+    account_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     
-    # Tags per ricerca/filtro
-    tags = Column(ARRAY(String))
+    category_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("categories.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True
+    )
+    
+    # Transaction Information
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2),
+        nullable=False
+    )
+    type: Mapped[str] = mapped_column(String(20), nullable=False)  # income or expense
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    
+    # Recurring Transaction Settings
+    is_recurring: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    recurring_frequency: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # daily, weekly, monthly, yearly
+    
+    # Tags for filtering and organization
+    tags: Mapped[Optional[list[str]]] = mapped_column(
+        ARRAY(String(50)),
+        nullable=True
+    )
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
     
     # Relationships
-    user = relationship("User", back_populates="transactions")
-    account = relationship("Account", back_populates="transactions")
-    category = relationship("Category", back_populates="transactions")
+    user: Mapped["User"] = relationship("User", back_populates="transactions")
+    account: Mapped["Account"] = relationship("Account", back_populates="transactions")
+    category: Mapped["Category"] = relationship("Category", back_populates="transactions")
     
-    def __repr__(self):
-        return f"<Transaction {self.type} {self.amount} on {self.date}>"
+    # Indexes
+    __table_args__ = (
+        Index('ix_transactions_user_date', 'user_id', 'date'),
+        Index('ix_transactions_user_type', 'user_id', 'type'),
+        Index('ix_transactions_account_date', 'account_id', 'date'),
+        Index('ix_transactions_category', 'category_id'),
+        Index('ix_transactions_user_recurring', 'user_id', 'is_recurring'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Transaction(id={self.id}, type={self.type}, amount={self.amount}, date={self.date})>"
+    
+    @property
+    def signed_amount(self) -> Decimal:
+        """
+        Return signed amount based on transaction type.
+        Positive for income, negative for expense.
+        """
+        return self.amount if self.type == "income" else -self.amount

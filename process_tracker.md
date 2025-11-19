@@ -150,10 +150,10 @@
 - [x] Commit schemas
 
 ### 2.3 - Authentication Dependencies
-- [ ] `backend/app/dependencies.py` creato
-- [ ] `get_current_user()` implementata
-- [ ] `get_current_active_user()` implementata
-- [ ] Commit dependencies
+- [x] `backend/app/dependencies.py` creato
+- [x] `get_current_user()` implementata
+- [x] `get_current_active_user()` implementata
+- [x] Commit dependencies
 
 ### 2.4 - Auth Router
 - [ ] `backend/app/crud/user.py` creato

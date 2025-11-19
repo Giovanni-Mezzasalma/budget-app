@@ -1,52 +1,109 @@
 """
-Category Model
-Gestisce categorie per transazioni
+Category database model.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+
+from datetime import datetime
+from typing import List, Optional, TYPE_CHECKING
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.database import Base
 import uuid
-import enum
-from ..database import Base
 
-
-class TransactionType(str, enum.Enum):
-    """Tipi di transazione"""
-    INCOME = "income"
-    EXPENSE = "expense"
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.transaction import Transaction
 
 
 class Category(Base):
-    """Modello Category per categorizzazione transazioni"""
+    """Category model for organizing transactions."""
     
     __tablename__ = "categories"
     
     # Primary Key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        index=True
+    )
     
     # Foreign Keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    parent_category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"))
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     
-    # Category details
-    name = Column(String(100), nullable=False)
-    type = Column(Enum(TransactionType), nullable=False)
+    parent_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
     
-    # Customization
-    color = Column(String(7))  # HEX color
-    icon = Column(String(50))
+    # Category Information
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str] = mapped_column(String(20), nullable=False)  # income or expense
     
-    # System category (non eliminabile/modificabile)
-    is_system = Column(Boolean, default=False)
+    # UI Customization
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # Hex color
+    icon: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     
-    # Timestamp
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Status
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
     
     # Relationships
-    user = relationship("User", back_populates="categories")
-    parent_category = relationship("Category", remote_side=[id], backref="subcategories")
-    transactions = relationship("Transaction", back_populates="category")
+    user: Mapped["User"] = relationship("User", back_populates="categories")
     
-    def __repr__(self):
-        return f"<Category {self.name} ({self.type})>"
+    # Self-referential relationship for subcategories
+    parent: Mapped[Optional["Category"]] = relationship(
+        "Category",
+        remote_side=[id],
+        back_populates="subcategories",
+        lazy="selectin"
+    )
+    
+    subcategories: Mapped[List["Category"]] = relationship(
+        "Category",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    
+    transactions: Mapped[List["Transaction"]] = relationship(
+        "Transaction",
+        back_populates="category",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    
+    # Indexes
+    __table_args__ = (
+        Index('ix_categories_user_active', 'user_id', 'is_active'),
+        Index('ix_categories_user_type', 'user_id', 'type'),
+        Index('ix_categories_parent', 'parent_id'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Category(id={self.id}, name={self.name}, type={self.type})>"
+    
+    @property
+    def full_name(self) -> str:
+        """Get full category name including parent (e.g., 'Food > Restaurants')."""
+        if self.parent:
+            return f"{self.parent.name} > {self.name}"
+        return self.name
