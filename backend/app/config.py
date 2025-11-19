@@ -1,42 +1,56 @@
 """
-Configurazione applicazione
-Gestisce environment variables e settings globali
+Application configuration using Pydantic Settings.
+Manages environment variables and application settings.
 """
-from pydantic_settings import BaseSettings
-from typing import List
-import os
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 
 class Settings(BaseSettings):
-    """Settings globali applicazione"""
+    """
+    Application settings loaded from environment variables.
+    
+    Create a .env file in the backend directory with:
+    DATABASE_URL=postgresql://user:password@localhost:5432/budgetapp
+    SECRET_KEY=your-secret-key-here
+    """
+    
+    # Application
+    APP_NAME: str = "Budget App API"
+    APP_VERSION: str = "1.0.0"
+    DEBUG: bool = False
     
     # Database
     DATABASE_URL: str
-    JWT_SECRET_KEY: str
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
-    DB_NAME: str = "budget_app_dev"
-    DB_USER: str = "budget_user"
-    DB_PASSWORD: str
     
     # Security
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 giorni
-    
-    # Application
-    DEBUG: bool = True
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",  # React development server
+        "http://localhost:5173",  # Vite development server
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
     
-    class Config:
-        env_file = ".env"
-        extra = "allow"
-        case_sensitive = True
+    # API
+    API_V1_PREFIX: str = "/api/v1"
+    
+    # Pagination
+    DEFAULT_PAGE_SIZE: int = 50
+    MAX_PAGE_SIZE: int = 100
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
 
-# Istanza singola settings
+# Create a global settings instance
 settings = Settings()

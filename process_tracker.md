@@ -156,15 +156,15 @@
 - [x] Commit dependencies
 
 ### 2.4 - Auth Router
-- [ ] `backend/app/crud/user.py` creato
-- [ ] `get_user_by_email()` implementata
-- [ ] `create_user()` implementata
-- [ ] `authenticate_user()` implementata
-- [ ] `backend/app/routers/auth.py` creato
-- [ ] POST `/auth/register` implementato
-- [ ] POST `/auth/login` implementato
-- [ ] GET `/auth/me` implementato
-- [ ] Commit auth router
+- [x] `backend/app/crud/user.py` creato
+- [x] `get_user_by_email()` implementata
+- [x] `create_user()` implementata
+- [x] `authenticate_user()` implementata
+- [x] `backend/app/routers/auth.py` creato
+- [x] POST `/auth/register` implementato
+- [x] POST `/auth/login` implementato
+- [x] GET `/auth/me` implementato
+- [x] Commit auth router
 
 ### 2.5 - Main Application
 - [ ] `backend/main.py` creato

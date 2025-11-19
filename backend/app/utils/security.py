@@ -5,7 +5,7 @@ Password hashing e JWT token management
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Dict, Any
 from ..config import settings
 
 # Password hashing context
@@ -74,6 +74,16 @@ def verify_token(token: str) -> Optional[dict]:
         
     Returns:
         Dict con payload o None se invalido
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+    
+def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+    """
+    Decode and validate a JWT access token.
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
