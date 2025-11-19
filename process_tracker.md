@@ -133,12 +133,12 @@
 **Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
 
 ### 2.1 - Security Utilities
-- [ ] `backend/app/utils/security.py` creato
-- [ ] `hash_password()` implementata
-- [ ] `verify_password()` implementata
-- [ ] `create_access_token()` implementata
-- [ ] `verify_token()` implementata
-- [ ] Commit security utils
+- [x] `backend/app/utils/security.py` creato
+- [x] `hash_password()` implementata
+- [x] `verify_password()` implementata
+- [x] `create_access_token()` implementata
+- [x] `verify_token()` implementata
+- [x] Commit security utils
 
 ### 2.2 - Pydantic Schemas
 - [ ] `backend/app/schemas/__init__.py` creato

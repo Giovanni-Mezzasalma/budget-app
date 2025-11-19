@@ -1597,8 +1597,8 @@ Implementare sistema completo di autenticazione con JWT, registrazione, login e 
 ### 2.1 - Security Utilities
 
 #### 2.1.1 - Password hashing
-- [ ] 📝 Crea `backend/app/utils/__init__.py` (vuoto)
-- [ ] 📝 Crea `backend/app/utils/security.py`
+- [x] 📝 Crea `backend/app/utils/__init__.py` (vuoto)
+- [x] 📝 Crea `backend/app/utils/security.py`
 
 ```python
 """
