@@ -2000,8 +2000,8 @@ async def get_current_active_user(
 ### 2.4 - Auth Router
 
 #### 2.4.1 - CRUD operations User
-- [ ] 📝 Crea `backend/app/crud/__init__.py` (vuoto)
-- [ ] 📝 Crea `backend/app/crud/user.py`
+- [x] 📝 Crea `backend/app/crud/__init__.py` (vuoto)
+- [x] 📝 Crea `backend/app/crud/user.py`
 
 ```python
 """
@@ -2083,8 +2083,8 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
 ```
 
 #### 2.4.2 - Auth router endpoints
-- [ ] 📝 Crea `backend/app/routers/__init__.py` (vuoto)
-- [ ] 📝 Crea `backend/app/routers/auth.py`
+- [x] 📝 Crea `backend/app/routers/__init__.py` (vuoto)
+- [x] 📝 Crea `backend/app/routers/auth.py`
 
 ```python
 """
@@ -2327,13 +2327,13 @@ INFO:     Started reloader process
 ### 2.6 - Testing Authentication
 
 #### 2.6.1 - Test con Swagger UI
-- [ ] Avvia server: `python run.py`
-- [ ] Apri http://localhost:8000/docs
+- [x] Avvia server: `python run.py`
+- [x] Apri http://localhost:8000/docs
 
 **Test Registrazione:**
-- [ ] Expand `POST /api/v1/auth/register`
-- [ ] Click "Try it out"
-- [ ] Inserisci dati:
+- [x] Expand `POST /api/v1/auth/register`
+- [x] Click "Try it out"
+- [x] Inserisci dati:
 ```json
 {
   "email": "test@example.com",
@@ -2341,61 +2341,61 @@ INFO:     Started reloader process
   "full_name": "Test User"
 }
 ```
-- [ ] Click "Execute"
-- [ ] Verifica risposta 201 con JWT token
+- [x] Click "Execute"
+- [x] Verifica risposta 201 con JWT token
 
 **Test Login:**
-- [ ] Expand `POST /api/v1/auth/login`
-- [ ] Inserisci stessi dati di registrazione
-- [ ] Verifica risposta 200 con JWT token
+- [x] Expand `POST /api/v1/auth/login`
+- [x] Inserisci stessi dati di registrazione
+- [x] Verifica risposta 200 con JWT token
 
 **Test Get Profile:**
-- [ ] Copia il `access_token` dalla risposta login
-- [ ] Click pulsante "Authorize" in alto
-- [ ] Incolla token (senza "Bearer")
-- [ ] Click "Authorize" poi "Close"
-- [ ] Expand `GET /api/v1/auth/me`
-- [ ] Click "Try it out" poi "Execute"
-- [ ] Verifica risposta 200 con dati utente
+- [x] Copia il `access_token` dalla risposta login
+- [x] Click pulsante "Authorize" in alto
+- [x] Incolla token (senza "Bearer")
+- [x] Click "Authorize" poi "Close"
+- [x] Expand `GET /api/v1/auth/me`
+- [x] Click "Try it out" poi "Execute"
+- [x] Verifica risposta 200 con dati utente
 
 #### 2.6.2 - Verifica database
-- [ ] Apri **pgAdmin 4**
-- [ ] Naviga a `budget_app_dev` → `Schemas` → `public` → `Tables` → `users`
-- [ ] Click destro → View/Edit Data → All Rows
-- [ ] Dovresti vedere utente creato con:
-  - [ ] email corretta
-  - [ ] password_hash (non password in chiaro!)
-  - [ ] created_at popolato
-  - [ ] is_active = true
+- [x] Apri **pgAdmin 4**
+- [x] Naviga a `budget_app_dev` → `Schemas` → `public` → `Tables` → `users`
+- [x] Click destro → View/Edit Data → All Rows
+- [x] Dovresti vedere utente creato con:
+  - [x] email corretta
+  - [x] password_hash (non password in chiaro!)
+  - [x] created_at popolato
+  - [x] is_active = true
 
 #### 2.6.3 - Test errori
-- [ ] In Swagger, prova a registrare stesso email
-  - [ ] Dovresti ricevere errore 400 "Email already registered"
-- [ ] Prova login con password sbagliata
-  - [ ] Dovresti ricevere errore 401 "Incorrect email or password"
-- [ ] Prova GET /me senza token
-  - [ ] Click "Authorize" → "Logout"
-  - [ ] Prova GET /me
-  - [ ] Dovresti ricevere errore 401
+- [x] In Swagger, prova a registrare stesso email
+  - [x] Dovresti ricevere errore 400 "Email already registered"
+- [x] Prova login con password sbagliata
+  - [x] Dovresti ricevere errore 401 "Incorrect email or password"
+- [x] Prova GET /me senza token
+  - [x] Click "Authorize" → "Logout"
+  - [x] Prova GET /me
+  - [x] Dovresti ricevere errore 401
 
 #### 2.6.4 - Test con curl (opzionale)
-- [ ] Apri nuovo terminal
-- [ ] Test registrazione:
+- [x] Apri nuovo terminal
+- [x] Test registrazione:
 ```bash
 curl -X POST "http://localhost:8000/api/v1/auth/register" \
   -H "Content-Type: application/json" \
   -d '{"email":"curl@test.com","password":"Curl1234","full_name":"Curl Test"}'
 ```
-- [ ] Salva il token dalla risposta
+- [x] Salva il token dalla risposta
 
-- [ ] Test profilo con token:
+- [x] Test profilo con token:
 ```bash
 curl -X GET "http://localhost:8000/api/v1/auth/me" \
   -H "Authorization: Bearer TUO_TOKEN_QUI"
 ```
 
 #### 2.6.5 - Documentazione test
-- [ ] 📝 Crea `docs/TESTING.md`
+- [x] 📝 Crea `docs/TESTING.md`
 
 ```markdown
 # 🧪 Testing Guide
@@ -2469,9 +2469,9 @@ Verranno aggiunti test Pytest nella Fase 4.
 ```
 
 #### 2.6.6 - Commit testing docs
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add testing documentation`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add testing documentation`
+  - [x] Push
 
 ---
 
@@ -2479,19 +2479,19 @@ Verranno aggiunti test Pytest nella Fase 4.
 
 Prima di continuare, verifica:
 
-- [ ] ✅ Security utils (hashing, JWT) funzionanti
-- [ ] ✅ Pydantic schemas User creati e validanti
-- [ ] ✅ Auth dependencies per protezione endpoints
-- [ ] ✅ CRUD operations User implementate
-- [ ] ✅ Router /auth con register, login, me
-- [ ] ✅ FastAPI main app configurata con CORS
-- [ ] ✅ Server avvia senza errori
-- [ ] ✅ Swagger UI accessibile e funzionante
-- [ ] ✅ Test registrazione passato
-- [ ] ✅ Test login passato
-- [ ] ✅ Test profilo autenticato passato
-- [ ] ✅ Utenti salvati correttamente in database
-- [ ] ✅ Tutti i commit pushati su GitHub
+- [x] ✅ Security utils (hashing, JWT) funzionanti
+- [x] ✅ Pydantic schemas User creati e validanti
+- [x] ✅ Auth dependencies per protezione endpoints
+- [x] ✅ CRUD operations User implementate
+- [x] ✅ Router /auth con register, login, me
+- [x] ✅ FastAPI main app configurata con CORS
+- [x] ✅ Server avvia senza errori
+- [x] ✅ Swagger UI accessibile e funzionante
+- [x] ✅ Test registrazione passato
+- [x] ✅ Test login passato
+- [x] ✅ Test profilo autenticato passato
+- [x] ✅ Utenti salvati correttamente in database
+- [x] ✅ Tutti i commit pushati su GitHub
 
 **Test completo workflow:**
 ```

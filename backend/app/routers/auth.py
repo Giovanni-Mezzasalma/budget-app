@@ -1,68 +1,21 @@
 """
-Authentication router with register, login, and user info endpoints.
+Authentication Router
+Endpoints per registrazione, login e gestione profilo
 """
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from app.database import get_db
 from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
 from app.crud.user import get_user_by_email, create_user, authenticate_user, get_user_by_id
-from app.utils.security import create_access_token, decode_access_token
+from app.utils.security import create_access_token
 from app.config import settings
+from app.dependencies import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-# OAuth2 scheme for token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
-
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> UserResponse:
-    """
-    Dependency to get the current authenticated user from JWT token.
-    
-    Args:
-        token: JWT access token
-        db: Database session
-        
-    Returns:
-        Current user object
-        
-    Raises:
-        HTTPException: If token is invalid or user not found
-    """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    # Decode token
-    payload = decode_access_token(token)
-    if payload is None:
-        raise credentials_exception
-    
-    user_id: str = payload.get("sub")
-    if user_id is None:
-        raise credentials_exception
-    
-    # Get user from database
-    user = get_user_by_id(db, user_id)
-    if user is None:
-        raise credentials_exception
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
-        )
-    
-    return user
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -71,18 +24,11 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """
-    Register a new user.
+    Registrazione nuovo utente.
     
-    Args:
-        user_data: User registration data (email, full_name, password)
-        db: Database session
-        
-    Returns:
-        Created user object (without password)
-        
-    Raises:
-        HTTPException 400: If email already exists
-        HTTPException 422: If validation fails
+    - **email**: Email valida (deve essere unica)
+    - **password**: Minimo 8 caratteri, 1 numero, 1 maiuscola
+    - **full_name**: Nome completo
     """
     # Check if user already exists
     existing_user = get_user_by_email(db, user_data.email)
@@ -114,22 +60,14 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """
-    Login with email and password to get JWT access token.
+    Login con email e password per ottenere JWT token.
     
-    This endpoint follows OAuth2 password flow standard.
-    Use 'username' field for email address.
+    Questo endpoint segue lo standard OAuth2 password flow.
+    Usa il campo 'username' per inserire l'email.
     
-    Args:
-        form_data: OAuth2 form with username (email) and password
-        db: Database session
-        
-    Returns:
-        JWT access token and token type
-        
-    Raises:
-        HTTPException 401: If credentials are invalid
+    Dopo il login, il token verrà automaticamente usato per le richieste successive.
     """
-    # Authenticate user (form_data.username is the email)
+    # Authenticate user (form_data.username contiene l'email)
     user = authenticate_user(db, form_data.username, form_data.password)
     
     if not user:
@@ -142,7 +80,7 @@ async def login(
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": str(user.id)},
         expires_delta=access_token_expires
     )
     
@@ -158,19 +96,9 @@ async def login_json(
     db: Session = Depends(get_db)
 ):
     """
-    Login with JSON payload (alternative to OAuth2 form).
+    Login con JSON body (alternativa a OAuth2 form).
     
-    Use this endpoint if you prefer JSON request body instead of form data.
-    
-    Args:
-        user_data: Login credentials (email, password)
-        db: Database session
-        
-    Returns:
-        JWT access token and token type
-        
-    Raises:
-        HTTPException 401: If credentials are invalid
+    Usa questo endpoint se preferisci inviare JSON invece di form data.
     """
     # Authenticate user
     user = authenticate_user(db, user_data.email, user_data.password)
@@ -185,7 +113,7 @@ async def login_json(
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": str(user.id)},
         expires_delta=access_token_expires
     )
     
@@ -197,18 +125,11 @@ async def login_json(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Get current authenticated user information.
+    Recupera informazioni utente autenticato corrente.
     
-    Requires valid JWT token in Authorization header:
-    Authorization: Bearer <token>
-    
-    Args:
-        current_user: Current authenticated user (from token)
-        
-    Returns:
-        Current user object (without password)
+    Richiede JWT token valido (usa il pulsante Authorize).
     """
     return current_user

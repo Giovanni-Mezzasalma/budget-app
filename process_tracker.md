@@ -176,23 +176,23 @@
 - [x] Commit main app
 
 ### 2.6 - Testing Authentication
-- [ ] Test registrazione in Swagger: SUCCESS
-- [ ] Test login in Swagger: SUCCESS
-- [ ] Test GET /me con token: SUCCESS
-- [ ] Utente visibile in pgAdmin
-- [ ] Password hashata (non in chiaro)
-- [ ] Test email duplicata: ERROR 400 ✓
-- [ ] Test password sbagliata: ERROR 401 ✓
-- [ ] Test /me senza token: ERROR 401 ✓
-- [ ] `docs/TESTING.md` creato
-- [ ] Commit testing docs
+- [x] Test registrazione in Swagger: SUCCESS
+- [x] Test login in Swagger: SUCCESS
+- [x] Test GET /me con token: SUCCESS
+- [x] Utente visibile in pgAdmin
+- [x] Password hashata (non in chiaro)
+- [x] Test email duplicata: ERROR 400 ✓
+- [x] Test password sbagliata: ERROR 401 ✓
+- [x] Test /me senza token: ERROR 401 ✓
+- [x] `docs/TESTING.md` creato
+- [x] Commit testing docs
 
 **CHECKPOINT FASE 2:**
-- [ ] ✅ Auth completa funzionante
-- [ ] ✅ JWT tokens generati correttamente
-- [ ] ✅ Swagger UI testato
-- [ ] ✅ Tutti gli error cases coperti
-- [ ] ✅ Ready per FASE 3
+- [x] ✅ Auth completa funzionante
+- [x] ✅ JWT tokens generati correttamente
+- [x] ✅ Swagger UI testato
+- [x] ✅ Tutti gli error cases coperti
+- [x] ✅ Ready per FASE 3
 
 ---
 
