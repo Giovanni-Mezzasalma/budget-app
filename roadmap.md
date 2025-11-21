@@ -2306,7 +2306,7 @@ if __name__ == "__main__":
 ```bash
 python run.py
 ```
-- [ ] Dovresti vedere output tipo:
+- [x] Dovresti vedere output tipo:
 ```
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     Started reloader process

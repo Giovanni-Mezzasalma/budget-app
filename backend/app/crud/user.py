@@ -63,7 +63,7 @@ def create_user(db: Session, user: UserCreate) -> User:
     db_user = User(
         email=user.email,
         full_name=user.full_name,
-        hashed_password=hashed_password,
+        password_hash=hashed_password,
         is_active=True
     )
     
@@ -98,7 +98,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
         return None
     
     # Verify password
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.password_hash):
         return None
     
     return user
