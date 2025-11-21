@@ -198,22 +198,22 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
+**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso
 
 ### 3.1 - Accounts CRUD & Router
-- [ ] `backend/app/schemas/account.py` completato
-- [ ] `backend/app/crud/account.py` creato
-- [ ] Tutte le funzioni CRUD implementate
-- [ ] `update_account_balance()` implementata
-- [ ] `backend/app/routers/accounts.py` creato
-- [ ] Tutti gli endpoints implementati
-- [ ] Router registrato in `main.py`
-- [ ] Test POST /accounts: SUCCESS
-- [ ] Test GET /accounts: SUCCESS
-- [ ] Test PUT /accounts/{id}: SUCCESS
-- [ ] Test DELETE /accounts/{id}: SUCCESS
-- [ ] Dati verificati in pgAdmin
-- [ ] Commit accounts
+- [x] `backend/app/schemas/account.py` completato
+- [x] `backend/app/crud/account.py` creato
+- [x] Tutte le funzioni CRUD implementate
+- [x] `update_account_balance()` implementata
+- [x] `backend/app/routers/accounts.py` creato
+- [x] Tutti gli endpoints implementati
+- [x] Router registrato in `main.py`
+- [x] Test POST /accounts: SUCCESS
+- [x] Test GET /accounts: SUCCESS
+- [x] Test PUT /accounts/{id}: SUCCESS
+- [x] Test DELETE /accounts/{id}: SUCCESS
+- [x] Dati verificati in pgAdmin
+- [x] Commit accounts
 
 ### 3.2 - Categories CRUD & Router
 - [ ] `backend/app/schemas/category.py` completato

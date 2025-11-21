@@ -2516,12 +2516,12 @@ Implementare tutti gli endpoints CRUD per Accounts, Categories, Transactions, Tr
 ### 3.1 - Accounts CRUD & Router
 
 #### 3.1.1 - Completare Account schemas
-- [ ] 📝 Apri `backend/app/schemas/account.py`
-- [ ] Aggiungi schemas mancanti se necessario
-- [ ] Assicurati ci siano: `AccountCreate`, `AccountUpdate`, `AccountResponse`
+- [x] 📝 Apri `backend/app/schemas/account.py`
+- [x] Aggiungi schemas mancanti se necessario
+- [x] Assicurati ci siano: `AccountCreate`, `AccountUpdate`, `AccountResponse`
 
 #### 3.1.2 - Account CRUD operations
-- [ ] 📝 Crea `backend/app/crud/account.py`
+- [x] 📝 Crea `backend/app/crud/account.py`
 
 ```python
 """
@@ -2618,7 +2618,7 @@ def update_account_balance(
 ```
 
 #### 3.1.3 - Account router
-- [ ] 📝 Crea `backend/app/routers/accounts.py`
+- [x] 📝 Crea `backend/app/routers/accounts.py`
 
 ```python
 """
@@ -2704,31 +2704,31 @@ async def delete_account(
 ```
 
 #### 3.1.4 - Registra router in main
-- [ ] 📝 Apri `backend/main.py`
-- [ ] Aggiungi import:
+- [x] 📝 Apri `backend/main.py`
+- [x] Aggiungi import:
 ```python
 from app.routers import auth, accounts
 ```
-- [ ] Aggiungi router:
+- [x] Aggiungi router:
 ```python
 app.include_router(accounts.router, prefix="/api/v1")
 ```
 
 #### 3.1.5 - Test Accounts
-- [ ] Avvia server: `python run.py`
-- [ ] Apri Swagger: http://localhost:8000/docs
-- [ ] Autorizza con token utente
-- [ ] Test POST /accounts (crea account)
-- [ ] Test GET /accounts (lista)
-- [ ] Test GET /accounts/{id} (dettaglio)
-- [ ] Test PUT /accounts/{id} (modifica)
-- [ ] Test DELETE /accounts/{id} (elimina)
-- [ ] Verifica in pgAdmin che dati siano salvati
+- [x] Avvia server: `python run.py`
+- [x] Apri Swagger: http://localhost:8000/docs
+- [x] Autorizza con token utente
+- [x] Test POST /accounts (crea account)
+- [x] Test GET /accounts (lista)
+- [x] Test GET /accounts/{id} (dettaglio)
+- [x] Test PUT /accounts/{id} (modifica)
+- [x] Test DELETE /accounts/{id} (elimina)
+- [x] Verifica in pgAdmin che dati siano salvati
 
 #### 3.1.6 - Commit accounts
-- [ ] In **GitHub Desktop**:
-  - [ ] Commit: `Add accounts CRUD and router`
-  - [ ] Push
+- [x] In **GitHub Desktop**:
+  - [x] Commit: `Add accounts CRUD and router`
+  - [x] Push
 
 ---
 
