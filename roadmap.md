@@ -2808,8 +2808,8 @@ def create_transaction(db, transaction, user_id):
 ### 3.4 - Transfers CRUD & Router
 
 #### 3.4.1 - Transfer CRUD
-- [ ] 📝 Crea `backend/app/crud/transfer.py`
-- [ ] **IMPORTANTE:** In `create_transfer`, aggiorna balance di entrambi gli account:
+- [x] 📝 Crea `backend/app/crud/transfer.py`
+- [x] **IMPORTANTE:** In `create_transfer`, aggiorna balance di entrambi gli account:
 ```python
 def create_transfer(db, transfer, user_id):
     # Crea transfer
@@ -2827,15 +2827,15 @@ def create_transfer(db, transfer, user_id):
 ```
 
 #### 3.4.2 - Transfer router
-- [ ] 📝 Crea `backend/app/routers/transfers.py`
+- [x] 📝 Crea `backend/app/routers/transfers.py`
 
 #### 3.4.3 - Test
-- [ ] Crea 2 account
-- [ ] Crea transfer tra loro
-- [ ] Verifica che balance di entrambi si aggiorni
+- [x] Crea 2 account
+- [x] Crea transfer tra loro
+- [x] Verifica che balance di entrambi si aggiorni
 
 #### 3.4.4 - Commit
-- [ ] Commit: `Add transfers CRUD and router`
+- [x] Commit: `Add transfers CRUD and router`
 
 ---
 

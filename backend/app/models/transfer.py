@@ -50,6 +50,13 @@ class Transfer(Base):
         index=True
     )
     
+    # Transfer Type
+    type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="generic"
+    )  # generic, withdrawal, deposit, savings, investment, loan_given, loan_received
+    
     # Transfer Information
     amount: Mapped[Decimal] = mapped_column(
         Numeric(15, 2),
@@ -106,10 +113,11 @@ class Transfer(Base):
         Index('ix_transfers_from_account', 'from_account_id'),
         Index('ix_transfers_to_account', 'to_account_id'),
         Index('ix_transfers_accounts', 'from_account_id', 'to_account_id'),
+        Index('ix_transfers_user_type', 'user_id', 'type'),
     )
     
     def __repr__(self) -> str:
-        return f"<Transfer(id={self.id}, amount={self.amount}, date={self.date})>"
+        return f"<Transfer(id={self.id}, type={self.type}, amount={self.amount}, date={self.date})>"
     
     @property
     def converted_amount(self) -> Decimal:

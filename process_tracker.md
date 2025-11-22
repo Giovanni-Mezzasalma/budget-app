@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (70% completato)
+**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (80% completato)
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -237,14 +237,14 @@
 - [x] Commit transactions
 
 ### 3.4 - Transfers CRUD & Router
-- [ ] `backend/app/schemas/transfer.py` completato
-- [ ] `backend/app/crud/transfer.py` creato
-- [ ] `create_transfer()` con update 2 balance
-- [ ] `backend/app/routers/transfers.py` creato
-- [ ] Router registrato in `main.py`
-- [ ] Test transfer: SUCCESS
-- [ ] Entrambi i balance aggiornati: VERIFIED ✓
-- [ ] Commit transfers
+- [x] `backend/app/schemas/transfer.py` completato
+- [x] `backend/app/crud/transfer.py` creato
+- [x] `create_transfer()` con update 2 balance
+- [x] `backend/app/routers/transfers.py` creato
+- [x] Router registrato in `main.py`
+- [x] Test transfer: SUCCESS
+- [x] Entrambi i balance aggiornati: VERIFIED ✓
+- [x] Commit transfers
 
 ### 3.5 - Custom Charts (opzionale)
 - [ ] Deciso: [ ] Implementare ora [ ] Rimandare a Sviluppi Futuri

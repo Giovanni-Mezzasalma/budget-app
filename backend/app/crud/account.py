@@ -250,3 +250,112 @@ def get_total_balance(db: Session, user_id: str) -> Decimal:
         total += account.initial_balance  # In futuro: account.current_balance
     
     return total
+
+def get_accounts_summary(db: Session, user_id: str) -> dict:
+    """
+    Calcola il riepilogo dei conti dell'utente.
+    
+    Separa:
+    - Patrimonio liquido (checking, savings, cash)
+    - Investimenti (investment)
+    - Crediti/Prestiti (loan) - soldi che ti devono
+    - Debiti (credit_card con balance negativo)
+    - Altri (other)
+    
+    Returns:
+        Dict con totali per categoria e totale patrimonio netto
+    """
+    from decimal import Decimal
+    
+    accounts = get_accounts(db, user_id, is_active=True, limit=500)
+    
+    # Categorie di account
+    liquid_types = ['checking', 'savings', 'cash']
+    investment_types = ['investment']
+    loan_types = ['loan']  # Crediti verso terzi
+    debt_types = ['credit_card']
+    
+    # Calcola totali per categoria
+    total_liquid = Decimal("0.00")
+    total_investments = Decimal("0.00")
+    total_loans = Decimal("0.00")  # Crediti (soldi che ti devono)
+    total_debts = Decimal("0.00")  # Debiti (soldi che devi)
+    total_other = Decimal("0.00")
+    
+    accounts_by_type = {
+        "liquid": [],
+        "investments": [],
+        "loans": [],
+        "debts": [],
+        "other": []
+    }
+    
+    for account in accounts:
+        balance = account.initial_balance
+        
+        if account.type in liquid_types:
+            total_liquid += balance
+            accounts_by_type["liquid"].append(account)
+        elif account.type in investment_types:
+            total_investments += balance
+            accounts_by_type["investments"].append(account)
+        elif account.type in loan_types:
+            total_loans += balance
+            accounts_by_type["loans"].append(account)
+        elif account.type in debt_types:
+            # Per carte di credito, balance negativo = debito
+            if balance < 0:
+                total_debts += abs(balance)
+            else:
+                total_liquid += balance  # Se positivo, è liquidità
+            accounts_by_type["debts"].append(account)
+        else:
+            total_other += balance
+            accounts_by_type["other"].append(account)
+    
+    # Patrimonio netto = liquido + investimenti - debiti
+    # I prestiti (crediti) sono a parte perché sono soldi "bloccati"
+    net_worth = total_liquid + total_investments - total_debts
+    
+    # Patrimonio totale inclusi crediti
+    total_assets = net_worth + total_loans
+    
+    return {
+        "total_liquid": total_liquid,
+        "total_investments": total_investments,
+        "total_loans": total_loans,  # Crediti verso terzi
+        "total_debts": total_debts,
+        "total_other": total_other,
+        "net_worth": net_worth,  # Patrimonio netto (esclusi crediti)
+        "total_assets": total_assets,  # Totale inclusi crediti
+        "accounts_count": len(accounts),
+        "by_category": {
+            "liquid": {
+                "total": total_liquid,
+                "count": len(accounts_by_type["liquid"]),
+                "types": liquid_types
+            },
+            "investments": {
+                "total": total_investments,
+                "count": len(accounts_by_type["investments"]),
+                "types": investment_types
+            },
+            "loans": {
+                "total": total_loans,
+                "count": len(accounts_by_type["loans"]),
+                "types": loan_types,
+                "description": "Crediti verso terzi (soldi che ti devono)"
+            },
+            "debts": {
+                "total": total_debts,
+                "count": len(accounts_by_type["debts"]),
+                "types": debt_types,
+                "description": "Debiti (soldi che devi)"
+            },
+            "other": {
+                "total": total_other,
+                "count": len(accounts_by_type["other"]),
+                "types": ["other"]
+            }
+        }
+    }

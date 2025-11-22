@@ -63,6 +63,90 @@ async def create_account(
         user_id=str(current_user.id)
     )
 
+@router.get("/summary")
+async def get_accounts_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Restituisce il riepilogo finanziario dell'utente.
+    
+    **Categorie:**
+    - **Liquidità** (checking, savings, cash): Soldi disponibili
+    - **Investimenti** (investment): Capitale investito
+    - **Crediti/Prestiti** (loan): Soldi che ti devono (prestiti dati)
+    - **Debiti** (credit_card negativo): Soldi che devi
+    
+    **Calcoli:**
+    - **net_worth**: Patrimonio netto = Liquidità + Investimenti - Debiti
+    - **total_assets**: Totale attività = net_worth + Crediti
+    
+    ⚠️ I prestiti (crediti verso terzi) sono separati dal patrimonio netto
+    perché sono soldi "bloccati" fino alla restituzione.
+    """
+    summary = account_crud.get_accounts_summary(db, user_id=str(current_user.id))
+    
+    # Converti Decimal a float per JSON
+    return {
+        "total_liquid": float(summary["total_liquid"]),
+        "total_investments": float(summary["total_investments"]),
+        "total_loans": float(summary["total_loans"]),
+        "total_debts": float(summary["total_debts"]),
+        "total_other": float(summary["total_other"]),
+        "net_worth": float(summary["net_worth"]),
+        "total_assets": float(summary["total_assets"]),
+        "accounts_count": summary["accounts_count"],
+        "by_category": {
+            "liquid": {
+                "total": float(summary["by_category"]["liquid"]["total"]),
+                "count": summary["by_category"]["liquid"]["count"],
+                "types": summary["by_category"]["liquid"]["types"],
+                "description": "Liquidità disponibile"
+            },
+            "investments": {
+                "total": float(summary["by_category"]["investments"]["total"]),
+                "count": summary["by_category"]["investments"]["count"],
+                "types": summary["by_category"]["investments"]["types"],
+                "description": "Capitale investito"
+            },
+            "loans": {
+                "total": float(summary["by_category"]["loans"]["total"]),
+                "count": summary["by_category"]["loans"]["count"],
+                "types": summary["by_category"]["loans"]["types"],
+                "description": "Crediti verso terzi (soldi che ti devono)"
+            },
+            "debts": {
+                "total": float(summary["by_category"]["debts"]["total"]),
+                "count": summary["by_category"]["debts"]["count"],
+                "types": summary["by_category"]["debts"]["types"],
+                "description": "Debiti (soldi che devi)"
+            },
+            "other": {
+                "total": float(summary["by_category"]["other"]["total"]),
+                "count": summary["by_category"]["other"]["count"],
+                "types": summary["by_category"]["other"]["types"],
+                "description": "Altri conti"
+            }
+        }
+    }
+
+
+@router.get("/types")
+async def get_account_types():
+    """
+    Restituisce tutti i tipi di account disponibili.
+    
+    Utile per popolare dropdown nel frontend.
+    """
+    return [
+        {"value": "checking", "label": "Conto Corrente", "category": "liquid"},
+        {"value": "savings", "label": "Conto Risparmio", "category": "liquid"},
+        {"value": "cash", "label": "Contanti", "category": "liquid"},
+        {"value": "credit_card", "label": "Carta di Credito", "category": "debt"},
+        {"value": "investment", "label": "Investimenti", "category": "investment"},
+        {"value": "loan", "label": "Prestiti a Terzi", "category": "loan"},
+        {"value": "other", "label": "Altro", "category": "other"},
+    ]
 
 @router.get("/{account_id}", response_model=AccountResponse)
 async def get_account(

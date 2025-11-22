@@ -39,7 +39,7 @@ class Account(Base):
     
     # Account Information
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)  # checking, savings, credit_card, cash, investment, other
+    type: Mapped[str] = mapped_column(String(50), nullable=False)  # checking, savings, credit_card, cash, investment, loan, other
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")  # ISO 4217
     initial_balance: Mapped[Decimal] = mapped_column(
         Numeric(15, 2),

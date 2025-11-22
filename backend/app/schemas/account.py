@@ -22,7 +22,7 @@ class AccountBase(BaseModel):
     @classmethod
     def validate_account_type(cls, v: str) -> str:
         """Validate account type."""
-        allowed_types = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'other']
+        allowed_types = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'loan', 'other']
         if v.lower() not in allowed_types:
             raise ValueError(f'Account type must be one of: {", ".join(allowed_types)}')
         return v.lower()
@@ -81,7 +81,7 @@ class AccountUpdate(BaseModel):
         """Validate account type if provided."""
         if v is None:
             return v
-        allowed_types = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'other']
+        allowed_types = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'loan', 'other']
         if v.lower() not in allowed_types:
             raise ValueError(f'Account type must be one of: {", ".join(allowed_types)}')
         return v.lower()
