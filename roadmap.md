@@ -2762,13 +2762,13 @@ app.include_router(accounts.router, prefix="/api/v1")
 ### 3.3 - Transactions CRUD & Router
 
 #### 3.3.1 - Completare Transaction schemas
-- [ ] 📝 Completa `backend/app/schemas/transaction.py`
-- [ ] Include tutti i campi: amount, type, date, description, notes, tags
+- [x] 📝 Completa `backend/app/schemas/transaction.py`
+- [x] Include tutti i campi: amount, type, date, description, notes, tags
 
 #### 3.3.2 - Transaction CRUD
-- [ ] 📝 Crea `backend/app/crud/transaction.py`
-- [ ] Implementa CRUD base
-- [ ] **IMPORTANTE:** In `create_transaction`, aggiorna anche balance dell'account:
+- [x] 📝 Crea `backend/app/crud/transaction.py`
+- [x] Implementa CRUD base
+- [x] **IMPORTANTE:** In `create_transaction`, aggiorna anche balance dell'account:
 ```python
 def create_transaction(db, transaction, user_id):
     # Crea transaction
@@ -2786,8 +2786,8 @@ def create_transaction(db, transaction, user_id):
 ```
 
 #### 3.3.3 - Transaction router
-- [ ] 📝 Crea `backend/app/routers/transactions.py`
-- [ ] Implementa endpoints con query parameters per filtri:
+- [x] 📝 Crea `backend/app/routers/transactions.py`
+- [x] Implementa endpoints con query parameters per filtri:
   - `account_id` (opzionale)
   - `category_id` (opzionale)
   - `start_date` (opzionale)
@@ -2795,13 +2795,13 @@ def create_transaction(db, transaction, user_id):
   - `type` (income/expense, opzionale)
 
 #### 3.3.4 - Registra e testa
-- [ ] Registra router in main
-- [ ] Test creazione transaction
-- [ ] **Verifica in pgAdmin che balance account si aggiorni automaticamente**
-- [ ] Test filtri
+- [x] Registra router in main
+- [x] Test creazione transaction
+- [x] **Verifica in pgAdmin che balance account si aggiorni automaticamente**
+- [x] Test filtri
 
 #### 3.3.5 - Commit
-- [ ] Commit: `Add transactions CRUD and router`
+- [X] Commit: `Add transactions CRUD and router`
 
 ---
 

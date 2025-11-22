@@ -1,11 +1,20 @@
 """
 Transaction-related Pydantic schemas for request/response validation.
+
+Tipi di transazione (derivano dalla categoria):
+- income: Entrate
+- expense_necessity: Spese di Necessità
+- expense_extra: Spese Extra
 """
 
-from datetime import datetime, date
+from datetime import datetime, date as date_type
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
+
+
+# Tipi validi per le transazioni (stessi delle categorie)
+VALID_TRANSACTION_TYPES = ["income", "expense_necessity", "expense_extra"]
 
 
 class TransactionBase(BaseModel):
@@ -13,22 +22,10 @@ class TransactionBase(BaseModel):
     account_id: str = Field(..., description="Account ID for this transaction")
     category_id: str = Field(..., description="Category ID for this transaction")
     amount: Decimal = Field(..., gt=0, description="Transaction amount (always positive)")
-    type: str = Field(..., description="Transaction type: income or expense")
-    date: date = Field(..., description="Transaction date")
+    date: date_type = Field(..., description="Transaction date")
     description: Optional[str] = Field(None, max_length=500, description="Transaction description")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
-    is_recurring: bool = Field(default=False, description="Whether this is a recurring transaction")
-    recurring_frequency: Optional[str] = Field(None, description="Frequency: daily, weekly, monthly, yearly")
-    tags: Optional[list[str]] = Field(default=None, description="Transaction tags for filtering")
-    
-    @field_validator('type')
-    @classmethod
-    def validate_transaction_type(cls, v: str) -> str:
-        """Validate transaction type."""
-        allowed_types = ['income', 'expense']
-        if v.lower() not in allowed_types:
-            raise ValueError(f'Transaction type must be one of: {", ".join(allowed_types)}')
-        return v.lower()
+    tags: Optional[List[str]] = Field(default=None, description="Transaction tags for filtering")
     
     @field_validator('amount')
     @classmethod
@@ -36,24 +33,7 @@ class TransactionBase(BaseModel):
         """Validate amount has max 2 decimal places and is positive."""
         if v <= 0:
             raise ValueError('Amount must be positive')
-        if v.as_tuple().exponent < -2:
-            raise ValueError('Amount cannot have more than 2 decimal places')
-        return v.quantize(Decimal('0.01'))
-    
-    @field_validator('recurring_frequency')
-    @classmethod
-    def validate_recurring_frequency(cls, v: Optional[str], info) -> Optional[str]:
-        """Validate recurring frequency if transaction is recurring."""
-        # Access is_recurring from the values dictionary
-        if info.data.get('is_recurring') and v is None:
-            raise ValueError('Recurring frequency is required for recurring transactions')
-        
-        if v is not None:
-            allowed_frequencies = ['daily', 'weekly', 'monthly', 'yearly']
-            if v.lower() not in allowed_frequencies:
-                raise ValueError(f'Recurring frequency must be one of: {", ".join(allowed_frequencies)}')
-            return v.lower()
-        return v
+        return round(v, 2)
     
     @field_validator('description')
     @classmethod
@@ -65,11 +45,10 @@ class TransactionBase(BaseModel):
     
     @field_validator('tags')
     @classmethod
-    def validate_tags(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
         """Validate and clean tags."""
         if v is None:
             return v
-        # Remove empty strings and duplicates
         cleaned_tags = list(set(tag.strip().lower() for tag in v if tag.strip()))
         return cleaned_tags if cleaned_tags else None
 
@@ -84,24 +63,10 @@ class TransactionUpdate(BaseModel):
     account_id: Optional[str] = Field(None, description="Account ID")
     category_id: Optional[str] = Field(None, description="Category ID")
     amount: Optional[Decimal] = Field(None, gt=0, description="Transaction amount")
-    type: Optional[str] = Field(None, description="Transaction type: income or expense")
-    date: Optional[date] = Field(None, description="Transaction date")
+    date: Optional[date_type] = Field(None, description="Transaction date")
     description: Optional[str] = Field(None, max_length=500, description="Transaction description")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
-    is_recurring: Optional[bool] = Field(None, description="Whether this is recurring")
-    recurring_frequency: Optional[str] = Field(None, description="Frequency")
-    tags: Optional[list[str]] = Field(None, description="Transaction tags")
-    
-    @field_validator('type')
-    @classmethod
-    def validate_transaction_type(cls, v: Optional[str]) -> Optional[str]:
-        """Validate transaction type if provided."""
-        if v is None:
-            return v
-        allowed_types = ['income', 'expense']
-        if v.lower() not in allowed_types:
-            raise ValueError(f'Transaction type must be one of: {", ".join(allowed_types)}')
-        return v.lower()
+    tags: Optional[List[str]] = Field(None, description="Transaction tags")
     
     @field_validator('amount')
     @classmethod
@@ -111,20 +76,7 @@ class TransactionUpdate(BaseModel):
             return v
         if v <= 0:
             raise ValueError('Amount must be positive')
-        if v.as_tuple().exponent < -2:
-            raise ValueError('Amount cannot have more than 2 decimal places')
-        return v.quantize(Decimal('0.01'))
-    
-    @field_validator('recurring_frequency')
-    @classmethod
-    def validate_recurring_frequency(cls, v: Optional[str]) -> Optional[str]:
-        """Validate recurring frequency if provided."""
-        if v is not None:
-            allowed_frequencies = ['daily', 'weekly', 'monthly', 'yearly']
-            if v.lower() not in allowed_frequencies:
-                raise ValueError(f'Recurring frequency must be one of: {", ".join(allowed_frequencies)}')
-            return v.lower()
-        return v
+        return round(v, 2)
     
     @field_validator('description')
     @classmethod
@@ -136,7 +88,7 @@ class TransactionUpdate(BaseModel):
     
     @field_validator('tags')
     @classmethod
-    def validate_tags(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
         """Validate and clean tags if provided."""
         if v is None:
             return v
@@ -144,11 +96,21 @@ class TransactionUpdate(BaseModel):
         return cleaned_tags if cleaned_tags else None
 
 
-class TransactionResponse(TransactionBase):
+class TransactionResponse(BaseModel):
     """Schema for transaction response."""
     id: str = Field(..., description="Transaction unique identifier")
     user_id: str = Field(..., description="Owner user ID")
-    created_at: datetime = Field(..., description="Transaction creation timestamp")
+    account_id: str = Field(..., description="Account ID")
+    category_id: str = Field(..., description="Category ID")
+    amount: Decimal = Field(..., description="Transaction amount")
+    type: str = Field(..., description="Transaction type (from category)")
+    date: date_type = Field(..., description="Transaction date")
+    description: Optional[str] = Field(None, description="Transaction description")
+    notes: Optional[str] = Field(None, description="Additional notes")
+    tags: Optional[List[str]] = Field(None, description="Transaction tags")
+    is_recurring: bool = Field(default=False, description="Is recurring transaction")
+    recurring_frequency: Optional[str] = Field(None, description="Recurring frequency")
+    created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     
     class Config:
@@ -158,6 +120,31 @@ class TransactionResponse(TransactionBase):
 class TransactionWithDetails(TransactionResponse):
     """Schema for transaction response with related details."""
     account_name: Optional[str] = Field(None, description="Account name")
+    account_color: Optional[str] = Field(None, description="Account color")
     category_name: Optional[str] = Field(None, description="Category name")
+    category_full_name: Optional[str] = Field(None, description="Full category name (with parent)")
     category_color: Optional[str] = Field(None, description="Category color")
     category_icon: Optional[str] = Field(None, description="Category icon")
+
+
+class TransactionSummary(BaseModel):
+    """Schema for transaction summary/statistics."""
+    total_income: Decimal = Field(default=Decimal("0.00"), description="Total income")
+    total_expense_necessity: Decimal = Field(default=Decimal("0.00"), description="Total necessity expenses")
+    total_expense_extra: Decimal = Field(default=Decimal("0.00"), description="Total extra expenses")
+    total_expenses: Decimal = Field(default=Decimal("0.00"), description="Total all expenses")
+    net: Decimal = Field(default=Decimal("0.00"), description="Net (income - expenses)")
+    transaction_count: int = Field(default=0, description="Number of transactions")
+
+
+class TransactionFilters(BaseModel):
+    """Schema for transaction filter parameters."""
+    account_id: Optional[str] = None
+    category_id: Optional[str] = None
+    type: Optional[str] = None
+    start_date: Optional[date_type] = None
+    end_date: Optional[date_type] = None
+    min_amount: Optional[Decimal] = None
+    max_amount: Optional[Decimal] = None
+    tags: Optional[List[str]] = None
+    search: Optional[str] = None

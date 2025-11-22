@@ -37,6 +37,18 @@ from app.crud.category import (
     get_category_statistics,
 )
 
+from app.crud.transaction import (
+    get_transactions,
+    get_transaction,
+    get_transaction_by_id,
+    create_transaction,
+    update_transaction,
+    delete_transaction,
+    get_transaction_summary,
+    get_transactions_by_category,
+    get_monthly_totals,
+)
+
 __all__ = [
     # User CRUD
     "get_user_by_email",
@@ -67,4 +79,14 @@ __all__ = [
     "deactivate_category",
     "seed_default_categories",
     "get_category_statistics",
+    # Transaction CRUD
+    "get_transactions",
+    "get_transaction",
+    "get_transaction_by_id",
+    "create_transaction",
+    "update_transaction",
+    "delete_transaction",
+    "get_transaction_summary",
+    "get_transactions_by_category",
+    "get_monthly_totals",
 ]
