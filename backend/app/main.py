@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import engine, Base
 from app.routers.auth import router as auth_router
 from app.routers.accounts import router as accounts_router
-
+from app.routers.categories import router as categories_router  # AGGIUNGI QUESTA
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -69,7 +69,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(accounts_router, prefix=settings.API_V1_PREFIX)
-
+app.include_router(categories_router, prefix=settings.API_V1_PREFIX)
 
 # Health check endpoints
 @app.get("/", tags=["Health"])

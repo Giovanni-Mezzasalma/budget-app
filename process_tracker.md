@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso
+**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (40% completato)
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -216,13 +216,13 @@
 - [x] Commit accounts
 
 ### 3.2 - Categories CRUD & Router
-- [ ] `backend/app/schemas/category.py` completato
-- [ ] `backend/app/crud/category.py` creato
-- [ ] `seed_default_categories()` implementata
-- [ ] `backend/app/routers/categories.py` creato
-- [ ] Router registrato in `main.py`
-- [ ] Test tutti gli endpoints: SUCCESS
-- [ ] Commit categories
+- [x] `backend/app/schemas/category.py` completato
+- [x] `backend/app/crud/category.py` creato
+- [x] `seed_default_categories()` implementata
+- [x] `backend/app/routers/categories.py` creato
+- [x] Router registrato in `main.py`
+- [x] Test tutti gli endpoints: SUCCESS
+- [x] Commit categories
 
 ### 3.3 - Transactions CRUD & Router
 - [ ] `backend/app/schemas/transaction.py` completato

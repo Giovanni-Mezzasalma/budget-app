@@ -2737,25 +2737,25 @@ app.include_router(accounts.router, prefix="/api/v1")
 💡 **Nota:** Implementazione molto simile ad Accounts. Segui stesso pattern.
 
 #### 3.2.1 - Completare Category schemas
-- [ ] 📝 Completa `backend/app/schemas/category.py` con tutti i campi necessari
+- [x] 📝 Completa `backend/app/schemas/category.py` con tutti i campi necessari
 
 #### 3.2.2 - Category CRUD
-- [ ] 📝 Crea `backend/app/crud/category.py`
-- [ ] Implementa: `get_categories`, `create_category`, `update_category`, `delete_category`
-- [ ] Aggiungi funzione `seed_default_categories(db, user_id)` che chiama funzione SQL
+- [x] 📝 Crea `backend/app/crud/category.py`
+- [x] Implementa: `get_categories`, `create_category`, `update_category`, `delete_category`
+- [x] Aggiungi funzione `seed_default_categories(db, user_id)` che chiama funzione SQL
 
 #### 3.2.3 - Category router
-- [ ] 📝 Crea `backend/app/routers/categories.py`
-- [ ] Implementa endpoints GET, POST, PUT, DELETE
+- [x] 📝 Crea `backend/app/routers/categories.py`
+- [x] Implementa endpoints GET, POST, PUT, DELETE
 
 #### 3.2.4 - Registra router
-- [ ] Aggiungi in `main.py`
+- [x] Aggiungi in `main.py`
 
 #### 3.2.5 - Test
-- [ ] Test tutti gli endpoints in Swagger
+- [x] Test tutti gli endpoints in Swagger
 
 #### 3.2.6 - Commit
-- [ ] Commit: `Add categories CRUD and router`
+- [x] Commit: `Add categories CRUD and router`
 
 ---
 

@@ -24,6 +24,19 @@ from app.crud.account import (
     get_total_balance,
 )
 
+from app.crud.category import (
+    get_categories,
+    get_categories_tree,
+    get_category,
+    get_category_by_id,
+    create_category,
+    update_category,
+    delete_category,
+    deactivate_category,
+    seed_default_categories,
+    get_category_statistics,
+)
+
 __all__ = [
     # User CRUD
     "get_user_by_email",
@@ -43,4 +56,15 @@ __all__ = [
     "deactivate_account",
     "update_account_balance",
     "get_total_balance",
+    # Category CRUD
+    "get_categories",
+    "get_categories_tree",
+    "get_category",
+    "get_category_by_id",
+    "create_category",
+    "update_category",
+    "delete_category",
+    "deactivate_category",
+    "seed_default_categories",
+    "get_category_statistics",
 ]
