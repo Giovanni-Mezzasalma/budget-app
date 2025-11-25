@@ -1,0 +1,49 @@
+"""
+Custom Chart Schemas
+Validazione dati grafici personalizzati
+"""
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
+from datetime import datetime
+import uuid
+from enum import Enum
+
+
+class ChartType(str, Enum):
+    """Tipi di grafici disponibili"""
+    LINE = "line"
+    BAR = "bar"
+    PIE = "pie"
+    AREA = "area"
+
+
+class CustomChartBase(BaseModel):
+    """Schema base custom chart"""
+    name: str = Field(..., min_length=1, max_length=100, description="Nome del grafico")
+    chart_type: ChartType = Field(..., description="Tipo di grafico")
+    config: Dict[str, Any] = Field(..., description="Configurazione grafico (JSON)")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Filtri applicati (JSON)")
+
+
+class CustomChartCreate(CustomChartBase):
+    """Schema creazione custom chart"""
+    pass
+
+
+class CustomChartUpdate(BaseModel):
+    """Schema aggiornamento custom chart"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    chart_type: Optional[ChartType] = None
+    config: Optional[Dict[str, Any]] = None
+    filters: Optional[Dict[str, Any]] = None
+
+
+class CustomChartResponse(CustomChartBase):
+    """Schema risposta custom chart"""
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True

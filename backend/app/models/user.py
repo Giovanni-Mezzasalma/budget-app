@@ -72,6 +72,13 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin"
     )
+
+    custom_charts: Mapped[List["CustomChart"]] = relationship(
+        "CustomChart",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
     
     # Indexes
     __table_args__ = (

@@ -62,6 +62,14 @@ from app.crud.transfer import (
     get_transfer_statistics,
 )
 
+from app.crud.custom_chart import (
+    get_custom_charts,
+    get_custom_chart,
+    create_custom_chart,
+    update_custom_chart,
+    delete_custom_chart,
+)
+
 __all__ = [
     # User CRUD
     "get_user_by_email",
@@ -113,4 +121,10 @@ __all__ = [
     "get_transfers_by_type",
     "get_loans_summary",
     "get_transfer_statistics",
+    # Custom Chart CRUD
+    "get_custom_charts",
+    "get_custom_chart",
+    "create_custom_chart",
+    "update_custom_chart",
+    "delete_custom_chart",
 ]

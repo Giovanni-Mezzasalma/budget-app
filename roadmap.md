@@ -2843,11 +2843,11 @@ def create_transfer(db, transfer, user_id):
 
 💡 **Decisione:** Puoi fare custom charts ora o lasciare per dopo.
 
-- [ ] Decidi se implementare ora o rimandare a "Sviluppi Futuri"
-- [ ] Se implementi ora:
-  - [ ] CRUD per custom_charts
-  - [ ] Router
-  - [ ] Test
+- [x] Decidi se implementare ora o rimandare a "Sviluppi Futuri"
+- [x] Se implementi ora:
+  - [x] CRUD per custom_charts
+  - [x] Router
+  - [x] Test
 
 ---
 

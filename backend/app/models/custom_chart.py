@@ -3,7 +3,7 @@ CustomChart Model
 Gestisce grafici personalizzati utente
 """
 from sqlalchemy import Column, String, DateTime, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -24,12 +24,12 @@ class CustomChart(Base):
     
     __tablename__ = "custom_charts"
     
-    # Primary Key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Primary Key    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
     # Foreign Key
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
     # Chart details
     name = Column(String(100), nullable=False)
     chart_type = Column(Enum(ChartType), nullable=False)

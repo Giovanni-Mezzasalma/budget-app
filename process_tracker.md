@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (80% completato)
+**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (90% completato)
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -247,8 +247,8 @@
 - [x] Commit transfers
 
 ### 3.5 - Custom Charts (opzionale)
-- [ ] Deciso: [ ] Implementare ora [ ] Rimandare a Sviluppi Futuri
-- [ ] Se implementato: CRUD e router creati
+- [x] Deciso: [x] Implementare ora [ ] Rimandare a Sviluppi Futuri
+- [x] Se implementato: CRUD e router creati
 
 ### 3.6 - Analytics Endpoints
 - [ ] `backend/app/routers/analytics.py` creato
