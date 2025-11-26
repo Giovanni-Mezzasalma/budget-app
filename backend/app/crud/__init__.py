@@ -70,6 +70,15 @@ from app.crud.custom_chart import (
     delete_custom_chart,
 )
 
+from app.crud.analytics import (
+    calculate_summary,
+    calculate_monthly_trend,
+    calculate_totals_by_category,
+    calculate_totals_by_account,
+    calculate_daily_breakdown,
+    calculate_year_comparison,
+)
+
 __all__ = [
     # User CRUD
     "get_user_by_email",
@@ -127,4 +136,11 @@ __all__ = [
     "create_custom_chart",
     "update_custom_chart",
     "delete_custom_chart",
+    # Analytics
+    "calculate_summary",
+    "calculate_monthly_trend",
+    "calculate_totals_by_category",
+    "calculate_totals_by_account",
+    "calculate_daily_breakdown",
+    "calculate_year_comparison",
 ]

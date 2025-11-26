@@ -14,6 +14,7 @@ from app.routers.categories import router as categories_router
 from app.routers.transactions import router as transactions_router
 from app.routers.transfers import router as transfers_router
 from app.routers import custom_charts
+from app.routers.analytics import router as analytics_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -76,6 +77,7 @@ app.include_router(categories_router, prefix=settings.API_V1_PREFIX)
 app.include_router(transactions_router, prefix=settings.API_V1_PREFIX)
 app.include_router(transfers_router, prefix=settings.API_V1_PREFIX)
 app.include_router(custom_charts.router, prefix=settings.API_V1_PREFIX)
+app.include_router(analytics_router, prefix=settings.API_V1_PREFIX)
 
 # Health check endpoints
 @app.get("/", tags=["Health"])

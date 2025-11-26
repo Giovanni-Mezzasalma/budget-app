@@ -2854,7 +2854,7 @@ def create_transfer(db, transfer, user_id):
 ### 3.6 - Statistics & Analytics Endpoints
 
 #### 3.6.1 - Analytics router
-- [ ] 📝 Crea `backend/app/routers/analytics.py`
+- [x] 📝 Crea `backend/app/routers/analytics.py`
 
 ```python
 """
@@ -2945,15 +2945,15 @@ async def get_monthly_trend(
 ```
 
 #### 3.6.2 - Registra analytics router
-- [ ] Aggiungi in `main.py`
+- [x] Aggiungi in `main.py`
 
 #### 3.6.3 - Test analytics
-- [ ] Crea alcune transactions
-- [ ] Test GET /analytics/summary
-- [ ] Test GET /analytics/monthly-trend
+- [x] Crea alcune transactions
+- [x] Test GET /analytics/summary
+- [x] Test GET /analytics/monthly-trend
 
 #### 3.6.4 - Commit
-- [ ] Commit: `Add analytics endpoints`
+- [x] Commit: `Add analytics endpoints`
 
 ---
 
@@ -2962,46 +2962,46 @@ async def get_monthly_trend(
 Verifica che tutti questi endpoints funzionino:
 
 **Authentication:**
-- [ ] ✅ POST /auth/register
-- [ ] ✅ POST /auth/login
-- [ ] ✅ GET /auth/me
+- [x] ✅ POST /auth/register
+- [x] ✅ POST /auth/login
+- [x] ✅ GET /auth/me
 
 **Accounts:**
-- [ ] ✅ GET /accounts (lista)
-- [ ] ✅ POST /accounts (crea)
-- [ ] ✅ GET /accounts/{id} (dettaglio)
-- [ ] ✅ PUT /accounts/{id} (modifica)
-- [ ] ✅ DELETE /accounts/{id} (elimina)
+- [x] ✅ GET /accounts (lista)
+- [x] ✅ POST /accounts (crea)
+- [x] ✅ GET /accounts/{id} (dettaglio)
+- [x] ✅ PUT /accounts/{id} (modifica)
+- [x] ✅ DELETE /accounts/{id} (elimina)
 
 **Categories:**
-- [ ] ✅ GET /categories
-- [ ] ✅ POST /categories
-- [ ] ✅ PUT /categories/{id}
-- [ ] ✅ DELETE /categories/{id}
+- [x] ✅ GET /categories
+- [x] ✅ POST /categories
+- [x] ✅ PUT /categories/{id}
+- [x] ✅ DELETE /categories/{id}
 
 **Transactions:**
-- [ ] ✅ GET /transactions (con filtri)
-- [ ] ✅ POST /transactions (crea + aggiorna balance)
-- [ ] ✅ PUT /transactions/{id}
-- [ ] ✅ DELETE /transactions/{id}
+- [x] ✅ GET /transactions (con filtri)
+- [x] ✅ POST /transactions (crea + aggiorna balance)
+- [x] ✅ PUT /transactions/{id}
+- [x] ✅ DELETE /transactions/{id}
 
 **Transfers:**
-- [ ] ✅ GET /transfers
-- [ ] ✅ POST /transfers (crea + aggiorna 2 balance)
-- [ ] ✅ DELETE /transfers/{id}
+- [x] ✅ GET /transfers
+- [x] ✅ POST /transfers (crea + aggiorna 2 balance)
+- [x] ✅ DELETE /transfers/{id}
 
 **Analytics:**
-- [ ] ✅ GET /analytics/summary
-- [ ] ✅ GET /analytics/monthly-trend
+- [x] ✅ GET /analytics/summary
+- [x] ✅ GET /analytics/monthly-trend
 
 **Test integrazione completa:**
-1. [ ] Registra utente
-2. [ ] Crea 2 account
-3. [ ] Crea alcune categorie
-4. [ ] Crea transactions (verifica balance si aggiorna)
-5. [ ] Crea transfer (verifica entrambi i balance)
-6. [ ] Chiama /analytics/summary (verifica dati corretti)
-7. [ ] Tutto funziona end-to-end!
+1. [x] Registra utente
+2. [x] Crea 2 account
+3. [x] Crea alcune categorie
+4. [x] Crea transactions (verifica balance si aggiorna)
+5. [x] Crea transfer (verifica entrambi i balance)
+6. [x] Chiama /analytics/summary (verifica dati corretti)
+7. [x] Tutto funziona end-to-end!
 
 **Tempo stimato:** 4-5 giorni  
 **Prossimo:** FASE 4 - Testing & Debug
