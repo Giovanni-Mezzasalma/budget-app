@@ -5,7 +5,6 @@ Validazione dati grafici personalizzati
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
-import uuid
 from enum import Enum
 
 
@@ -40,10 +39,10 @@ class CustomChartUpdate(BaseModel):
 
 class CustomChartResponse(CustomChartBase):
     """Schema risposta custom chart"""
-    id: uuid.UUID
-    user_id: uuid.UUID
-    created_at: datetime
-    updated_at: Optional[datetime]
+    id: str = Field(..., description="Chart unique identifier")
+    user_id: str = Field(..., description="Owner user ID")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
     
     class Config:
         from_attributes = True
