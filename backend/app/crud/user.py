@@ -134,7 +134,7 @@ def update_user(db: Session, user_id: str, **kwargs) -> Optional[User]:
         user.full_name = kwargs["full_name"]
     
     if "password" in kwargs:
-        user.hashed_password = hash_password(kwargs["password"])
+        user.password_hash = hash_password(kwargs["password"])
     
     if "is_active" in kwargs:
         user.is_active = kwargs["is_active"]

@@ -7,6 +7,7 @@ from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.transfer import Transfer
+from app.models.custom_chart import CustomChart
 
 __all__ = [
     "User",
@@ -14,4 +15,5 @@ __all__ = [
     "Category",
     "Transaction",
     "Transfer",
+    "CustomChart",
 ]

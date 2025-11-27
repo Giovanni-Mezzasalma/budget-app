@@ -65,7 +65,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def verify_token(token: str) -> Optional[dict]:
+def verify_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Verifica e decodifica JWT token
     
@@ -80,13 +80,7 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
-    
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Decode and validate a JWT access token.
-    """
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError:
-        return None
+
+
+# Alias per retrocompatibilità
+decode_access_token = verify_token
