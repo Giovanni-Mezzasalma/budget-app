@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** ✅ Completato
+**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (90% completato)
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -258,6 +258,115 @@
 - [x] Test summary: SUCCESS
 - [x] Test monthly trend: SUCCESS
 - [x] Commit analytics
+
+# SEZIONE 3.7 - Code Review & Bug Fixing
+
+> **Inserire questa sezione nel process_tracker.md dopo la sezione 3.6 (Analytics Endpoints) e prima del CHECKPOINT FASE 3**
+
+---
+
+### 3.7 - Code Review & Bug Fixing
+
+**Obiettivo:** Correggere incongruenze e bug identificati nella code review prima di procedere con Testing (Fase 4).
+
+#### Problemi Critici
+
+##### A. Strategia Balance Account
+- [ ] Analizzato problema `initial_balance` vs `current_balance`
+- [ ] Decisione presa: [ ] Opzione A (rinomina) / [ ] Opzione B (calcolo dinamico) / [ ] Opzione C (campo separato)
+- [ ] Implementazione completata
+- [ ] File modificati:
+  - [ ] `app/models/account.py`
+  - [ ] `app/crud/account.py`
+  - [ ] `app/crud/transaction.py`
+  - [ ] `app/crud/transfer.py`
+- [ ] Test balance dopo transazione: PASS
+- [ ] Test balance dopo transfer: PASS
+
+##### B. Allineamento Tipi Transazione (3 tipi)
+- [ ] Aggiornato commento in `app/models/category.py`
+- [ ] Aggiornato commento in `app/models/transaction.py`
+- [ ] Verificato che schema e CRUD usino stessi 3 tipi
+- [ ] Documentazione allineata
+
+##### C. Path Correzione
+- [ ] Corretto `backend/run.py`: `main:app` → `app.main:app`
+- [ ] Corretto `backend/Dockerfile`: `main:app` → `app.main:app`
+- [ ] Server avvia correttamente con nuovo path
+- [ ] Docker build funziona (se testato)
+
+#### Problemi Medi
+
+##### D. Centralizzazione Enum ChartType
+- [ ] Rimosso enum duplicato da `app/models/custom_chart.py`
+- [ ] Import da `app/schemas/custom_chart.py`
+- [ ] Test endpoint custom-charts funzionante
+
+##### E. Validazione update_transfer
+- [ ] Revisione codice `app/crud/transfer.py`
+- [ ] Verificati tutti i casi edge
+- [ ] Aggiunta validazione mancante (se necessaria)
+
+##### F. File SQL Obsoleti
+- [ ] Decisione: [ ] Rimuovere / [ ] Archiviare / [ ] Aggiornare
+- [ ] Azione completata
+- [ ] Documentato in README se necessario
+
+#### Note Documentate
+
+##### G. Migration Vuota (c744b8064fb0)
+- [ ] ✅ Documentato: tabella `custom_charts` creata via SQL manuale
+- [ ] ✅ Non richiede fix, solo nota per riferimento futuro
+
+##### H-J. Altri Minori
+- [ ] Nota UUID String(36) documentata (futuro refactoring)
+- [ ] Commenti: decisione lingua presa
+- [ ] CORS_ORIGINS: testato parsing da .env
+
+#### Test Finale Post-Correzioni
+
+- [ ] `cd backend && source venv/bin/activate`
+- [ ] `python -m app.main` o `python run.py` → Server UP
+- [ ] http://localhost:8000 → JSON response OK
+- [ ] http://localhost:8000/docs → Swagger UI OK
+- [ ] Login con utente esistente → Token OK
+- [ ] GET /accounts → Lista OK
+- [ ] POST /transactions (income) → Balance +amount
+- [ ] POST /transactions (expense) → Balance -amount
+- [ ] POST /transfers → From -amount, To +amount
+- [ ] GET /analytics/summary → Dati corretti
+
+#### Commit Fase 3.7
+
+- [ ] Tutti i file modificati staged
+- [ ] Commit message: `fix: Code review corrections - balance strategy, path fixes, type alignment`
+- [ ] Push completato
+
+---
+
+## Note Aggiuntive per Fase 3.7
+
+**Tempo stimato:** 2-4 ore
+
+**Priorità correzioni:**
+1. 🔴 Path `run.py` e `Dockerfile` (5 min) - BLOCCANTE per avvio
+2. 🔴 Commenti tipi transazione (10 min) - Allineamento documentazione
+3. 🟡 Strategia balance (30-60 min) - Dipende da opzione scelta
+4. 🟡 Enum centralizzazione (15 min)
+5. 🟢 File SQL obsoleti (5 min)
+6. 🟢 Note documentazione (10 min)
+
+**Decisioni da prendere:**
+
+| Decisione | Opzioni | Raccomandazione |
+|-----------|---------|-----------------|
+| Balance strategy | A/B/C | **Opzione A** (rinomina) per MVP, B per v2 |
+| File SQL | Rimuovi/Archivia/Aggiorna | **Archivia** in `database/archive/` |
+| Lingua commenti | IT/EN | **EN** per codice |
+
+---
+
+**NOTA:** Dopo aver completato questa sezione, procedere con il CHECKPOINT FASE 3 aggiornato e poi FASE 4 (Testing).
 
 **CHECKPOINT FASE 3:**
 - [x] ✅ Tutti gli endpoints CRUD funzionanti

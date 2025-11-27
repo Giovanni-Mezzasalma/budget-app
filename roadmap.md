@@ -2954,6 +2954,142 @@ async def get_monthly_trend(
 
 #### 3.6.4 - Commit
 - [x] Commit: `Add analytics endpoints`
+---
+
+# SEZIONE 3.7 - Code Review & Bug Fixing
+
+---
+
+### 3.7 - Code Review & Bug Fixing
+
+Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione completa del codice e correggere le incongruenze identificate.
+
+#### 3.7.1 - Problemi Critici (Bloccanti)
+
+##### A. Mismatch `initial_balance` vs `current_balance`
+- [ ] **Problema:** Il campo `initial_balance` viene usato come balance corrente e modificato ad ogni transazione/transfer. Questo è semanticamente errato - `initial_balance` dovrebbe essere il saldo iniziale immutabile.
+- [ ] **File coinvolti:**
+  - `app/models/account.py` - ha property `current_balance` mai usata
+  - `app/crud/account.py` - modifica `initial_balance` invece di calcolare
+  - `app/crud/transaction.py` - modifica `initial_balance`
+  - `app/crud/transfer.py` - modifica `initial_balance`
+- [ ] **Decisione da prendere:**
+  - **Opzione A:** Rinominare `initial_balance` in `balance` (più semplice, meno corretto semanticamente)
+  - **Opzione B:** Mantenere `initial_balance` immutabile e calcolare `current_balance` dinamicamente (più corretto, richiede refactoring)
+  - **Opzione C:** Aggiungere campo `balance` separato che viene aggiornato (compromesso)
+- [ ] **Azione:** Decidere approccio e implementare
+
+##### B. Mismatch tipi Transazione/Categoria (2 vs 3 tipi)
+- [ ] **Problema:** Inconsistenza tra documentazione, SQL originale, model e schema
+  - SQL originale: `ENUM ('income', 'expense')`
+  - Model comment: "income or expense"
+  - Schema attuale: `["income", "expense_necessity", "expense_extra"]`
+- [ ] **File coinvolti:**
+  - `app/models/category.py` - commento dice 2 tipi
+  - `app/models/transaction.py` - commento dice 2 tipi
+  - `app/schemas/category.py` - valida 3 tipi
+  - `app/schemas/transaction.py` - valida 3 tipi
+  - `app/crud/transaction.py` - usa 3 tipi nella logica
+  - `app/crud/analytics.py` - usa 3 tipi
+- [ ] **Decisione:** I 3 tipi (`income`, `expense_necessity`, `expense_extra`) sono la scelta corretta per il business logic (basato sul file Excel originale)
+- [ ] **Azione:** Aggiornare commenti nei model per riflettere i 3 tipi
+
+##### C. Path errato in `run.py` e `Dockerfile`
+- [ ] **Problema:** I file riferiscono `main:app` ma il file è in `app/main.py`
+- [ ] **File coinvolti:**
+  - `backend/run.py` - riga `uvicorn.run("main:app", ...)`
+  - `backend/Dockerfile` - riga `CMD ["uvicorn", "main:app", ...]`
+- [ ] **Azione:** Correggere in `app.main:app`
+
+#### 3.7.2 - Problemi Medi (Da correggere prima del deploy)
+
+##### D. Enum `ChartType` duplicato
+- [ ] **Problema:** Definito sia in `models/custom_chart.py` che in `schemas/custom_chart.py`
+- [ ] **Rischio:** Potrebbero andare out of sync
+- [ ] **Azione:** Centralizzare in un unico file (es. `schemas/custom_chart.py`) e importare nel model
+
+##### E. Validazione incompleta in `update_transfer`
+- [ ] **Problema:** La validazione della direzione transfer potrebbe non coprire tutti i casi edge
+- [ ] **File:** `app/crud/transfer.py`
+- [ ] **Azione:** Verificare e completare validazione
+
+##### F. File SQL in `database/` obsoleti
+- [ ] **Problema:** I file SQL originali sono out of sync con i model attuali
+- [ ] **File:**
+  - `database/01_create_schema.sql`
+  - `database/02_seed_default_categories.sql`
+- [ ] **Azione:** 
+  - Opzione A: Rimuovere (Alembic gestisce tutto)
+  - Opzione B: Aggiornare e tenere come documentazione
+  - Opzione C: Spostare in `database/archive/` con nota
+
+#### 3.7.3 - Problemi Minori / Note
+
+##### G. Migration `c744b8064fb0` vuota
+- [ ] **Nota:** La migration per `custom_charts` è vuota perché la tabella era già stata creata via SQL manuale
+- [ ] **Impatto:** Nessuno per il funzionamento attuale
+- [ ] **Rischio:** Se si fa `alembic downgrade` completo e poi `upgrade`, la tabella potrebbe non essere ricreata
+- [ ] **Azione:** Documentare, non richiede fix immediato
+
+##### H. UUID come String(36) invece di UUID nativo
+- [ ] **Nota:** I model usano `String(36)` invece del tipo UUID nativo PostgreSQL
+- [ ] **Impatto:** Funziona ma perde ottimizzazioni PostgreSQL
+- [ ] **Azione:** Nessuna per MVP, considerare per futuro refactoring
+
+##### I. Commenti misti italiano/inglese
+- [ ] **Nota:** Inconsistenza nella lingua dei commenti e docstring
+- [ ] **Azione:** Uniformare (suggerimento: inglese per codice, italiano per docs utente)
+
+##### J. CORS_ORIGINS parsing
+- [ ] **Nota:** `.env.example` usa stringa JSON, `config.py` si aspetta lista
+- [ ] **Impatto:** Pydantic-settings dovrebbe gestirlo, ma verificare
+- [ ] **Azione:** Testare parsing da `.env`
+
+#### 3.7.4 - Checklist Correzioni
+
+**Critiche (fare ora):**
+- [ ] Decidere e implementare strategia balance (A/B/C)
+- [ ] Aggiornare commenti model per 3 tipi transazione
+- [ ] Correggere path in `run.py`: `app.main:app`
+- [ ] Correggere path in `Dockerfile`: `app.main:app`
+
+**Medie (fare prima di Fase 6):**
+- [ ] Centralizzare `ChartType` enum
+- [ ] Verificare validazione `update_transfer`
+- [ ] Gestire file SQL obsoleti
+
+**Minori (nice to have):**
+- [ ] Uniformare lingua commenti
+- [ ] Documentare nota su migration vuota
+- [ ] Testare parsing CORS_ORIGINS
+
+#### 3.7.5 - Test Post-Correzioni
+
+Dopo le correzioni, verificare:
+- [ ] Server avvia senza errori: `python run.py` (o con path corretto)
+- [ ] Swagger UI accessibile: http://localhost:8000/docs
+- [ ] Test creazione transaction → balance aggiornato correttamente
+- [ ] Test creazione transfer → entrambi i balance aggiornati
+- [ ] Test analytics/summary → dati corretti
+- [ ] Nessun errore nei log
+
+#### 3.7.6 - Commit
+- [ ] Commit: `Code review fixes - Phase 3.7`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 3 (AGGIORNATO)
+
+Verifica che tutti questi endpoint funzionino E che le correzioni 3.7 siano applicate:
+
+[... resto del checkpoint esistente ...]
+
+**Aggiunte Fase 3.7:**
+- [ ] ✅ Path `run.py` e `Dockerfile` corretti
+- [ ] ✅ Strategia balance definita e implementata
+- [ ] ✅ Commenti model allineati con schema
+- [ ] ✅ Test post-correzioni passati
 
 ---
 
