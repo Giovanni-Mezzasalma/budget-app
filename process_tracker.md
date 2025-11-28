@@ -290,10 +290,7 @@
 - [ ] Documentazione allineata
 
 ##### C. Path Correzione
-- [ ] Corretto `backend/run.py`: `main:app` → `app.main:app`
-- [ ] Corretto `backend/Dockerfile`: `main:app` → `app.main:app`
-- [ ] Server avvia correttamente con nuovo path
-- [ ] Docker build funziona (se testato)
+- [x] Corretto `backend/Dockerfile`: `main:app` → `app.main:app` (Docker build funziona non ancora testato)
 
 #### Problemi Medi
 

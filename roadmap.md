@@ -2995,11 +2995,10 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 - [ ] **Azione:** Aggiornare commenti nei model per riflettere i 3 tipi
 
 ##### C. Path errato in `run.py` e `Dockerfile`
-- [ ] **Problema:** I file riferiscono `main:app` ma il file è in `app/main.py`
-- [ ] **File coinvolti:**
-  - `backend/run.py` - riga `uvicorn.run("main:app", ...)`
+- [x] **Problema:** I file riferiscono `main:app` ma il file è in `app/main.py`
+- [x] **File coinvolti:**
   - `backend/Dockerfile` - riga `CMD ["uvicorn", "main:app", ...]`
-- [ ] **Azione:** Correggere in `app.main:app`
+- [x] **Azione:** Correggere in `app.main:app`
 
 #### 3.7.2 - Problemi Medi (Da correggere prima del deploy)
 
