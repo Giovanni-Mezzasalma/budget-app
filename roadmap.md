@@ -2967,32 +2967,32 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 #### 3.7.1 - Problemi Critici (Bloccanti)
 
 ##### A. Mismatch `initial_balance` vs `current_balance`
-- [ ] **Problema:** Il campo `initial_balance` viene usato come balance corrente e modificato ad ogni transazione/transfer. Questo è semanticamente errato - `initial_balance` dovrebbe essere il saldo iniziale immutabile.
-- [ ] **File coinvolti:**
+- [x] **Problema:** Il campo `initial_balance` viene usato come balance corrente e modificato ad ogni transazione/transfer. Questo è semanticamente errato - `initial_balance` dovrebbe essere il saldo iniziale immutabile.
+- [x] **File coinvolti:**
   - `app/models/account.py` - ha property `current_balance` mai usata
   - `app/crud/account.py` - modifica `initial_balance` invece di calcolare
   - `app/crud/transaction.py` - modifica `initial_balance`
   - `app/crud/transfer.py` - modifica `initial_balance`
-- [ ] **Decisione da prendere:**
+- [x] **Decisione da prendere:**
   - **Opzione A:** Rinominare `initial_balance` in `balance` (più semplice, meno corretto semanticamente)
   - **Opzione B:** Mantenere `initial_balance` immutabile e calcolare `current_balance` dinamicamente (più corretto, richiede refactoring)
   - **Opzione C:** Aggiungere campo `balance` separato che viene aggiornato (compromesso)
-- [ ] **Azione:** Decidere approccio e implementare
+- [x] **Azione:** Decidere approccio e implementare
 
 ##### B. Mismatch tipi Transazione/Categoria (2 vs 3 tipi)
-- [ ] **Problema:** Inconsistenza tra documentazione, SQL originale, model e schema
+- [x] **Problema:** Inconsistenza tra documentazione, SQL originale, model e schema
   - SQL originale: `ENUM ('income', 'expense')`
   - Model comment: "income or expense"
   - Schema attuale: `["income", "expense_necessity", "expense_extra"]`
-- [ ] **File coinvolti:**
+- [x] **File coinvolti:**
   - `app/models/category.py` - commento dice 2 tipi
   - `app/models/transaction.py` - commento dice 2 tipi
   - `app/schemas/category.py` - valida 3 tipi
   - `app/schemas/transaction.py` - valida 3 tipi
   - `app/crud/transaction.py` - usa 3 tipi nella logica
   - `app/crud/analytics.py` - usa 3 tipi
-- [ ] **Decisione:** I 3 tipi (`income`, `expense_necessity`, `expense_extra`) sono la scelta corretta per il business logic (basato sul file Excel originale)
-- [ ] **Azione:** Aggiornare commenti nei model per riflettere i 3 tipi
+- [x] **Decisione:** I 3 tipi (`income`, `expense_necessity`, `expense_extra`) sono la scelta corretta per il business logic (basato sul file Excel originale)
+- [x] **Azione:** Aggiornare commenti nei model per riflettere i 3 tipi
 
 ##### C. Path errato in `run.py` e `Dockerfile`
 - [x] **Problema:** I file riferiscono `main:app` ma il file è in `app/main.py`

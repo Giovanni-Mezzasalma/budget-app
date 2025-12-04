@@ -44,7 +44,7 @@ class Category(Base):
     
     # Category Information
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    type: Mapped[str] = mapped_column(String(20), nullable=False)  # income or expense
+    type: Mapped[str] = mapped_column(String(20), nullable=False)  # income, expense_necessity or expense_extra
     
     # UI Customization
     color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # Hex color

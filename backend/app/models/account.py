@@ -17,7 +17,18 @@ if TYPE_CHECKING:
 
 
 class Account(Base):
-    """Account model for managing user financial accounts."""
+    """
+    Account model for managing user financial accounts.
+    
+    Balance Strategy:
+    - initial_balance: Saldo iniziale impostato alla creazione, IMMUTABILE
+    - current_balance: Saldo attuale, aggiornato da transazioni e trasferimenti
+    
+    Questo permette di:
+    - Mantenere traccia del saldo iniziale storico
+    - Avere un current_balance sempre aggiornato senza ricalcoli
+    - Verificare la coerenza: current_balance = initial_balance + sum(transactions) + sum(transfers)
+    """
     
     __tablename__ = "accounts"
     
@@ -41,10 +52,19 @@ class Account(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)  # checking, savings, credit_card, cash, investment, loan, other
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")  # ISO 4217
+    
+    # Balance Fields
     initial_balance: Mapped[Decimal] = mapped_column(
         Numeric(15, 2),
         nullable=False,
-        default=Decimal("0.00")
+        default=Decimal("0.00"),
+        comment="Saldo iniziale storico, impostato alla creazione e MAI modificato"
+    )
+    current_balance: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        comment="Saldo attuale, aggiornato automaticamente da transazioni e trasferimenti"
     )
     
     # UI Customization
@@ -98,17 +118,27 @@ class Account(Base):
     __table_args__ = (
         Index('ix_accounts_user_active', 'user_id', 'is_active'),
         Index('ix_accounts_user_type', 'user_id', 'type'),
+        Index('ix_accounts_user_current_balance', 'user_id', 'current_balance'),
     )
     
     def __repr__(self) -> str:
-        return f"<Account(id={self.id}, name={self.name}, type={self.type}, currency={self.currency})>"
+        return f"<Account(id={self.id}, name={self.name}, type={self.type}, balance={self.current_balance} {self.currency})>"
     
     @property
-    def current_balance(self) -> Decimal:
+    def balance_difference(self) -> Decimal:
         """
-        Calculate current balance: initial_balance + sum(transactions) + sum(transfers).
-        Note: This is a computed property. For better performance in queries,
-        consider caching or computing at query time.
+        Calcola la differenza tra balance attuale e iniziale.
+        Positivo = guadagno netto, Negativo = perdita netta.
+        """
+        return self.current_balance - self.initial_balance
+    
+    def recalculate_balance(self) -> Decimal:
+        """
+        Ricalcola il balance dalle transazioni e trasferimenti.
+        Utile per verificare la coerenza o correggere discrepanze.
+        
+        Returns:
+            Il balance calcolato (non modifica current_balance)
         """
         balance = self.initial_balance
         
@@ -116,13 +146,12 @@ class Account(Base):
         for transaction in self.transactions:
             if transaction.type == "income":
                 balance += transaction.amount
-            else:  # expense
+            else:  # expense_necessity or expense_extra
                 balance -= transaction.amount
         
         # Add incoming transfers, subtract outgoing transfers
         for transfer in self.transfers_to:
             if transfer.exchange_rate:
-                # If exchange rate is set, use converted amount
                 balance += transfer.amount * transfer.exchange_rate
             else:
                 balance += transfer.amount
@@ -131,3 +160,17 @@ class Account(Base):
             balance -= (transfer.amount + transfer.fee)
         
         return balance
+    
+    def verify_balance_integrity(self) -> tuple[bool, Decimal]:
+        """
+        Verifica che current_balance sia coerente con le transazioni.
+        
+        Returns:
+            Tuple (is_valid, difference)
+            - is_valid: True se il balance è corretto
+            - difference: Differenza tra current e calculated (0 se corretto)
+        """
+        calculated = self.recalculate_balance()
+        difference = self.current_balance - calculated
+        is_valid = abs(difference) < Decimal("0.01")  # Tolleranza per arrotondamenti
+        return is_valid, difference

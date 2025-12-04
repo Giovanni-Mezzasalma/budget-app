@@ -52,7 +52,8 @@ CREATE TYPE account_type_enum AS ENUM (
 -- Transaction types
 CREATE TYPE transaction_type_enum AS ENUM (
     'income',       -- Entrata
-    'expense'       -- Uscita
+    'expense_necessity'       -- Uscita necessità
+    'expense_extra'           -- Uscita extra
 );
 
 -- Chart types
@@ -351,22 +352,22 @@ BEGIN
     
     -- Expense Categories
     INSERT INTO categories (user_id, name, type, color, icon, is_system) VALUES
-    (p_user_id, 'Casa', 'expense', '#EF4444', '🏠', TRUE),
-    (p_user_id, 'Affitto', 'expense', '#DC2626', '🔑', TRUE),
-    (p_user_id, 'Bollette', 'expense', '#F97316', '💡', TRUE),
-    (p_user_id, 'Alimentari', 'expense', '#F59E0B', '🛒', TRUE),
-    (p_user_id, 'Ristoranti', 'expense', '#EAB308', '🍽️', TRUE),
-    (p_user_id, 'Trasporti', 'expense', '#14B8A6', '🚗', TRUE),
-    (p_user_id, 'Benzina', 'expense', '#06B6D4', '⛽', TRUE),
-    (p_user_id, 'Salute', 'expense', '#EC4899', '🏥', TRUE),
-    (p_user_id, 'Farmacia', 'expense', '#F472B6', '💊', TRUE),
-    (p_user_id, 'Svago', 'expense', '#8B5CF6', '🎭', TRUE),
-    (p_user_id, 'Abbigliamento', 'expense', '#06B6D4', '👕', TRUE),
-    (p_user_id, 'Educazione', 'expense', '#3B82F6', '📚', TRUE),
-    (p_user_id, 'Tecnologia', 'expense', '#6366F1', '💻', TRUE),
-    (p_user_id, 'Viaggi', 'expense', '#10B981', '✈️', TRUE),
-    (p_user_id, 'Sport', 'expense', '#84CC16', '🏋️', TRUE),
-    (p_user_id, 'Altro', 'expense', '#6B7280', '📦', TRUE);
+    (p_user_id, 'Casa', 'expense_necessity', '#EF4444', '🏠', TRUE),
+    (p_user_id, 'Affitto', 'expense_necessity', '#DC2626', '🔑', TRUE),
+    (p_user_id, 'Bollette', 'expense_necessity', '#F97316', '💡', TRUE),
+    (p_user_id, 'Alimentari', 'expense_necessity', '#F59E0B', '🛒', TRUE),
+    (p_user_id, 'Ristoranti', 'expense_extra', '#EAB308', '🍽️', TRUE),
+    (p_user_id, 'Trasporti', 'expense_necessity', '#14B8A6', '🚗', TRUE),
+    (p_user_id, 'Benzina', 'expense_necessity', '#06B6D4', '⛽', TRUE),
+    (p_user_id, 'Salute', 'expense_necessity', '#EC4899', '🏥', TRUE),
+    (p_user_id, 'Farmacia', 'expense_necessity', '#F472B6', '💊', TRUE),
+    (p_user_id, 'Svago', 'expense_extra', '#8B5CF6', '🎭', TRUE),
+    (p_user_id, 'Abbigliamento', 'expense_extra', '#06B6D4', '👕', TRUE),
+    (p_user_id, 'Educazione', 'expense_necessity', '#3B82F6', '📚', TRUE),
+    (p_user_id, 'Tecnologia', 'expense_extra', '#6366F1', '💻', TRUE),
+    (p_user_id, 'Viaggi', 'expense_extra', '#10B981', '✈️', TRUE),
+    (p_user_id, 'Sport', 'expense_extra', '#84CC16', '🏋️', TRUE),
+    (p_user_id, 'Altro', 'expense_extra', '#6B7280', '📦', TRUE);
 END;
 $$ LANGUAGE plpgsql;
 

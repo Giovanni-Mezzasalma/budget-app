@@ -1,6 +1,10 @@
 """
 Accounts Router
-Gestione conti bancari/portafogli utente
+User account management with proper balance handling.
+
+Balance Strategy:
+- initial_balance: Set at creation, immutable
+- current_balance: Updated automatically by transactions/transfers
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -19,23 +23,30 @@ router = APIRouter(prefix="/accounts", tags=["Accounts"])
 async def get_accounts(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0, description="Numero di record da saltare"),
-    limit: int = Query(100, ge=1, le=100, description="Numero massimo di risultati"),
-    is_active: Optional[bool] = Query(None, description="Filtra per stato attivo/inattivo")
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=100, description="Maximum number of results"),
+    is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
+    type: Optional[str] = Query(None, description="Filter by account type")
 ):
     """
-    Lista tutti gli account dell'utente corrente.
+    List all accounts for the current user.
     
-    - **skip**: Offset per paginazione (default: 0)
-    - **limit**: Numero massimo risultati (default: 100, max: 100)
-    - **is_active**: Filtra solo attivi (true) o inattivi (false)
+    - **skip**: Pagination offset (default: 0)
+    - **limit**: Maximum results (default: 100, max: 100)
+    - **is_active**: Filter active (true) or inactive (false) only
+    - **type**: Filter by account type (checking, savings, etc.)
+    
+    **Response includes:**
+    - `initial_balance`: Balance set at creation (immutable)
+    - `current_balance`: Current balance (updated by transactions/transfers)
     """
     accounts = account_crud.get_accounts(
         db, 
         user_id=str(current_user.id), 
         skip=skip, 
         limit=limit,
-        is_active=is_active
+        is_active=is_active,
+        account_type=type
     )
     return accounts
 
@@ -47,15 +58,18 @@ async def create_account(
     db: Session = Depends(get_db)
 ):
     """
-    Crea un nuovo account.
+    Create a new account.
     
-    - **name**: Nome account (es. "Conto Corrente", "Risparmio")
-    - **type**: Tipo account (checking, savings, credit_card, cash, investment, other)
-    - **currency**: Valuta ISO 4217 (default: EUR)
-    - **initial_balance**: Saldo iniziale (default: 0.00)
-    - **color**: Colore HEX per UI (es. #3B82F6)
-    - **icon**: Icona/emoji per UI
-    - **notes**: Note aggiuntive
+    - **name**: Account name (e.g., "Checking Account", "Savings")
+    - **type**: Account type (checking, savings, credit_card, cash, investment, loan, other)
+    - **currency**: ISO 4217 currency code (default: EUR)
+    - **initial_balance**: Starting balance (default: 0.00) - **set once, never changes**
+    - **color**: HEX color for UI (e.g., #3B82F6)
+    - **icon**: Icon/emoji for UI
+    - **notes**: Additional notes
+    
+    ⚠️ `initial_balance` is set at creation and cannot be modified afterwards.
+    `current_balance` will be automatically initialized to the same value.
     """
     return account_crud.create_account(
         db, 
@@ -63,30 +77,30 @@ async def create_account(
         user_id=str(current_user.id)
     )
 
+
 @router.get("/summary")
 async def get_accounts_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Restituisce il riepilogo finanziario dell'utente.
+    Get financial summary for the user.
     
-    **Categorie:**
-    - **Liquidità** (checking, savings, cash): Soldi disponibili
-    - **Investimenti** (investment): Capitale investito
-    - **Crediti/Prestiti** (loan): Soldi che ti devono (prestiti dati)
-    - **Debiti** (credit_card negativo): Soldi che devi
+    **Categories:**
+    - **Liquid** (checking, savings, cash): Available money
+    - **Investments** (investment): Invested capital
+    - **Credits/Loans** (loan): Money owed to you (loans given)
+    - **Debts** (negative credit_card): Money you owe
     
-    **Calcoli:**
-    - **net_worth**: Patrimonio netto = Liquidità + Investimenti - Debiti
-    - **total_assets**: Totale attività = net_worth + Crediti
+    **Calculations:**
+    - **net_worth**: Net worth = Liquid + Investments - Debts
+    - **total_assets**: Total assets = net_worth + Credits
     
-    ⚠️ I prestiti (crediti verso terzi) sono separati dal patrimonio netto
-    perché sono soldi "bloccati" fino alla restituzione.
+    Uses `current_balance` for all calculations.
     """
     summary = account_crud.get_accounts_summary(db, user_id=str(current_user.id))
     
-    # Converti Decimal a float per JSON
+    # Convert Decimal to float for JSON
     return {
         "total_liquid": float(summary["total_liquid"]),
         "total_investments": float(summary["total_investments"]),
@@ -99,33 +113,37 @@ async def get_accounts_summary(
         "by_category": {
             "liquid": {
                 "total": float(summary["by_category"]["liquid"]["total"]),
+                "initial": float(summary["by_category"]["liquid"].get("initial", 0)),
+                "difference": float(summary["by_category"]["liquid"].get("difference", 0)),
                 "count": summary["by_category"]["liquid"]["count"],
                 "types": summary["by_category"]["liquid"]["types"],
-                "description": "Liquidità disponibile"
+                "description": "Available liquidity"
             },
             "investments": {
                 "total": float(summary["by_category"]["investments"]["total"]),
+                "initial": float(summary["by_category"]["investments"].get("initial", 0)),
+                "difference": float(summary["by_category"]["investments"].get("difference", 0)),
                 "count": summary["by_category"]["investments"]["count"],
                 "types": summary["by_category"]["investments"]["types"],
-                "description": "Capitale investito"
+                "description": "Invested capital"
             },
             "loans": {
                 "total": float(summary["by_category"]["loans"]["total"]),
                 "count": summary["by_category"]["loans"]["count"],
                 "types": summary["by_category"]["loans"]["types"],
-                "description": "Crediti verso terzi (soldi che ti devono)"
+                "description": "Credits to third parties (money owed to you)"
             },
             "debts": {
                 "total": float(summary["by_category"]["debts"]["total"]),
                 "count": summary["by_category"]["debts"]["count"],
                 "types": summary["by_category"]["debts"]["types"],
-                "description": "Debiti (soldi che devi)"
+                "description": "Debts (money you owe)"
             },
             "other": {
                 "total": float(summary["by_category"]["other"]["total"]),
                 "count": summary["by_category"]["other"]["count"],
                 "types": summary["by_category"]["other"]["types"],
-                "description": "Altri conti"
+                "description": "Other accounts"
             }
         }
     }
@@ -134,19 +152,66 @@ async def get_accounts_summary(
 @router.get("/types")
 async def get_account_types():
     """
-    Restituisce tutti i tipi di account disponibili.
+    Get all available account types.
     
-    Utile per popolare dropdown nel frontend.
+    Useful for populating dropdowns in frontend.
     """
     return [
-        {"value": "checking", "label": "Conto Corrente", "category": "liquid"},
-        {"value": "savings", "label": "Conto Risparmio", "category": "liquid"},
-        {"value": "cash", "label": "Contanti", "category": "liquid"},
-        {"value": "credit_card", "label": "Carta di Credito", "category": "debt"},
-        {"value": "investment", "label": "Investimenti", "category": "investment"},
-        {"value": "loan", "label": "Prestiti a Terzi", "category": "loan"},
-        {"value": "other", "label": "Altro", "category": "other"},
+        {"value": "checking", "label": "Checking Account", "category": "liquid"},
+        {"value": "savings", "label": "Savings Account", "category": "liquid"},
+        {"value": "cash", "label": "Cash", "category": "liquid"},
+        {"value": "credit_card", "label": "Credit Card", "category": "debt"},
+        {"value": "investment", "label": "Investments", "category": "investment"},
+        {"value": "loan", "label": "Loans to Third Parties", "category": "loan"},
+        {"value": "other", "label": "Other", "category": "other"},
     ]
+
+
+@router.get("/verify-balances")
+async def verify_account_balances(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Verify balance integrity for all accounts.
+    
+    Compares `current_balance` with calculated balance from transactions/transfers.
+    Returns list of accounts with discrepancies (if any).
+    """
+    discrepancies = account_crud.verify_all_balances(db, user_id=str(current_user.id))
+    
+    return {
+        "status": "ok" if len(discrepancies) == 0 else "discrepancies_found",
+        "discrepancies_count": len(discrepancies),
+        "discrepancies": discrepancies
+    }
+
+
+@router.post("/{account_id}/fix-balance", response_model=AccountResponse)
+async def fix_account_balance(
+    account_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Recalculate and fix account's current_balance from transactions/transfers.
+    
+    Use this to correct any balance discrepancies.
+    """
+    account = account_crud.fix_account_balance(
+        db,
+        account_id=account_id,
+        user_id=str(current_user.id)
+    )
+    
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found"
+        )
+    
+    return account
+
 
 @router.get("/{account_id}", response_model=AccountResponse)
 async def get_account(
@@ -155,9 +220,11 @@ async def get_account(
     db: Session = Depends(get_db)
 ):
     """
-    Recupera dettagli di un singolo account.
+    Get details of a single account.
     
-    - **account_id**: ID univoco dell'account
+    **Response includes:**
+    - `initial_balance`: Balance set at creation
+    - `current_balance`: Current balance after all transactions/transfers
     """
     account = account_crud.get_account(
         db, 
@@ -182,18 +249,11 @@ async def update_account(
     db: Session = Depends(get_db)
 ):
     """
-    Aggiorna un account esistente.
+    Update an existing account.
     
-    Puoi aggiornare solo i campi che vuoi modificare.
-    I campi non inclusi nella richiesta rimarranno invariati.
+    **Updatable fields:** name, type, currency, color, icon, notes, is_active
     
-    - **name**: Nuovo nome account
-    - **type**: Nuovo tipo account
-    - **currency**: Nuova valuta
-    - **color**: Nuovo colore
-    - **icon**: Nuova icona
-    - **notes**: Nuove note
-    - **is_active**: Attiva/disattiva account
+    ⚠️ **Cannot update:** initial_balance, current_balance
     """
     updated_account = account_crud.update_account(
         db,
@@ -218,12 +278,9 @@ async def delete_account(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina un account.
+    Delete an account.
     
-    ⚠️ **Attenzione**: Questa operazione elimina anche tutte le transazioni 
-    e i trasferimenti associati all'account.
-    
-    - **account_id**: ID univoco dell'account da eliminare
+    ⚠️ **Warning**: This also deletes all transactions and transfers associated with the account.
     """
     success = account_crud.delete_account(
         db,
@@ -247,12 +304,9 @@ async def deactivate_account(
     db: Session = Depends(get_db)
 ):
     """
-    Disattiva un account (soft delete).
+    Deactivate an account (soft delete).
     
-    L'account non verrà eliminato ma sarà nascosto dalle liste.
-    Può essere riattivato con PUT impostando is_active=true.
-    
-    - **account_id**: ID univoco dell'account da disattivare
+    The account will be hidden from lists but can be reactivated with PUT (is_active=true).
     """
     deactivated = account_crud.deactivate_account(
         db,

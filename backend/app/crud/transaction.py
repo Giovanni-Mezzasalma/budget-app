@@ -1,6 +1,11 @@
 """
 Transaction CRUD Operations
-Database operations per Transaction model con aggiornamento automatico balance account
+Database operations for Transaction model with automatic current_balance updates.
+
+Transaction types (derived from category):
+- income: Income
+- expense_necessity: Necessity expenses
+- expense_extra: Extra/discretionary expenses
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
@@ -30,56 +35,49 @@ def get_transactions(
     search: Optional[str] = None
 ) -> List[Transaction]:
     """
-    Lista le transazioni dell'utente con filtri opzionali.
+    List user transactions with optional filters.
     
     Args:
         db: Database session
-        user_id: ID utente proprietario
-        skip: Offset per paginazione
-        limit: Numero massimo risultati
-        account_id: Filtra per account
-        category_id: Filtra per categoria
-        transaction_type: Filtra per tipo (income, expense_necessity, expense_extra)
-        start_date: Data inizio periodo
-        end_date: Data fine periodo
-        min_amount: Importo minimo
-        max_amount: Importo massimo
-        tags: Filtra per tags
-        search: Cerca in description/notes
+        user_id: Owner user ID
+        skip: Pagination offset
+        limit: Maximum results
+        account_id: Filter by account
+        category_id: Filter by category
+        transaction_type: Filter by type (income, expense_necessity, expense_extra)
+        start_date: Period start date
+        end_date: Period end date
+        min_amount: Minimum amount
+        max_amount: Maximum amount
+        tags: Filter by tags
+        search: Search in description/notes
     """
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     
-    # Filtro per account
     if account_id is not None:
         query = query.filter(Transaction.account_id == account_id)
     
-    # Filtro per categoria
     if category_id is not None:
         query = query.filter(Transaction.category_id == category_id)
     
-    # Filtro per tipo
     if transaction_type is not None:
         query = query.filter(Transaction.type == transaction_type)
     
-    # Filtro per date
     if start_date is not None:
         query = query.filter(Transaction.date >= start_date)
     
     if end_date is not None:
         query = query.filter(Transaction.date <= end_date)
     
-    # Filtro per importo
     if min_amount is not None:
         query = query.filter(Transaction.amount >= min_amount)
     
     if max_amount is not None:
         query = query.filter(Transaction.amount <= max_amount)
     
-    # Filtro per tags (almeno uno dei tags specificati)
     if tags is not None and len(tags) > 0:
         query = query.filter(Transaction.tags.overlap(tags))
     
-    # Ricerca in description e notes
     if search is not None and search.strip():
         search_term = f"%{search.strip()}%"
         query = query.filter(
@@ -89,7 +87,7 @@ def get_transactions(
             )
         )
     
-    # Ordina per data decrescente (più recenti prima)
+    # Order by date descending (most recent first)
     query = query.order_by(Transaction.date.desc(), Transaction.created_at.desc())
     
     return query.offset(skip).limit(limit).all()
@@ -100,9 +98,7 @@ def get_transaction(
     transaction_id: str,
     user_id: str
 ) -> Optional[Transaction]:
-    """
-    Recupera singola transazione verificando ownership.
-    """
+    """Get single transaction verifying ownership."""
     return db.query(Transaction).filter(
         Transaction.id == transaction_id,
         Transaction.user_id == user_id
@@ -110,9 +106,7 @@ def get_transaction(
 
 
 def get_transaction_by_id(db: Session, transaction_id: str) -> Optional[Transaction]:
-    """
-    Recupera transazione per ID (senza verifica ownership).
-    """
+    """Get transaction by ID (without ownership verification)."""
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
 
@@ -122,11 +116,15 @@ def create_transaction(
     user_id: str
 ) -> Transaction:
     """
-    Crea nuova transazione e aggiorna il balance dell'account.
+    Create new transaction and update account's current_balance.
     
-    Il tipo della transazione viene derivato dalla categoria selezionata.
+    Transaction type is derived from the selected category.
+    
+    Balance update logic:
+    - income: current_balance += amount
+    - expense_necessity/expense_extra: current_balance -= amount
     """
-    # Verifica che l'account esista e appartenga all'utente
+    # Verify account exists and belongs to user
     account = db.query(Account).filter(
         Account.id == transaction.account_id,
         Account.user_id == user_id
@@ -135,7 +133,7 @@ def create_transaction(
     if not account:
         raise ValueError("Account not found")
     
-    # Verifica che la categoria esista e appartenga all'utente
+    # Verify category exists and belongs to user
     category = db.query(Category).filter(
         Category.id == transaction.category_id,
         Category.user_id == user_id
@@ -144,10 +142,10 @@ def create_transaction(
     if not category:
         raise ValueError("Category not found")
     
-    # Il tipo della transazione deriva dalla categoria
+    # Transaction type is derived from category
     transaction_type = category.type
     
-    # Crea la transazione
+    # Create the transaction
     db_transaction = Transaction(
         user_id=user_id,
         account_id=transaction.account_id,
@@ -164,7 +162,7 @@ def create_transaction(
     
     db.add(db_transaction)
     
-    # Aggiorna il balance dell'account
+    # Update account's current_balance (NOT initial_balance)
     _update_account_balance_for_transaction(account, transaction.amount, transaction_type, "add")
     
     db.commit()
@@ -180,22 +178,24 @@ def update_transaction(
     user_id: str
 ) -> Optional[Transaction]:
     """
-    Aggiorna transazione esistente e ricalcola i balance se necessario.
+    Update existing transaction and recalculate balances if necessary.
+    
+    If amount, type, or account changes, balances are recalculated.
     """
     db_transaction = get_transaction(db, transaction_id, user_id)
     
     if not db_transaction:
         return None
     
-    # Salva valori precedenti per ricalcolo balance
+    # Save old values for balance recalculation
     old_amount = db_transaction.amount
     old_type = db_transaction.type
     old_account_id = db_transaction.account_id
     
-    # Prepara i dati di aggiornamento
+    # Prepare update data
     update_data = transaction_update.model_dump(exclude_unset=True)
     
-    # Se cambia la categoria, aggiorna anche il tipo
+    # If category changes, update type as well
     new_type = old_type
     if "category_id" in update_data:
         category = db.query(Category).filter(
@@ -209,7 +209,7 @@ def update_transaction(
         new_type = category.type
         update_data["type"] = new_type
     
-    # Se cambia l'account, verifica che esista
+    # If account changes, verify it exists
     new_account_id = update_data.get("account_id", old_account_id)
     if new_account_id != old_account_id:
         new_account = db.query(Account).filter(
@@ -220,20 +220,20 @@ def update_transaction(
         if not new_account:
             raise ValueError("Account not found")
     
-    # Applica gli aggiornamenti
+    # Apply updates
     for field, value in update_data.items():
         setattr(db_transaction, field, value)
     
     new_amount = db_transaction.amount
     
-    # Ricalcola i balance se necessario
+    # Recalculate balances if necessary
     if old_account_id != new_account_id or old_amount != new_amount or old_type != new_type:
-        # Rimuovi effetto dal vecchio account
+        # Remove effect from old account
         old_account = db.query(Account).filter(Account.id == old_account_id).first()
         if old_account:
             _update_account_balance_for_transaction(old_account, old_amount, old_type, "remove")
         
-        # Aggiungi effetto al nuovo account
+        # Add effect to new account
         new_account = db.query(Account).filter(Account.id == new_account_id).first()
         if new_account:
             _update_account_balance_for_transaction(new_account, new_amount, new_type, "add")
@@ -250,14 +250,14 @@ def delete_transaction(
     user_id: str
 ) -> bool:
     """
-    Elimina transazione e ripristina il balance dell'account.
+    Delete transaction and restore account's current_balance.
     """
     db_transaction = get_transaction(db, transaction_id, user_id)
     
     if not db_transaction:
         return False
     
-    # Ripristina il balance dell'account
+    # Restore account's current_balance
     account = db.query(Account).filter(Account.id == db_transaction.account_id).first()
     if account:
         _update_account_balance_for_transaction(
@@ -280,9 +280,7 @@ def get_transaction_summary(
     end_date: Optional[date] = None,
     account_id: Optional[str] = None
 ) -> TransactionSummary:
-    """
-    Calcola il riepilogo delle transazioni per un periodo.
-    """
+    """Calculate transaction summary for a period."""
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     
     if start_date:
@@ -327,9 +325,7 @@ def get_transactions_by_category(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> Dict[str, Decimal]:
-    """
-    Raggruppa le transazioni per categoria e calcola i totali.
-    """
+    """Group transactions by category and calculate totals."""
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     
     if start_date:
@@ -340,7 +336,6 @@ def get_transactions_by_category(
     
     transactions = query.all()
     
-    # Raggruppa per category_id
     by_category: Dict[str, Decimal] = {}
     
     for t in transactions:
@@ -357,9 +352,7 @@ def get_monthly_totals(
     year: int,
     month: int
 ) -> TransactionSummary:
-    """
-    Calcola i totali per un mese specifico.
-    """
+    """Calculate totals for a specific month."""
     from calendar import monthrange
     
     start_date = date(year, month, 1)
@@ -376,29 +369,33 @@ def _update_account_balance_for_transaction(
     operation: str
 ) -> None:
     """
-    Aggiorna il balance dell'account in base alla transazione.
+    Update account's current_balance based on transaction.
     
     Args:
-        account: Account da aggiornare
-        amount: Importo transazione
-        transaction_type: Tipo (income, expense_necessity, expense_extra)
-        operation: "add" per nuova transazione, "remove" per eliminazione
+        account: Account to update
+        amount: Transaction amount
+        transaction_type: Type (income, expense_necessity, expense_extra)
+        operation: "add" for new transaction, "remove" for deletion
     
-    Logica:
-    - income + add → balance aumenta
-    - income + remove → balance diminuisce
-    - expense + add → balance diminuisce
-    - expense + remove → balance aumenta
+    Logic:
+    - income + add → current_balance increases
+    - income + remove → current_balance decreases
+    - expense + add → current_balance decreases
+    - expense + remove → current_balance increases
+    
+    Note: Only current_balance is modified, initial_balance remains unchanged.
     """
     is_expense = transaction_type in ["expense_necessity", "expense_extra"]
     
     if operation == "add":
         if is_expense:
-            account.initial_balance -= amount
+            account.current_balance -= amount
         else:  # income
-            account.initial_balance += amount
+            account.current_balance += amount
     elif operation == "remove":
         if is_expense:
-            account.initial_balance += amount
+            account.current_balance += amount
         else:  # income
-            account.initial_balance -= amount
+            account.current_balance -= amount
+    else:
+        raise ValueError(f"Invalid operation: {operation}. Must be 'add' or 'remove'")

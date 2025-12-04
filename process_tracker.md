@@ -272,22 +272,22 @@
 #### Problemi Critici
 
 ##### A. Strategia Balance Account
-- [ ] Analizzato problema `initial_balance` vs `current_balance`
-- [ ] Decisione presa: [ ] Opzione A (rinomina) / [ ] Opzione B (calcolo dinamico) / [ ] Opzione C (campo separato)
-- [ ] Implementazione completata
-- [ ] File modificati:
-  - [ ] `app/models/account.py`
-  - [ ] `app/crud/account.py`
-  - [ ] `app/crud/transaction.py`
-  - [ ] `app/crud/transfer.py`
-- [ ] Test balance dopo transazione: PASS
-- [ ] Test balance dopo transfer: PASS
+- [x] Analizzato problema `initial_balance` vs `current_balance`
+- [x] Decisione presa: [ ] Opzione A (rinomina) / [ ] Opzione B (calcolo dinamico) / [x] Opzione C (campo separato)
+- [x] Implementazione completata
+- [x] File modificati:
+  - [x] `app/models/account.py`
+  - [x] `app/crud/account.py`
+  - [x] `app/crud/transaction.py`
+  - [x] `app/crud/transfer.py`
+- [x] Test balance dopo transazione: PASS
+- [x] Test balance dopo transfer: PASS
 
 ##### B. Allineamento Tipi Transazione (3 tipi)
-- [ ] Aggiornato commento in `app/models/category.py`
-- [ ] Aggiornato commento in `app/models/transaction.py`
-- [ ] Verificato che schema e CRUD usino stessi 3 tipi
-- [ ] Documentazione allineata
+- [x] Aggiornato commento in `app/models/category.py`
+- [x] Aggiornato commento in `app/models/transaction.py`
+- [x] Verificato che schema e CRUD usino stessi 3 tipi
+- [x] Documentazione allineata
 
 ##### C. Path Correzione
 - [x] Corretto `backend/Dockerfile`: `main:app` → `app.main:app` (Docker build funziona non ancora testato)
@@ -342,7 +342,7 @@
 ---
 
 ## Note Aggiuntive per Fase 3.7
-
+è possibile effettuare transazionie e trasferimenti per somme superiori all'account balance questa è una cosa da sistemare!
 **Tempo stimato:** 2-4 ore
 
 **Priorità correzioni:**

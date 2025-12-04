@@ -1,5 +1,9 @@
 """
 Account-related Pydantic schemas for request/response validation.
+
+Balance Strategy:
+- initial_balance: Impostato solo alla creazione, poi immutabile
+- current_balance: Aggiornato automaticamente, read-only per l'utente
 """
 
 from datetime import datetime
@@ -8,12 +12,15 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 
+# Valid account types
+VALID_ACCOUNT_TYPES = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'loan', 'other']
+
+
 class AccountBase(BaseModel):
     """Base account schema with common fields."""
     name: str = Field(..., min_length=1, max_length=100, description="Account name")
-    type: str = Field(..., description="Account type: checking, savings, credit_card, cash, investment")
+    type: str = Field(..., description="Account type: checking, savings, credit_card, cash, investment, loan, other")
     currency: str = Field(default="EUR", min_length=3, max_length=3, description="Currency code (ISO 4217)")
-    initial_balance: Decimal = Field(default=Decimal("0.00"), description="Initial account balance")
     color: Optional[str] = Field(None, max_length=7, description="Hex color code for UI (e.g., #FF5733)")
     icon: Optional[str] = Field(None, max_length=50, description="Icon name for UI")
     notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
@@ -22,9 +29,8 @@ class AccountBase(BaseModel):
     @classmethod
     def validate_account_type(cls, v: str) -> str:
         """Validate account type."""
-        allowed_types = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'loan', 'other']
-        if v.lower() not in allowed_types:
-            raise ValueError(f'Account type must be one of: {", ".join(allowed_types)}')
+        if v.lower() not in VALID_ACCOUNT_TYPES:
+            raise ValueError(f'Account type must be one of: {", ".join(VALID_ACCOUNT_TYPES)}')
         return v.lower()
     
     @field_validator('currency')
@@ -50,6 +56,19 @@ class AccountBase(BaseModel):
         except ValueError:
             raise ValueError('Color must be a valid hex code')
         return v.upper()
+
+
+class AccountCreate(AccountBase):
+    """
+    Schema for creating a new account.
+    
+    initial_balance viene impostato alla creazione e non può essere modificato successivamente.
+    current_balance viene inizializzato automaticamente allo stesso valore.
+    """
+    initial_balance: Decimal = Field(
+        default=Decimal("0.00"), 
+        description="Initial account balance (set once at creation, immutable)"
+    )
     
     @field_validator('initial_balance')
     @classmethod
@@ -60,13 +79,14 @@ class AccountBase(BaseModel):
         return v.quantize(Decimal('0.01'))
 
 
-class AccountCreate(AccountBase):
-    """Schema for creating a new account."""
-    pass
-
-
 class AccountUpdate(BaseModel):
-    """Schema for updating an existing account."""
+    """
+    Schema for updating an existing account.
+    
+    Note: initial_balance e current_balance NON sono modificabili direttamente.
+    - initial_balance è immutabile dopo la creazione
+    - current_balance viene aggiornato solo tramite transazioni/trasferimenti
+    """
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="Account name")
     type: Optional[str] = Field(None, description="Account type")
     currency: Optional[str] = Field(None, min_length=3, max_length=3, description="Currency code")
@@ -81,9 +101,8 @@ class AccountUpdate(BaseModel):
         """Validate account type if provided."""
         if v is None:
             return v
-        allowed_types = ['checking', 'savings', 'credit_card', 'cash', 'investment', 'loan', 'other']
-        if v.lower() not in allowed_types:
-            raise ValueError(f'Account type must be one of: {", ".join(allowed_types)}')
+        if v.lower() not in VALID_ACCOUNT_TYPES:
+            raise ValueError(f'Account type must be one of: {", ".join(VALID_ACCOUNT_TYPES)}')
         return v.lower()
     
     @field_validator('currency')
@@ -114,9 +133,11 @@ class AccountUpdate(BaseModel):
 
 
 class AccountResponse(AccountBase):
-    """Schema for account response."""
+    """Schema for account response with both balance fields."""
     id: str = Field(..., description="Account unique identifier")
     user_id: str = Field(..., description="Owner user ID")
+    initial_balance: Decimal = Field(..., description="Initial balance (set at creation, immutable)")
+    current_balance: Decimal = Field(..., description="Current balance (updated by transactions/transfers)")
     is_active: bool = Field(default=True, description="Account active status")
     created_at: datetime = Field(..., description="Account creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
@@ -125,12 +146,33 @@ class AccountResponse(AccountBase):
         from_attributes = True
 
 
-class AccountWithBalance(AccountResponse):
-    """Schema for account response with calculated current balance."""
-    current_balance: Decimal = Field(..., description="Current account balance (initial + transactions)")
+class AccountWithStats(AccountResponse):
+    """Schema for account response with additional statistics."""
+    balance_difference: Decimal = Field(..., description="Difference between current and initial balance")
+    transaction_count: Optional[int] = Field(None, description="Number of transactions")
     
-    @field_validator('current_balance')
+    @field_validator('balance_difference', mode='before')
     @classmethod
-    def validate_current_balance(cls, v: Decimal) -> Decimal:
-        """Ensure current balance has max 2 decimal places."""
-        return v.quantize(Decimal('0.01'))
+    def calculate_difference(cls, v, info):
+        """Calculate balance difference if not provided."""
+        if v is not None:
+            return v
+        data = info.data
+        if 'current_balance' in data and 'initial_balance' in data:
+            return data['current_balance'] - data['initial_balance']
+        return Decimal("0.00")
+
+
+class AccountSummary(BaseModel):
+    """Schema for account summary in lists/dashboards."""
+    id: str
+    name: str
+    type: str
+    currency: str
+    current_balance: Decimal
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    is_active: bool = True
+    
+    class Config:
+        from_attributes = True

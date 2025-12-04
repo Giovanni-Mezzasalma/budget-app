@@ -1,6 +1,10 @@
 """
 Account CRUD Operations
-Database operations per Account model
+Database operations for Account model with proper balance management.
+
+Balance Strategy:
+- initial_balance: Set at creation, NEVER modified
+- current_balance: Updated by transactions and transfers
 """
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -16,27 +20,32 @@ def get_accounts(
     user_id: str, 
     skip: int = 0, 
     limit: int = 100,
-    is_active: Optional[bool] = None
+    is_active: Optional[bool] = None,
+    account_type: Optional[str] = None
 ) -> List[Account]:
     """
-    Lista tutti gli account dell'utente.
+    List all accounts for a user.
     
     Args:
         db: Database session
-        user_id: ID utente proprietario
-        skip: Offset per paginazione
-        limit: Numero massimo risultati
-        is_active: Filtra per stato attivo/inattivo
+        user_id: Owner user ID
+        skip: Pagination offset
+        limit: Maximum results
+        is_active: Filter by active/inactive status
+        account_type: Filter by account type
     
     Returns:
-        Lista di Account objects
+        List of Account objects
     """
     query = db.query(Account).filter(Account.user_id == user_id)
     
     if is_active is not None:
         query = query.filter(Account.is_active == is_active)
     
-    return query.offset(skip).limit(limit).all()
+    if account_type is not None:
+        query = query.filter(Account.type == account_type)
+    
+    return query.order_by(Account.name).offset(skip).limit(limit).all()
 
 
 def get_account(
@@ -45,15 +54,15 @@ def get_account(
     user_id: str
 ) -> Optional[Account]:
     """
-    Recupera singolo account verificando ownership.
+    Get single account verifying ownership.
     
     Args:
         db: Database session
-        account_id: ID account da recuperare
-        user_id: ID utente (per verifica ownership)
+        account_id: Account ID to retrieve
+        user_id: User ID (for ownership verification)
     
     Returns:
-        Account object se trovato e appartiene all'utente, None altrimenti
+        Account object if found and belongs to user, None otherwise
     """
     return db.query(Account).filter(
         Account.id == account_id,
@@ -63,8 +72,8 @@ def get_account(
 
 def get_account_by_id(db: Session, account_id: str) -> Optional[Account]:
     """
-    Recupera account per ID (senza verifica ownership).
-    Usare solo internamente quando ownership già verificata.
+    Get account by ID (without ownership verification).
+    Use only internally when ownership already verified.
     """
     return db.query(Account).filter(Account.id == account_id).first()
 
@@ -75,15 +84,18 @@ def create_account(
     user_id: str
 ) -> Account:
     """
-    Crea nuovo account per l'utente.
+    Create new account for user.
+    
+    initial_balance and current_balance are set to the same value at creation.
+    After creation, only current_balance will be modified by transactions/transfers.
     
     Args:
         db: Database session
-        account: Dati account da AccountCreate schema
-        user_id: ID utente proprietario
+        account: Account data from AccountCreate schema
+        user_id: Owner user ID
     
     Returns:
-        Account object creato
+        Created Account object
     """
     db_account = Account(
         user_id=user_id,
@@ -91,6 +103,7 @@ def create_account(
         type=account.type,
         currency=account.currency,
         initial_balance=account.initial_balance,
+        current_balance=account.initial_balance,  # Start with same value
         color=account.color,
         icon=account.icon,
         notes=account.notes,
@@ -111,23 +124,27 @@ def update_account(
     user_id: str
 ) -> Optional[Account]:
     """
-    Aggiorna account esistente.
+    Update existing account.
+    
+    Note: initial_balance and current_balance cannot be modified through this function.
+    - initial_balance is immutable after creation
+    - current_balance is only modified by transactions/transfers
     
     Args:
         db: Database session
-        account_id: ID account da aggiornare
-        account_update: Dati da aggiornare
-        user_id: ID utente (per verifica ownership)
+        account_id: Account ID to update
+        account_update: Data to update
+        user_id: User ID (for ownership verification)
     
     Returns:
-        Account aggiornato se trovato, None altrimenti
+        Updated account if found, None otherwise
     """
     db_account = get_account(db, account_id, user_id)
     
     if not db_account:
         return None
     
-    # Aggiorna solo i campi forniti (exclude_unset=True)
+    # Update only provided fields (exclude_unset=True)
     update_data = account_update.model_dump(exclude_unset=True)
     
     for field, value in update_data.items():
@@ -145,15 +162,15 @@ def delete_account(
     user_id: str
 ) -> bool:
     """
-    Elimina account (hard delete).
+    Delete account (hard delete).
     
     Args:
         db: Database session
-        account_id: ID account da eliminare
-        user_id: ID utente (per verifica ownership)
+        account_id: Account ID to delete
+        user_id: User ID (for ownership verification)
     
     Returns:
-        True se eliminato, False se non trovato
+        True if deleted, False if not found
     """
     db_account = get_account(db, account_id, user_id)
     
@@ -172,15 +189,15 @@ def deactivate_account(
     user_id: str
 ) -> Optional[Account]:
     """
-    Disattiva account (soft delete).
+    Deactivate account (soft delete).
     
     Args:
         db: Database session
-        account_id: ID account da disattivare
-        user_id: ID utente (per verifica ownership)
+        account_id: Account ID to deactivate
+        user_id: User ID (for ownership verification)
     
     Returns:
-        Account disattivato se trovato, None altrimenti
+        Deactivated account if found, None otherwise
     """
     db_account = get_account(db, account_id, user_id)
     
@@ -201,86 +218,89 @@ def update_account_balance(
     operation: str
 ) -> Optional[Account]:
     """
-    Aggiorna balance account (chiamato da transactions/transfers).
+    Update account's current_balance (called by transactions/transfers).
     
     Args:
         db: Database session
-        account_id: ID account
-        amount: Importo da aggiungere/sottrarre
-        operation: 'add' per aggiungere, 'subtract' per sottrarre
+        account_id: Account ID
+        amount: Amount to add/subtract
+        operation: 'add' to add, 'subtract' to subtract
     
     Returns:
-        Account aggiornato se trovato, None altrimenti
+        Updated account if found, None otherwise
     
     Note:
-        Questa funzione NON fa commit - il chiamante deve gestire la transazione
+        This function does NOT commit - caller must manage the transaction.
+        Only current_balance is modified, initial_balance remains unchanged.
     """
     account = db.query(Account).filter(Account.id == account_id).first()
     
     if not account:
         return None
     
-    # Calcola nuovo balance basato su initial_balance + transazioni
-    # Per ora aggiorniamo direttamente (in futuro si può calcolare dinamicamente)
     if operation == 'add':
-        # Per income o transfer in entrata
-        pass  # Il balance viene calcolato dalla property current_balance
+        account.current_balance += amount
     elif operation == 'subtract':
-        # Per expense o transfer in uscita
-        pass  # Il balance viene calcolato dalla property current_balance
+        account.current_balance -= amount
+    else:
+        raise ValueError(f"Invalid operation: {operation}. Must be 'add' or 'subtract'")
     
     return account
 
 
-def get_total_balance(db: Session, user_id: str) -> Decimal:
+def get_total_balance(db: Session, user_id: str, is_active: Optional[bool] = True) -> Decimal:
     """
-    Calcola balance totale di tutti gli account attivi dell'utente.
+    Calculate total current_balance of all accounts for a user.
     
     Args:
         db: Database session
-        user_id: ID utente
+        user_id: User ID
+        is_active: Filter by active status (default: only active accounts)
     
     Returns:
-        Somma dei balance di tutti gli account attivi
+        Sum of current_balance of all matching accounts
     """
-    accounts = get_accounts(db, user_id, is_active=True)
+    accounts = get_accounts(db, user_id, is_active=is_active, limit=1000)
     
     total = Decimal("0.00")
     for account in accounts:
-        total += account.initial_balance  # In futuro: account.current_balance
+        total += account.current_balance
     
     return total
 
+
 def get_accounts_summary(db: Session, user_id: str) -> dict:
     """
-    Calcola il riepilogo dei conti dell'utente.
+    Calculate financial summary for user's accounts.
     
-    Separa:
-    - Patrimonio liquido (checking, savings, cash)
-    - Investimenti (investment)
-    - Crediti/Prestiti (loan) - soldi che ti devono
-    - Debiti (credit_card con balance negativo)
-    - Altri (other)
+    Categories:
+    - Liquid assets (checking, savings, cash)
+    - Investments (investment)
+    - Credits/Loans (loan) - money owed to you
+    - Debts (credit_card with negative balance)
+    - Other (other)
     
     Returns:
-        Dict con totali per categoria e totale patrimonio netto
+        Dict with totals by category and net worth calculations
     """
-    from decimal import Decimal
-    
     accounts = get_accounts(db, user_id, is_active=True, limit=500)
     
-    # Categorie di account
+    # Account type categories
     liquid_types = ['checking', 'savings', 'cash']
     investment_types = ['investment']
-    loan_types = ['loan']  # Crediti verso terzi
+    loan_types = ['loan']  # Credits to third parties
     debt_types = ['credit_card']
     
-    # Calcola totali per categoria
+    # Calculate totals by category
     total_liquid = Decimal("0.00")
     total_investments = Decimal("0.00")
-    total_loans = Decimal("0.00")  # Crediti (soldi che ti devono)
-    total_debts = Decimal("0.00")  # Debiti (soldi che devi)
+    total_loans = Decimal("0.00")  # Credits (money owed to you)
+    total_debts = Decimal("0.00")  # Debts (money you owe)
     total_other = Decimal("0.00")
+    
+    # Also track initial balances for comparison
+    initial_liquid = Decimal("0.00")
+    initial_investments = Decimal("0.00")
     
     accounts_by_type = {
         "liquid": [],
@@ -291,52 +311,58 @@ def get_accounts_summary(db: Session, user_id: str) -> dict:
     }
     
     for account in accounts:
-        balance = account.initial_balance
+        balance = account.current_balance  # Use current_balance, not initial_balance
         
         if account.type in liquid_types:
             total_liquid += balance
+            initial_liquid += account.initial_balance
             accounts_by_type["liquid"].append(account)
         elif account.type in investment_types:
             total_investments += balance
+            initial_investments += account.initial_balance
             accounts_by_type["investments"].append(account)
         elif account.type in loan_types:
             total_loans += balance
             accounts_by_type["loans"].append(account)
         elif account.type in debt_types:
-            # Per carte di credito, balance negativo = debito
+            # For credit cards, negative balance = debt
             if balance < 0:
                 total_debts += abs(balance)
             else:
-                total_liquid += balance  # Se positivo, è liquidità
+                total_liquid += balance  # If positive, it's liquidity
             accounts_by_type["debts"].append(account)
         else:
             total_other += balance
             accounts_by_type["other"].append(account)
     
-    # Patrimonio netto = liquido + investimenti - debiti
-    # I prestiti (crediti) sono a parte perché sono soldi "bloccati"
+    # Net worth = liquid + investments - debts
+    # Loans (credits) are separate as they're "locked" money
     net_worth = total_liquid + total_investments - total_debts
     
-    # Patrimonio totale inclusi crediti
+    # Total assets including credits
     total_assets = net_worth + total_loans
     
     return {
         "total_liquid": total_liquid,
         "total_investments": total_investments,
-        "total_loans": total_loans,  # Crediti verso terzi
+        "total_loans": total_loans,  # Credits to third parties
         "total_debts": total_debts,
         "total_other": total_other,
-        "net_worth": net_worth,  # Patrimonio netto (esclusi crediti)
-        "total_assets": total_assets,  # Totale inclusi crediti
+        "net_worth": net_worth,  # Net worth (excluding credits)
+        "total_assets": total_assets,  # Total including credits
         "accounts_count": len(accounts),
         "by_category": {
             "liquid": {
                 "total": total_liquid,
+                "initial": initial_liquid,
+                "difference": total_liquid - initial_liquid,
                 "count": len(accounts_by_type["liquid"]),
                 "types": liquid_types
             },
             "investments": {
                 "total": total_investments,
+                "initial": initial_investments,
+                "difference": total_investments - initial_investments,
                 "count": len(accounts_by_type["investments"]),
                 "types": investment_types
             },
@@ -344,13 +370,13 @@ def get_accounts_summary(db: Session, user_id: str) -> dict:
                 "total": total_loans,
                 "count": len(accounts_by_type["loans"]),
                 "types": loan_types,
-                "description": "Crediti verso terzi (soldi che ti devono)"
+                "description": "Credits to third parties (money owed to you)"
             },
             "debts": {
                 "total": total_debts,
                 "count": len(accounts_by_type["debts"]),
                 "types": debt_types,
-                "description": "Debiti (soldi che devi)"
+                "description": "Debts (money you owe)"
             },
             "other": {
                 "total": total_other,
@@ -359,3 +385,56 @@ def get_accounts_summary(db: Session, user_id: str) -> dict:
             }
         }
     }
+
+
+def verify_all_balances(db: Session, user_id: str) -> List[dict]:
+    """
+    Verify balance integrity for all user accounts.
+    
+    Returns:
+        List of accounts with balance discrepancies
+    """
+    accounts = get_accounts(db, user_id, limit=1000)
+    discrepancies = []
+    
+    for account in accounts:
+        is_valid, difference = account.verify_balance_integrity()
+        if not is_valid:
+            discrepancies.append({
+                "account_id": account.id,
+                "account_name": account.name,
+                "current_balance": float(account.current_balance),
+                "calculated_balance": float(account.recalculate_balance()),
+                "difference": float(difference)
+            })
+    
+    return discrepancies
+
+
+def fix_account_balance(db: Session, account_id: str, user_id: str) -> Optional[Account]:
+    """
+    Recalculate and fix current_balance from transactions/transfers.
+    
+    Use this to correct any balance discrepancies.
+    
+    Args:
+        db: Database session
+        account_id: Account ID to fix
+        user_id: User ID (for ownership verification)
+    
+    Returns:
+        Account with corrected balance, None if not found
+    """
+    account = get_account(db, account_id, user_id)
+    
+    if not account:
+        return None
+    
+    # Recalculate from transactions and transfers
+    correct_balance = account.recalculate_balance()
+    account.current_balance = correct_balance
+    
+    db.commit()
+    db.refresh(account)
+    
+    return account

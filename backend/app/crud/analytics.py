@@ -1,6 +1,8 @@
 """
 Analytics CRUD Operations
-Calcoli e aggregazioni per statistiche e report
+Calculations and aggregations for statistics and reports.
+
+Uses current_balance for all balance-related calculations.
 """
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, List, Any
@@ -21,26 +23,26 @@ def calculate_summary(
     account_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Calcola il riepilogo finanziario completo.
+    Calculate complete financial summary.
     
     Args:
         db: Database session
-        user_id: ID utente
-        start_date: Data inizio periodo (default: inizio mese corrente)
-        end_date: Data fine periodo (default: oggi)
-        account_id: Filtra per account specifico
+        user_id: User ID
+        start_date: Period start (default: current month start)
+        end_date: Period end (default: today)
+        account_id: Filter by specific account
     
     Returns:
-        Dict con totali, metriche e info periodo
+        Dict with totals, metrics, and period info
     """
-    # Default: mese corrente
+    # Default: current month
     if not start_date:
         today = date.today()
         start_date = date(today.year, today.month, 1)
     if not end_date:
         end_date = date.today()
     
-    # Query transazioni nel periodo
+    # Query transactions in period
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.date >= start_date,
@@ -52,7 +54,7 @@ def calculate_summary(
     
     transactions = query.all()
     
-    # Calcola totali per tipo
+    # Calculate totals by type
     total_income = Decimal("0.00")
     total_expense_necessity = Decimal("0.00")
     total_expense_extra = Decimal("0.00")
@@ -68,14 +70,15 @@ def calculate_summary(
     total_expenses = total_expense_necessity + total_expense_extra
     net = total_income - total_expenses
     
-    # Calcola balance totale accounts
+    # Calculate total current_balance of accounts
     accounts = db.query(Account).filter(
         Account.user_id == user_id,
         Account.is_active == True
     ).all()
-    total_balance = sum(a.initial_balance for a in accounts)
+    total_balance = sum(a.current_balance for a in accounts)  # Use current_balance
+    total_initial = sum(a.initial_balance for a in accounts)
     
-    # Metriche
+    # Metrics
     days_in_period = (end_date - start_date).days + 1
     avg_daily_expense = total_expenses / days_in_period if days_in_period > 0 else Decimal("0.00")
     savings_rate = ((total_income - total_expenses) / total_income * 100) if total_income > 0 else Decimal("0.00")
@@ -94,7 +97,9 @@ def calculate_summary(
             "net": float(net)
         },
         "accounts": {
-            "total_balance": float(total_balance),
+            "total_balance": float(total_balance),  # Current balance
+            "total_initial": float(total_initial),  # Initial balance for reference
+            "balance_change": float(total_balance - total_initial),
             "count": len(accounts)
         },
         "metrics": {
@@ -112,22 +117,22 @@ def calculate_monthly_trend(
     account_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Calcola il trend mensile di entrate e uscite.
+    Calculate monthly trend of income and expenses.
     
     Args:
         db: Database session
-        user_id: ID utente
-        months: Numero di mesi da analizzare (default: 12)
-        account_id: Filtra per account specifico
+        user_id: User ID
+        months: Number of months to analyze (default: 12)
+        account_id: Filter by specific account
     
     Returns:
-        Dict con dati mensili e info periodo
+        Dict with monthly data and period info
     """
     today = date.today()
     start_date = date(today.year, today.month, 1) - timedelta(days=30 * (months - 1))
     start_date = date(start_date.year, start_date.month, 1)
     
-    # Query transazioni
+    # Query transactions
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.date >= start_date
@@ -138,7 +143,7 @@ def calculate_monthly_trend(
     
     transactions = query.all()
     
-    # Raggruppa per mese
+    # Group by month
     monthly_data = {}
     
     for t in transactions:
@@ -166,7 +171,7 @@ def calculate_monthly_trend(
         
         monthly_data[month_key]["transaction_count"] += 1
     
-    # Calcola net e converti a lista
+    # Calculate net and convert to list
     result = []
     for month_key in sorted(monthly_data.keys()):
         data = monthly_data[month_key]
@@ -199,26 +204,26 @@ def calculate_totals_by_category(
     transaction_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Calcola i totali raggruppati per categoria.
+    Calculate totals grouped by category.
     
     Args:
         db: Database session
-        user_id: ID utente
-        start_date: Data inizio periodo
-        end_date: Data fine periodo
-        transaction_type: Filtra per tipo (income, expense_necessity, expense_extra)
+        user_id: User ID
+        start_date: Period start
+        end_date: Period end
+        transaction_type: Filter by type (income, expense_necessity, expense_extra)
     
     Returns:
-        Dict con totali per categoria e grand total
+        Dict with totals by category and grand total
     """
-    # Default: mese corrente
+    # Default: current month
     if not start_date:
         today = date.today()
         start_date = date(today.year, today.month, 1)
     if not end_date:
         end_date = date.today()
     
-    # Query transazioni
+    # Query transactions
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.date >= start_date,
@@ -230,7 +235,7 @@ def calculate_totals_by_category(
     
     transactions = query.all()
     
-    # Raggruppa per categoria
+    # Group by category
     category_totals = {}
     
     for t in transactions:
@@ -244,7 +249,7 @@ def calculate_totals_by_category(
         category_totals[cat_id]["total"] += t.amount
         category_totals[cat_id]["count"] += 1
     
-    # Arricchisci con info categoria
+    # Enrich with category info
     result = []
     for cat_id, data in category_totals.items():
         category = db.query(Category).filter(
@@ -265,12 +270,12 @@ def calculate_totals_by_category(
                 "percentage": 0.0
             })
     
-    # Calcola percentuali
+    # Calculate percentages
     grand_total = sum(item["total"] for item in result)
     for item in result:
         item["percentage"] = round((item["total"] / grand_total * 100), 2) if grand_total > 0 else 0.0
     
-    # Ordina per totale decrescente
+    # Sort by total descending
     result.sort(key=lambda x: x["total"], reverse=True)
     
     return {
@@ -290,25 +295,25 @@ def calculate_totals_by_account(
     end_date: Optional[date] = None
 ) -> Dict[str, Any]:
     """
-    Calcola i totali raggruppati per account.
+    Calculate totals grouped by account.
     
     Args:
         db: Database session
-        user_id: ID utente
-        start_date: Data inizio periodo
-        end_date: Data fine periodo
+        user_id: User ID
+        start_date: Period start
+        end_date: Period end
     
     Returns:
-        Dict con totali per account
+        Dict with totals by account
     """
-    # Default: mese corrente
+    # Default: current month
     if not start_date:
         today = date.today()
         start_date = date(today.year, today.month, 1)
     if not end_date:
         end_date = date.today()
     
-    # Prendi tutti gli account attivi
+    # Get all active accounts
     accounts = db.query(Account).filter(
         Account.user_id == user_id,
         Account.is_active == True
@@ -333,7 +338,9 @@ def calculate_totals_by_account(
             "account_type": account.type,
             "account_color": account.color,
             "currency": account.currency,
-            "current_balance": float(account.initial_balance),
+            "initial_balance": float(account.initial_balance),
+            "current_balance": float(account.current_balance),  # Use current_balance
+            "balance_change": float(account.current_balance - account.initial_balance),
             "period_income": float(income),
             "period_expenses": float(expenses),
             "period_net": float(income - expenses),
@@ -349,7 +356,9 @@ def calculate_totals_by_account(
         },
         "accounts": result,
         "totals": {
-            "total_balance": sum(a["current_balance"] for a in result),
+            "total_initial_balance": sum(a["initial_balance"] for a in result),
+            "total_current_balance": sum(a["current_balance"] for a in result),
+            "total_balance_change": sum(a["balance_change"] for a in result),
             "total_income": sum(a["period_income"] for a in result),
             "total_expenses": sum(a["period_expenses"] for a in result)
         }
@@ -364,24 +373,24 @@ def calculate_daily_breakdown(
     account_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Calcola breakdown giornaliero delle transazioni.
+    Calculate daily breakdown of transactions.
     
     Args:
         db: Database session
-        user_id: ID utente
-        start_date: Data inizio (default: 30 giorni fa)
-        end_date: Data fine (default: oggi)
-        account_id: Filtra per account
+        user_id: User ID
+        start_date: Start date (default: 30 days ago)
+        end_date: End date (default: today)
+        account_id: Filter by account
     
     Returns:
-        Dict con dati giornalieri
+        Dict with daily data
     """
     if not end_date:
         end_date = date.today()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
-    # Query transazioni
+    # Query transactions
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.date >= start_date,
@@ -393,7 +402,7 @@ def calculate_daily_breakdown(
     
     transactions = query.all()
     
-    # Inizializza tutti i giorni nel range
+    # Initialize all days in range
     daily_data = {}
     current = start_date
     while current <= end_date:
@@ -409,7 +418,7 @@ def calculate_daily_breakdown(
         }
         current += timedelta(days=1)
     
-    # Popola con transazioni
+    # Populate with transactions
     for t in transactions:
         day_key = t.date.isoformat()
         if day_key in daily_data:
@@ -424,7 +433,7 @@ def calculate_daily_breakdown(
             
             daily_data[day_key]["transaction_count"] += 1
     
-    # Converti a lista
+    # Convert to list
     result = []
     for day_key in sorted(daily_data.keys()):
         data = daily_data[day_key]
@@ -456,16 +465,16 @@ def calculate_year_comparison(
     year2: int
 ) -> Dict[str, Any]:
     """
-    Confronta due anni side-by-side.
+    Compare two years side-by-side.
     
     Args:
         db: Database session
-        user_id: ID utente
-        year1: Primo anno
-        year2: Secondo anno
+        user_id: User ID
+        year1: First year
+        year2: Second year
     
     Returns:
-        Dict con confronto mensile e totali annuali
+        Dict with monthly comparison and yearly totals
     """
     result = {
         "year1": year1,
@@ -502,7 +511,7 @@ def calculate_year_comparison(
         
         result["comparison"].append(month_data)
     
-    # Totali annuali
+    # Yearly totals
     for year_key, year in [("year1", year1), ("year2", year2)]:
         result[f"{year_key}_totals"] = {
             "income": sum(m[f"{year_key}_income"] for m in result["comparison"]),

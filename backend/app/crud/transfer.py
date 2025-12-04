@@ -1,6 +1,15 @@
 """
 Transfer CRUD Operations
-Database operations per Transfer model con aggiornamento automatico balance accounts
+Database operations for Transfer model with automatic current_balance updates.
+
+Transfer types:
+- generic: Generic transfer / Bank transfer
+- withdrawal: Withdrawal (Account → Cash)
+- deposit: Deposit (Cash → Account)
+- savings: Savings (Checking → Savings)
+- investment: Investment (Checking → Investment)
+- loan_given: Loan given (Checking → Loans to third parties)
+- loan_received: Loan received (Loans → Checking)
 """
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -24,35 +33,35 @@ def validate_transfer_direction(
     to_account: Account
 ) -> None:
     """
-    Valida che la direzione del trasferimento sia coerente con il tipo.
+    Validate that transfer direction is consistent with type.
     
     Raises:
-        ValueError: Se la direzione non è valida per il tipo di trasferimento
+        ValueError: If direction is invalid for the transfer type
     """
     rules = TRANSFER_TYPE_DIRECTION_RULES.get(transfer_type)
     
     if not rules:
-        return  # Tipo non riconosciuto, lascia passare (sarà gestito altrove)
+        return  # Unrecognized type, let it pass (will be handled elsewhere)
     
     from_types = rules.get("from_account_types")
     to_types = rules.get("to_account_types")
     
-    # Verifica account origine
+    # Verify source account
     if from_types is not None and from_account.type not in from_types:
         allowed = ", ".join(from_types)
         raise ValueError(
-            f"Per un trasferimento di tipo '{TRANSFER_TYPE_LABELS.get(transfer_type, transfer_type)}', "
-            f"l'account di origine deve essere di tipo: {allowed}. "
-            f"Account selezionato: {from_account.name} ({from_account.type})"
+            f"For a '{TRANSFER_TYPE_LABELS.get(transfer_type, transfer_type)}' transfer, "
+            f"source account must be of type: {allowed}. "
+            f"Selected account: {from_account.name} ({from_account.type})"
         )
     
-    # Verifica account destinazione
+    # Verify destination account
     if to_types is not None and to_account.type not in to_types:
         allowed = ", ".join(to_types)
         raise ValueError(
-            f"Per un trasferimento di tipo '{TRANSFER_TYPE_LABELS.get(transfer_type, transfer_type)}', "
-            f"l'account di destinazione deve essere di tipo: {allowed}. "
-            f"Account selezionato: {to_account.name} ({to_account.type})"
+            f"For a '{TRANSFER_TYPE_LABELS.get(transfer_type, transfer_type)}' transfer, "
+            f"destination account must be of type: {allowed}. "
+            f"Selected account: {to_account.name} ({to_account.type})"
         )
 
 
@@ -67,9 +76,7 @@ def get_transfers(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> List[Transfer]:
-    """
-    Lista i trasferimenti dell'utente con filtri opzionali.
-    """
+    """List user transfers with optional filters."""
     query = db.query(Transfer).filter(Transfer.user_id == user_id)
     
     if transfer_type is not None:
@@ -97,9 +104,7 @@ def get_transfer(
     transfer_id: str,
     user_id: str
 ) -> Optional[Transfer]:
-    """
-    Recupera singolo trasferimento verificando ownership.
-    """
+    """Get single transfer verifying ownership."""
     return db.query(Transfer).filter(
         Transfer.id == transfer_id,
         Transfer.user_id == user_id
@@ -107,9 +112,7 @@ def get_transfer(
 
 
 def get_transfer_by_id(db: Session, transfer_id: str) -> Optional[Transfer]:
-    """
-    Recupera trasferimento per ID (senza verifica ownership).
-    """
+    """Get transfer by ID (without ownership verification)."""
     return db.query(Transfer).filter(Transfer.id == transfer_id).first()
 
 
@@ -119,12 +122,16 @@ def create_transfer(
     user_id: str
 ) -> Transfer:
     """
-    Crea nuovo trasferimento e aggiorna i balance di entrambi gli account.
+    Create new transfer and update current_balance of both accounts.
+    
+    Balance updates:
+    - from_account.current_balance -= (amount + fee)
+    - to_account.current_balance += amount (or amount * exchange_rate)
     
     Raises:
-        ValueError: Se account non trovato, direzione non valida, etc.
+        ValueError: If account not found, invalid direction, etc.
     """
-    # Verifica che l'account origine esista e appartenga all'utente
+    # Verify source account exists and belongs to user
     from_account = db.query(Account).filter(
         Account.id == transfer.from_account_id,
         Account.user_id == user_id
@@ -133,7 +140,7 @@ def create_transfer(
     if not from_account:
         raise ValueError("Source account not found")
     
-    # Verifica che l'account destinazione esista e appartenga all'utente
+    # Verify destination account exists and belongs to user
     to_account = db.query(Account).filter(
         Account.id == transfer.to_account_id,
         Account.user_id == user_id
@@ -142,18 +149,18 @@ def create_transfer(
     if not to_account:
         raise ValueError("Destination account not found")
     
-    # Verifica che gli account siano diversi
+    # Verify accounts are different
     if transfer.from_account_id == transfer.to_account_id:
         raise ValueError("Source and destination accounts must be different")
     
-    # Valida la direzione del trasferimento rispetto al tipo
+    # Validate transfer direction based on type
     validate_transfer_direction(transfer.type, from_account, to_account)
     
-    # Calcola importo totale da sottrarre (amount + fee)
+    # Calculate total deduction (amount + fee)
     fee = transfer.fee if transfer.fee else Decimal("0.00")
     total_deduction = transfer.amount + fee
     
-    # Crea il trasferimento
+    # Create the transfer
     db_transfer = Transfer(
         user_id=user_id,
         from_account_id=transfer.from_account_id,
@@ -169,14 +176,14 @@ def create_transfer(
     
     db.add(db_transfer)
     
-    # Aggiorna i balance degli account
-    from_account.initial_balance -= total_deduction
+    # Update current_balance of both accounts (NOT initial_balance)
+    from_account.current_balance -= total_deduction
     
     if transfer.exchange_rate:
         converted_amount = transfer.amount * transfer.exchange_rate
-        to_account.initial_balance += converted_amount
+        to_account.current_balance += converted_amount
     else:
-        to_account.initial_balance += transfer.amount
+        to_account.current_balance += transfer.amount
     
     db.commit()
     db.refresh(db_transfer)
@@ -191,29 +198,29 @@ def update_transfer(
     user_id: str
 ) -> Optional[Transfer]:
     """
-    Aggiorna trasferimento esistente e ricalcola i balance se necessario.
+    Update existing transfer and recalculate balances if necessary.
     """
     db_transfer = get_transfer(db, transfer_id, user_id)
     
     if not db_transfer:
         return None
     
-    # Salva valori precedenti per ricalcolo balance
+    # Save old values for balance recalculation
     old_amount = db_transfer.amount
     old_fee = db_transfer.fee
     old_from_account_id = db_transfer.from_account_id
     old_to_account_id = db_transfer.to_account_id
     old_exchange_rate = db_transfer.exchange_rate
     
-    # Prepara i dati di aggiornamento
+    # Prepare update data
     update_data = transfer_update.model_dump(exclude_unset=True)
     
-    # Determina i nuovi valori (o mantieni i vecchi)
+    # Determine new values (or keep old)
     new_from_account_id = update_data.get("from_account_id", old_from_account_id)
     new_to_account_id = update_data.get("to_account_id", old_to_account_id)
     new_type = update_data.get("type", db_transfer.type)
     
-    # Verifica nuovi account se specificati
+    # Verify new accounts if specified
     if new_from_account_id != old_from_account_id:
         new_from_account = db.query(Account).filter(
             Account.id == new_from_account_id,
@@ -237,30 +244,30 @@ def update_transfer(
     if new_from_account_id == new_to_account_id:
         raise ValueError("Source and destination accounts must be different")
     
-    # Valida la direzione se cambiano account o tipo
+    # Validate direction if accounts or type change
     if (new_from_account_id != old_from_account_id or 
         new_to_account_id != old_to_account_id or 
         "type" in update_data):
         validate_transfer_direction(new_type, new_from_account, new_to_account)
     
-    # Ripristina i balance precedenti
+    # Restore old balances
     old_from_account = db.query(Account).filter(Account.id == old_from_account_id).first()
     old_to_account = db.query(Account).filter(Account.id == old_to_account_id).first()
     
     if old_from_account:
-        old_from_account.initial_balance += (old_amount + old_fee)
+        old_from_account.current_balance += (old_amount + old_fee)
     
     if old_to_account:
         if old_exchange_rate:
-            old_to_account.initial_balance -= (old_amount * old_exchange_rate)
+            old_to_account.current_balance -= (old_amount * old_exchange_rate)
         else:
-            old_to_account.initial_balance -= old_amount
+            old_to_account.current_balance -= old_amount
     
-    # Applica gli aggiornamenti
+    # Apply updates
     for field, value in update_data.items():
         setattr(db_transfer, field, value)
     
-    # Applica nuovi balance
+    # Apply new balances
     new_amount = db_transfer.amount
     new_fee = db_transfer.fee
     new_exchange_rate = db_transfer.exchange_rate
@@ -269,13 +276,13 @@ def update_transfer(
     new_to_account = db.query(Account).filter(Account.id == new_to_account_id).first()
     
     if new_from_account:
-        new_from_account.initial_balance -= (new_amount + new_fee)
+        new_from_account.current_balance -= (new_amount + new_fee)
     
     if new_to_account:
         if new_exchange_rate:
-            new_to_account.initial_balance += (new_amount * new_exchange_rate)
+            new_to_account.current_balance += (new_amount * new_exchange_rate)
         else:
-            new_to_account.initial_balance += new_amount
+            new_to_account.current_balance += new_amount
     
     db.commit()
     db.refresh(db_transfer)
@@ -289,7 +296,7 @@ def delete_transfer(
     user_id: str
 ) -> bool:
     """
-    Elimina trasferimento e ripristina i balance degli account.
+    Delete transfer and restore current_balance of both accounts.
     """
     db_transfer = get_transfer(db, transfer_id, user_id)
     
@@ -300,13 +307,13 @@ def delete_transfer(
     to_account = db.query(Account).filter(Account.id == db_transfer.to_account_id).first()
     
     if from_account:
-        from_account.initial_balance += (db_transfer.amount + db_transfer.fee)
+        from_account.current_balance += (db_transfer.amount + db_transfer.fee)
     
     if to_account:
         if db_transfer.exchange_rate:
-            to_account.initial_balance -= (db_transfer.amount * db_transfer.exchange_rate)
+            to_account.current_balance -= (db_transfer.amount * db_transfer.exchange_rate)
         else:
-            to_account.initial_balance -= db_transfer.amount
+            to_account.current_balance -= db_transfer.amount
     
     db.delete(db_transfer)
     db.commit()
@@ -321,9 +328,7 @@ def get_transfers_by_type(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> List[Transfer]:
-    """
-    Recupera trasferimenti per tipo specifico.
-    """
+    """Get transfers by specific type."""
     return get_transfers(
         db,
         user_id=user_id,
@@ -338,9 +343,7 @@ def get_loans_summary(
     db: Session,
     user_id: str
 ) -> dict:
-    """
-    Calcola riepilogo prestiti (dati e ricevuti).
-    """
+    """Calculate loans summary (given and received)."""
     loans_given = get_transfers_by_type(db, user_id, "loan_given")
     loans_received = get_transfers_by_type(db, user_id, "loan_received")
     
@@ -364,9 +367,7 @@ def get_transfer_statistics(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> dict:
-    """
-    Calcola statistiche sui trasferimenti per tipo.
-    """
+    """Calculate transfer statistics by type."""
     query = db.query(Transfer).filter(Transfer.user_id == user_id)
     
     if start_date:

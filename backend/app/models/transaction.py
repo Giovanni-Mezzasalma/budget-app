@@ -56,7 +56,7 @@ class Transaction(Base):
         Numeric(15, 2),
         nullable=False
     )
-    type: Mapped[str] = mapped_column(String(20), nullable=False)  # income or expense
+    type: Mapped[str] = mapped_column(String(20), nullable=False)  # income, expense_necessity or expense_extra
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)

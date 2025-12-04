@@ -104,7 +104,7 @@ accounts (1) ──┬───> (N) transfers (from)
 
 ## 📂 Tabella: categories
 
-**Descrizione:** Categorie per classificare transazioni (income/expense).
+**Descrizione:** Categorie per classificare transazioni (income/expense_necessity/expense_extra).
 
 ### Colonne
 
@@ -113,7 +113,7 @@ accounts (1) ──┬───> (N) transfers (from)
 | id | UUID | PK | Identificatore univoco |
 | user_id | UUID | FK → users.id, NOT NULL | Proprietario categoria |
 | name | VARCHAR(100) | NOT NULL | Nome categoria |
-| type | ENUM | NOT NULL | income o expense |
+| type | ENUM | NOT NULL | income o expense_necessity o expense_extra |
 | parent_category_id | UUID | FK → categories.id, NULL | Categoria padre (sottocategorie) |
 | color | VARCHAR(7) | NULL | Colore HEX |
 | icon | VARCHAR(50) | NULL | Emoji/icona |
@@ -123,7 +123,8 @@ accounts (1) ──┬───> (N) transfers (from)
 ### ENUM: transaction_type
 
 - `income` - Entrata
-- `expense` - Uscita
+- `expense_necessity` - Uscita di necessità
+- `expense_extra` - Uscita extra
 
 ### Constraints
 
@@ -156,7 +157,7 @@ accounts (1) ──┬───> (N) transfers (from)
 | account_id | UUID | FK → accounts.id, NOT NULL | Account coinvolto |
 | category_id | UUID | FK → categories.id, NOT NULL | Categoria |
 | amount | NUMERIC(12,2) | NOT NULL | Importo |
-| type | ENUM | NOT NULL | income o expense |
+| type | ENUM | NOT NULL | income o expense_necessity o expense_extra  |
 | date | DATE | NOT NULL | Data transazione |
 | description | VARCHAR(255) | NULL | Descrizione breve |
 | notes | TEXT | NULL | Note dettagliate |
@@ -389,7 +390,7 @@ FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
   "account_id": "223e4567-e89b-12d3-a456-426614174000",
   "category_id": "423e4567-e89b-12d3-a456-426614174000",
   "amount": 50.00,
-  "type": "expense",
+  "type": "expense_necessity",
   "date": "2025-11-15",
   "description": "Spesa settimanale",
   "tags": ["alimentari", "supermercato"]
