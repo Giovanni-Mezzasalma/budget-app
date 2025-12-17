@@ -3003,9 +3003,9 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 #### 3.7.2 - Problemi Medi (Da correggere prima del deploy)
 
 ##### D. Enum `ChartType` duplicato
-- [ ] **Problema:** Definito sia in `models/custom_chart.py` che in `schemas/custom_chart.py`
-- [ ] **Rischio:** Potrebbero andare out of sync
-- [ ] **Azione:** Centralizzare in un unico file (es. `schemas/custom_chart.py`) e importare nel model
+- [x] **Problema:** Definito sia in `models/custom_chart.py` che in `schemas/custom_chart.py`
+- [x] **Rischio:** Potrebbero andare out of sync
+- [x] **Azione:** Centralizzare in un unico file (es. `schemas/custom_chart.py`) e importare nel model
 
 ##### E. Validazione incompleta in `update_transfer`
 - [ ] **Problema:** La validazione della direzione transfer potrebbe non coprire tutti i casi edge

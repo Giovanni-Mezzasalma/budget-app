@@ -1,6 +1,8 @@
 """
 Custom Chart Schemas
 Validazione dati grafici personalizzati
+
+Nota: ChartType enum è definito qui ed importato dal model per evitare duplicazioni.
 """
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
@@ -9,7 +11,11 @@ from enum import Enum
 
 
 class ChartType(str, Enum):
-    """Tipi di grafici disponibili"""
+    """
+    Tipi di grafici disponibili.
+    
+    Questo enum è la source of truth ed è importato anche dal model SQLAlchemy.
+    """
     LINE = "line"
     BAR = "bar"
     PIE = "pie"

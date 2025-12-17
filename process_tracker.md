@@ -295,9 +295,9 @@
 #### Problemi Medi
 
 ##### D. Centralizzazione Enum ChartType
-- [ ] Rimosso enum duplicato da `app/models/custom_chart.py`
-- [ ] Import da `app/schemas/custom_chart.py`
-- [ ] Test endpoint custom-charts funzionante
+- [x] Rimosso enum duplicato da `app/models/custom_chart.py`
+- [x] Import da `app/schemas/custom_chart.py`
+- [x] Test endpoint custom-charts funzionante
 
 ##### E. Validazione update_transfer
 - [ ] Revisione codice `app/crud/transfer.py`

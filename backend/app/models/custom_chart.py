@@ -2,21 +2,15 @@
 CustomChart Model
 Gestisce grafici personalizzati utente
 """
-from sqlalchemy import Column, String, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
+
 from ..database import Base
-
-
-class ChartType(str, enum.Enum):
-    """Tipi di grafici disponibili"""
-    LINE = "line"
-    BAR = "bar"
-    PIE = "pie"
-    AREA = "area"
+# Import ChartType dallo schema per evitare duplicazione
+from ..schemas.custom_chart import ChartType
 
 
 class CustomChart(Base):
@@ -32,7 +26,7 @@ class CustomChart(Base):
 
     # Chart details
     name = Column(String(100), nullable=False)
-    chart_type = Column(Enum(ChartType), nullable=False)
+    chart_type = Column(SQLEnum(ChartType), nullable=False)
     
     # Configuration (JSONB per flessibilità)
     config = Column(JSONB, nullable=False)
