@@ -3008,9 +3008,9 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 - [x] **Azione:** Centralizzare in un unico file (es. `schemas/custom_chart.py`) e importare nel model
 
 ##### E. Validazione incompleta in `update_transfer`
-- [ ] **Problema:** La validazione della direzione transfer potrebbe non coprire tutti i casi edge
-- [ ] **File:** `app/crud/transfer.py`
-- [ ] **Azione:** Verificare e completare validazione
+- [x] **Problema:** La validazione della direzione transfer potrebbe non coprire tutti i casi edge
+- [x] **File:** `app/crud/transfer.py`
+- [x] **Azione:** Verificare e completare validazione
 
 ##### F. File SQL in `database/` obsoleti
 - [ ] **Problema:** I file SQL originali sono out of sync con i model attuali

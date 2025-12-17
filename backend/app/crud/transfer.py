@@ -199,6 +199,20 @@ def update_transfer(
 ) -> Optional[Transfer]:
     """
     Update existing transfer and recalculate balances if necessary.
+    
+    Validations:
+    - Transfer exists and belongs to user
+    - New accounts (if specified) exist, belong to user, and are active
+    - Source and destination accounts are different
+    - Transfer direction is valid for the transfer type
+    - Amount is positive (if specified)
+    - Fee is non-negative (if specified)
+    
+    Raises:
+        ValueError: If validation fails
+    
+    Returns:
+        Updated transfer if found, None if transfer doesn't exist
     """
     db_transfer = get_transfer(db, transfer_id, user_id)
     
@@ -215,42 +229,54 @@ def update_transfer(
     # Prepare update data
     update_data = transfer_update.model_dump(exclude_unset=True)
     
+    # Validate amount if provided
+    if "amount" in update_data and update_data["amount"] <= 0:
+        raise ValueError("Amount must be positive")
+    
+    # Validate fee if provided
+    if "fee" in update_data and update_data["fee"] < 0:
+        raise ValueError("Fee cannot be negative")
+    
     # Determine new values (or keep old)
     new_from_account_id = update_data.get("from_account_id", old_from_account_id)
     new_to_account_id = update_data.get("to_account_id", old_to_account_id)
     new_type = update_data.get("type", db_transfer.type)
     
-    # Verify new accounts if specified
-    if new_from_account_id != old_from_account_id:
-        new_from_account = db.query(Account).filter(
-            Account.id == new_from_account_id,
-            Account.user_id == user_id
-        ).first()
-        if not new_from_account:
-            raise ValueError("New source account not found")
-    else:
-        new_from_account = db.query(Account).filter(Account.id == new_from_account_id).first()
-    
-    if new_to_account_id != old_to_account_id:
-        new_to_account = db.query(Account).filter(
-            Account.id == new_to_account_id,
-            Account.user_id == user_id
-        ).first()
-        if not new_to_account:
-            raise ValueError("New destination account not found")
-    else:
-        new_to_account = db.query(Account).filter(Account.id == new_to_account_id).first()
-    
+    # Validate source and destination are different
     if new_from_account_id == new_to_account_id:
         raise ValueError("Source and destination accounts must be different")
     
-    # Validate direction if accounts or type change
+    # Always fetch and validate both accounts (they might have been deactivated/deleted)
+    new_from_account = db.query(Account).filter(
+        Account.id == new_from_account_id,
+        Account.user_id == user_id
+    ).first()
+    
+    if not new_from_account:
+        raise ValueError("Source account not found or does not belong to user")
+    
+    if not new_from_account.is_active:
+        raise ValueError(f"Source account '{new_from_account.name}' is inactive")
+    
+    new_to_account = db.query(Account).filter(
+        Account.id == new_to_account_id,
+        Account.user_id == user_id
+    ).first()
+    
+    if not new_to_account:
+        raise ValueError("Destination account not found or does not belong to user")
+    
+    if not new_to_account.is_active:
+        raise ValueError(f"Destination account '{new_to_account.name}' is inactive")
+    
+    # Validate transfer direction based on type
+    # Always validate if accounts or type change, to ensure consistency
     if (new_from_account_id != old_from_account_id or 
         new_to_account_id != old_to_account_id or 
         "type" in update_data):
         validate_transfer_direction(new_type, new_from_account, new_to_account)
     
-    # Restore old balances
+    # Restore old balances (reverse the original transfer effect)
     old_from_account = db.query(Account).filter(Account.id == old_from_account_id).first()
     old_to_account = db.query(Account).filter(Account.id == old_to_account_id).first()
     
@@ -263,7 +289,7 @@ def update_transfer(
         else:
             old_to_account.current_balance -= old_amount
     
-    # Apply updates
+    # Apply updates to transfer
     for field, value in update_data.items():
         setattr(db_transfer, field, value)
     
@@ -272,17 +298,14 @@ def update_transfer(
     new_fee = db_transfer.fee
     new_exchange_rate = db_transfer.exchange_rate
     
-    new_from_account = db.query(Account).filter(Account.id == new_from_account_id).first()
-    new_to_account = db.query(Account).filter(Account.id == new_to_account_id).first()
+    # Deduct from source account (amount + fee)
+    new_from_account.current_balance -= (new_amount + new_fee)
     
-    if new_from_account:
-        new_from_account.current_balance -= (new_amount + new_fee)
-    
-    if new_to_account:
-        if new_exchange_rate:
-            new_to_account.current_balance += (new_amount * new_exchange_rate)
-        else:
-            new_to_account.current_balance += new_amount
+    # Add to destination account (with exchange rate if applicable)
+    if new_exchange_rate:
+        new_to_account.current_balance += (new_amount * new_exchange_rate)
+    else:
+        new_to_account.current_balance += new_amount
     
     db.commit()
     db.refresh(db_transfer)

@@ -300,9 +300,9 @@
 - [x] Test endpoint custom-charts funzionante
 
 ##### E. Validazione update_transfer
-- [ ] Revisione codice `app/crud/transfer.py`
-- [ ] Verificati tutti i casi edge
-- [ ] Aggiunta validazione mancante (se necessaria)
+- [x] Revisione codice `app/crud/transfer.py`
+- [x] Verificati tutti i casi edge
+- [x] Aggiunta validazione mancante (se necessaria)
 
 ##### F. File SQL Obsoleti
 - [ ] Decisione: [ ] Rimuovere / [ ] Archiviare / [ ] Aggiornare
