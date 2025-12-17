@@ -3013,11 +3013,11 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 - [x] **Azione:** Verificare e completare validazione
 
 ##### F. File SQL in `database/` obsoleti
-- [ ] **Problema:** I file SQL originali sono out of sync con i model attuali
-- [ ] **File:**
+- [x] **Problema:** I file SQL originali sono out of sync con i model attuali
+- [x] **File:**
   - `database/01_create_schema.sql`
   - `database/02_seed_default_categories.sql`
-- [ ] **Azione:** 
+- [x] **Azione:** 
   - Opzione A: Rimuovere (Alembic gestisce tutto)
   - Opzione B: Aggiornare e tenere come documentazione
   - Opzione C: Spostare in `database/archive/` con nota

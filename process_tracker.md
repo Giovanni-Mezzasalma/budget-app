@@ -305,9 +305,9 @@
 - [x] Aggiunta validazione mancante (se necessaria)
 
 ##### F. File SQL Obsoleti
-- [ ] Decisione: [ ] Rimuovere / [ ] Archiviare / [ ] Aggiornare
-- [ ] Azione completata
-- [ ] Documentato in README se necessario
+- [x] Decisione: [x] Rimuovere / [ ] Archiviare / [ ] Aggiornare
+- [x] Azione completata
+- [x] Documentato in README se necessario
 
 #### Note Documentate
 
