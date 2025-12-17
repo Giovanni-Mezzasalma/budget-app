@@ -3025,10 +3025,10 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 #### 3.7.3 - Problemi Minori / Note
 
 ##### G. Migration `c744b8064fb0` vuota
-- [ ] **Nota:** La migration per `custom_charts` è vuota perché la tabella era già stata creata via SQL manuale
-- [ ] **Impatto:** Nessuno per il funzionamento attuale
-- [ ] **Rischio:** Se si fa `alembic downgrade` completo e poi `upgrade`, la tabella potrebbe non essere ricreata
-- [ ] **Azione:** Documentare, non richiede fix immediato
+- [x] **Nota:** La migration per `custom_charts` è vuota perché la tabella era già stata creata via SQL manuale
+- [x] **Impatto:** Nessuno per il funzionamento attuale
+- [x] **Rischio:** Se si fa `alembic downgrade` completo e poi `upgrade`, la tabella potrebbe non essere ricreata
+- [x] **Azione:** Documentare, non richiede fix immediato
 
 ##### H. UUID come String(36) invece di UUID nativo
 - [ ] **Nota:** I model usano `String(36)` invece del tipo UUID nativo PostgreSQL
