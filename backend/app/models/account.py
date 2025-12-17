@@ -58,13 +58,11 @@ class Account(Base):
         Numeric(15, 2),
         nullable=False,
         default=Decimal("0.00"),
-        comment="Saldo iniziale storico, impostato alla creazione e MAI modificato"
     )
     current_balance: Mapped[Decimal] = mapped_column(
         Numeric(15, 2),
         nullable=False,
         default=Decimal("0.00"),
-        comment="Saldo attuale, aggiornato automaticamente da transazioni e trasferimenti"
     )
     
     # UI Customization

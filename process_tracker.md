@@ -312,8 +312,8 @@
 #### Note Documentate
 
 ##### G. Migration Vuota (c744b8064fb0)
-- [ ] ✅ Documentato: tabella `custom_charts` creata via SQL manuale
-- [ ] ✅ Non richiede fix, solo nota per riferimento futuro
+- [x] ✅ Documentato: tabella `custom_charts` creata via SQL manuale
+- [x] ✅ Non richiede fix, solo nota per riferimento futuro
 
 ##### H-J. Altri Minori
 - [ ] Nota UUID String(36) documentata (futuro refactoring)
