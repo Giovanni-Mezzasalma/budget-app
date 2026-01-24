@@ -11,7 +11,7 @@ from datetime import datetime, date as date_type
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
-
+from uuid import UUID
 
 # Tipi validi per le transazioni (stessi delle categorie)
 VALID_TRANSACTION_TYPES = ["income", "expense_necessity", "expense_extra"]
@@ -19,8 +19,8 @@ VALID_TRANSACTION_TYPES = ["income", "expense_necessity", "expense_extra"]
 
 class TransactionBase(BaseModel):
     """Base transaction schema with common fields."""
-    account_id: str = Field(..., description="Account ID for this transaction")
-    category_id: str = Field(..., description="Category ID for this transaction")
+    account_id: UUID = Field(..., description="Account ID for this transaction")
+    category_id: UUID = Field(..., description="Category ID for this transaction")
     amount: Decimal = Field(..., gt=0, description="Transaction amount (always positive)")
     date: date_type = Field(..., description="Transaction date")
     description: Optional[str] = Field(None, max_length=500, description="Transaction description")
@@ -60,8 +60,8 @@ class TransactionCreate(TransactionBase):
 
 class TransactionUpdate(BaseModel):
     """Schema for updating an existing transaction."""
-    account_id: Optional[str] = Field(None, description="Account ID")
-    category_id: Optional[str] = Field(None, description="Category ID")
+    account_id: Optional[UUID] = Field(None, description="Account ID")
+    category_id: Optional[UUID] = Field(None, description="Category ID")
     amount: Optional[Decimal] = Field(None, gt=0, description="Transaction amount")
     date: Optional[date_type] = Field(None, description="Transaction date")
     description: Optional[str] = Field(None, max_length=500, description="Transaction description")
@@ -98,10 +98,10 @@ class TransactionUpdate(BaseModel):
 
 class TransactionResponse(BaseModel):
     """Schema for transaction response."""
-    id: str = Field(..., description="Transaction unique identifier")
-    user_id: str = Field(..., description="Owner user ID")
-    account_id: str = Field(..., description="Account ID")
-    category_id: str = Field(..., description="Category ID")
+    id: UUID = Field(..., description="Transaction unique identifier")
+    user_id: UUID = Field(..., description="Owner user ID")
+    account_id: UUID = Field(..., description="Account ID")
+    category_id: UUID = Field(..., description="Category ID")
     amount: Decimal = Field(..., description="Transaction amount")
     type: str = Field(..., description="Transaction type (from category)")
     date: date_type = Field(..., description="Transaction date")
@@ -139,8 +139,8 @@ class TransactionSummary(BaseModel):
 
 class TransactionFilters(BaseModel):
     """Schema for transaction filter parameters."""
-    account_id: Optional[str] = None
-    category_id: Optional[str] = None
+    account_id: Optional[UUID] = None
+    category_id: Optional[UUID] = None
     type: Optional[str] = None
     start_date: Optional[date_type] = None
     end_date: Optional[date_type] = None

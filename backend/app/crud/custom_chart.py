@@ -3,16 +3,23 @@ Custom Chart CRUD Operations
 Database operations per Custom Chart model
 """
 from sqlalchemy.orm import Session
-from typing import List, Optional
-import uuid
+from typing import List, Optional, Union
+from uuid import UUID
 
 from app.models.custom_chart import CustomChart
 from app.schemas.custom_chart import CustomChartCreate, CustomChartUpdate
 
+def _to_uuid(value: Union[str, UUID, None]) -> Optional[UUID]:
+    """Convert string to UUID if necessary."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return UUID(value)
+    return value
 
 def get_custom_charts(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     skip: int = 0,
     limit: int = 100
 ) -> List[CustomChart]:
@@ -28,6 +35,7 @@ def get_custom_charts(
     Returns:
         Lista di CustomChart objects
     """
+    user_id = _to_uuid(user_id)
     return db.query(CustomChart).filter(
         CustomChart.user_id == user_id
     ).order_by(CustomChart.created_at.desc()).offset(skip).limit(limit).all()
@@ -35,8 +43,8 @@ def get_custom_charts(
 
 def get_custom_chart(
     db: Session,
-    chart_id: str,
-    user_id: str
+    chart_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> Optional[CustomChart]:
     """
     Recupera singolo grafico verificando ownership.
@@ -49,6 +57,8 @@ def get_custom_chart(
     Returns:
         CustomChart object se trovato e appartiene all'utente, None altrimenti
     """
+    chart_id = _to_uuid(chart_id)
+    user_id = _to_uuid(user_id) 
     return db.query(CustomChart).filter(
         CustomChart.id == chart_id,
         CustomChart.user_id == user_id
@@ -58,7 +68,7 @@ def get_custom_chart(
 def create_custom_chart(
     db: Session,
     chart: CustomChartCreate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> CustomChart:
     """
     Crea nuovo grafico personalizzato.
@@ -71,6 +81,7 @@ def create_custom_chart(
     Returns:
         CustomChart object creato
     """
+    user_id = _to_uuid(user_id)
     db_chart = CustomChart(
         user_id=user_id,
         name=chart.name,
@@ -88,9 +99,9 @@ def create_custom_chart(
 
 def update_custom_chart(
     db: Session,
-    chart_id: str,
+    chart_id: Union[str, UUID],
     chart_update: CustomChartUpdate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Optional[CustomChart]:
     """
     Aggiorna grafico esistente.
@@ -123,8 +134,8 @@ def update_custom_chart(
 
 def delete_custom_chart(
     db: Session,
-    chart_id: str,
-    user_id: str
+    chart_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> bool:
     """
     Elimina grafico personalizzato.

@@ -7,6 +7,8 @@ from app.models.user import User
 from app.schemas.user import UserCreate
 from app.utils.security import hash_password, verify_password
 from typing import Optional
+from uuid import UUID
+from typing import Optional, Union
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
@@ -23,7 +25,7 @@ def get_user_by_email(db: Session, email: str) -> Optional[User]:
     return db.query(User).filter(User.email == email).first()
 
 
-def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
+def get_user_by_id(db: Session, user_id: Union[str, UUID]) -> Optional[User]:
     """
     Retrieve a user by ID.
     
@@ -34,6 +36,8 @@ def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
     Returns:
         User object if found, None otherwise
     """
+    if isinstance(user_id, str):
+        user_id = UUID(user_id)
     return db.query(User).filter(User.id == user_id).first()
 
 
@@ -104,7 +108,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     return user
 
 
-def update_user(db: Session, user_id: str, **kwargs) -> Optional[User]:
+def update_user(db: Session, user_id: Union[str, UUID], **kwargs) -> Optional[User]:
     """
     Update user information.
     
@@ -145,7 +149,7 @@ def update_user(db: Session, user_id: str, **kwargs) -> Optional[User]:
     return user
 
 
-def delete_user(db: Session, user_id: str) -> bool:
+def delete_user(db: Session, user_id: Union[str, UUID]) -> bool:
     """
     Delete a user (hard delete).
     
@@ -167,7 +171,7 @@ def delete_user(db: Session, user_id: str) -> bool:
     return True
 
 
-def deactivate_user(db: Session, user_id: str) -> Optional[User]:
+def deactivate_user(db: Session, user_id: Union[str, UUID]) -> Optional[User]:
     """
     Deactivate a user (soft delete).
     

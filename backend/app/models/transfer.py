@@ -8,7 +8,8 @@ from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, DateTime, Date, Numeric, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-import uuid
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+import uuid as uuid_lib
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -21,30 +22,30 @@ class Transfer(Base):
     __tablename__ = "transfers"
     
     # Primary Key
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid_lib.uuid4,
         index=True
     )
     
     # Foreign Keys
-    user_id: Mapped[str] = mapped_column(
-        String(36),
+    user_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     
-    from_account_id: Mapped[str] = mapped_column(
-        String(36),
+    from_account_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     
-    to_account_id: Mapped[str] = mapped_column(
-        String(36),
+    to_account_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True

@@ -9,6 +9,8 @@ Balance Strategy:
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -134,8 +136,8 @@ class AccountUpdate(BaseModel):
 
 class AccountResponse(AccountBase):
     """Schema for account response with both balance fields."""
-    id: str = Field(..., description="Account unique identifier")
-    user_id: str = Field(..., description="Owner user ID")
+    id: UUID = Field(..., description="Account unique identifier")
+    user_id: UUID = Field(..., description="Owner user ID")
     initial_balance: Decimal = Field(..., description="Initial balance (set at creation, immutable)")
     current_balance: Decimal = Field(..., description="Current balance (updated by transactions/transfers)")
     is_active: bool = Field(default=True, description="Account active status")
@@ -165,7 +167,7 @@ class AccountWithStats(AccountResponse):
 
 class AccountSummary(BaseModel):
     """Schema for account summary in lists/dashboards."""
-    id: str
+    id: UUID
     name: str
     type: str
     currency: str

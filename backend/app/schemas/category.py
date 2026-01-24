@@ -8,8 +8,9 @@ Struttura gerarchica:
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator
+from uuid import UUID
 
+from pydantic import BaseModel, Field, field_validator
 
 # Tipi validi per le macro categorie
 VALID_CATEGORY_TYPES = ["income", "expense_necessity", "expense_extra"]
@@ -28,7 +29,7 @@ class CategoryBase(BaseModel):
     type: str = Field(..., description="Macro category type: income, expense_necessity, or expense_extra")
     color: Optional[str] = Field(None, max_length=7, description="Hex color code for UI (e.g., #FF5733)")
     icon: Optional[str] = Field(None, max_length=50, description="Icon/emoji for UI")
-    parent_id: Optional[str] = Field(None, description="Parent category ID for subcategories")
+    parent_id: Optional[UUID] = Field(None, description="Parent category ID for subcategories")
     
     @field_validator('type')
     @classmethod
@@ -74,7 +75,7 @@ class CategoryUpdate(BaseModel):
     type: Optional[str] = Field(None, description="Macro category type")
     color: Optional[str] = Field(None, max_length=7, description="Hex color code")
     icon: Optional[str] = Field(None, max_length=50, description="Icon/emoji")
-    parent_id: Optional[str] = Field(None, description="Parent category ID")
+    parent_id: Optional[UUID] = Field(None, description="Parent category ID")
     is_active: Optional[bool] = Field(None, description="Category active status")
     
     @field_validator('type')
@@ -116,9 +117,9 @@ class CategoryUpdate(BaseModel):
 
 class CategoryResponse(BaseModel):
     """Schema for category response."""
-    id: str = Field(..., description="Category unique identifier")
-    user_id: str = Field(..., description="Owner user ID")
-    parent_id: Optional[str] = Field(None, description="Parent category ID")
+    id: UUID = Field(..., description="Category unique identifier")
+    user_id: UUID = Field(..., description="Owner user ID")
+    parent_id: Optional[UUID] = Field(None, description="Parent category ID")
     name: str = Field(..., description="Category name")
     type: str = Field(..., description="Macro category type")
     color: Optional[str] = Field(None, description="Hex color code")

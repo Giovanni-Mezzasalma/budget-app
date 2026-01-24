@@ -5,6 +5,7 @@ User-related Pydantic schemas for request/response validation.
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from uuid import UUID
 import re
 
 
@@ -56,7 +57,7 @@ class UserLogin(BaseModel):
 
 class UserResponse(UserBase):
     """Schema for user response (without password)."""
-    id: str = Field(..., description="User unique identifier")
+    id: UUID = Field(..., description="User unique identifier")
     is_active: bool = Field(default=True, description="User account status")
     created_at: datetime = Field(..., description="Account creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")

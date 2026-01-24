@@ -8,8 +8,9 @@ Transaction types (derived from category):
 - expense_extra: Extra/discretionary expenses
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
-from typing import List, Optional, Dict
+from sqlalchemy import or_
+from typing import List, Optional, Dict, Union
+from uuid import UUID
 from decimal import Decimal
 from datetime import date
 
@@ -18,14 +19,21 @@ from app.models.account import Account
 from app.models.category import Category
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionSummary
 
+def _to_uuid(value: Union[str, UUID, None]) -> Optional[UUID]:
+    """Convert string to UUID if necessary."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return UUID(value)
+    return value
 
 def get_transactions(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     skip: int = 0,
     limit: int = 100,
-    account_id: Optional[str] = None,
-    category_id: Optional[str] = None,
+    account_id: Optional[Union[str, UUID]] = None,
+    category_id: Optional[Union[str, UUID]] = None,
     transaction_type: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
@@ -52,12 +60,15 @@ def get_transactions(
         tags: Filter by tags
         search: Search in description/notes
     """
+    user_id = _to_uuid(user_id)
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     
     if account_id is not None:
+        account_id = _to_uuid(account_id)
         query = query.filter(Transaction.account_id == account_id)
     
     if category_id is not None:
+        category_id = _to_uuid(category_id)
         query = query.filter(Transaction.category_id == category_id)
     
     if transaction_type is not None:
@@ -95,25 +106,28 @@ def get_transactions(
 
 def get_transaction(
     db: Session,
-    transaction_id: str,
-    user_id: str
+    transaction_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> Optional[Transaction]:
     """Get single transaction verifying ownership."""
+    transaction_id = _to_uuid(transaction_id)
+    user_id = _to_uuid(user_id)
     return db.query(Transaction).filter(
         Transaction.id == transaction_id,
         Transaction.user_id == user_id
     ).first()
 
 
-def get_transaction_by_id(db: Session, transaction_id: str) -> Optional[Transaction]:
+def get_transaction_by_id(db: Session, transaction_id: Union[str, UUID]) -> Optional[Transaction]:
     """Get transaction by ID (without ownership verification)."""
+    transaction_id = _to_uuid(transaction_id)
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
 
 def create_transaction(
     db: Session,
     transaction: TransactionCreate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Transaction:
     """
     Create new transaction and update account's current_balance.
@@ -124,9 +138,12 @@ def create_transaction(
     - income: current_balance += amount
     - expense_necessity/expense_extra: current_balance -= amount
     """
+    user_id = _to_uuid(user_id)
+    account_id = _to_uuid(transaction.account_id)
+    category_id = _to_uuid(transaction.category_id)
     # Verify account exists and belongs to user
     account = db.query(Account).filter(
-        Account.id == transaction.account_id,
+        Account.id == account_id,
         Account.user_id == user_id
     ).first()
     
@@ -135,7 +152,7 @@ def create_transaction(
     
     # Verify category exists and belongs to user
     category = db.query(Category).filter(
-        Category.id == transaction.category_id,
+        Category.id == category_id,
         Category.user_id == user_id
     ).first()
     
@@ -148,8 +165,8 @@ def create_transaction(
     # Create the transaction
     db_transaction = Transaction(
         user_id=user_id,
-        account_id=transaction.account_id,
-        category_id=transaction.category_id,
+        account_id=account_id,
+        category_id=category_id,
         amount=transaction.amount,
         type=transaction_type,
         date=transaction.date,
@@ -173,9 +190,9 @@ def create_transaction(
 
 def update_transaction(
     db: Session,
-    transaction_id: str,
+    transaction_id: Union[str, UUID],
     transaction_update: TransactionUpdate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Optional[Transaction]:
     """
     Update existing transaction and recalculate balances if necessary.
@@ -198,9 +215,10 @@ def update_transaction(
     # If category changes, update type as well
     new_type = old_type
     if "category_id" in update_data:
+        category_id = _to_uuid(update_data["category_id"])
         category = db.query(Category).filter(
-            Category.id == update_data["category_id"],
-            Category.user_id == user_id
+            Category.id == category_id,
+            Category.user_id == _to_uuid(user_id)
         ).first()
         
         if not category:
@@ -208,17 +226,20 @@ def update_transaction(
         
         new_type = category.type
         update_data["type"] = new_type
+        update_data["category_id"] = category_id
     
     # If account changes, verify it exists
-    new_account_id = update_data.get("account_id", old_account_id)
+    new_account_id = _to_uuid(update_data.get("account_id")) if "account_id" in update_data else old_account_id
     if new_account_id != old_account_id:
         new_account = db.query(Account).filter(
             Account.id == new_account_id,
-            Account.user_id == user_id
+            Account.user_id == _to_uuid(user_id)
         ).first()
         
         if not new_account:
             raise ValueError("Account not found")
+        
+        update_data["account_id"] = new_account_id
     
     # Apply updates
     for field, value in update_data.items():
@@ -246,8 +267,8 @@ def update_transaction(
 
 def delete_transaction(
     db: Session,
-    transaction_id: str,
-    user_id: str
+    transaction_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> bool:
     """
     Delete transaction and restore account's current_balance.
@@ -275,12 +296,13 @@ def delete_transaction(
 
 def get_transaction_summary(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    account_id: Optional[str] = None
+    account_id: Optional[Union[str, UUID]] = None
 ) -> TransactionSummary:
     """Calculate transaction summary for a period."""
+    user_id = _to_uuid(user_id)
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     
     if start_date:
@@ -290,6 +312,7 @@ def get_transaction_summary(
         query = query.filter(Transaction.date <= end_date)
     
     if account_id:
+        account_id = _to_uuid(account_id)
         query = query.filter(Transaction.account_id == account_id)
     
     transactions = query.all()
@@ -321,11 +344,12 @@ def get_transaction_summary(
 
 def get_transactions_by_category(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> Dict[str, Decimal]:
     """Group transactions by category and calculate totals."""
+    user_id = _to_uuid(user_id)
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     
     if start_date:
@@ -348,7 +372,7 @@ def get_transactions_by_category(
 
 def get_monthly_totals(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     year: int,
     month: int
 ) -> TransactionSummary:

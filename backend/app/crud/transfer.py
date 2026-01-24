@@ -12,7 +12,8 @@ Transfer types:
 - loan_received: Loan received (Loans → Checking)
 """
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Union
+from uuid import UUID 
 from decimal import Decimal
 from datetime import date
 
@@ -26,6 +27,13 @@ from app.schemas.transfer import (
     TRANSFER_TYPE_LABELS
 )
 
+def _to_uuid(value: Union[str, UUID, None]) -> Optional[UUID]:
+    """Convert string to UUID if necessary."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return UUID(value)
+    return value
 
 def validate_transfer_direction(
     transfer_type: str,
@@ -67,25 +75,28 @@ def validate_transfer_direction(
 
 def get_transfers(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     skip: int = 0,
     limit: int = 100,
     transfer_type: Optional[str] = None,
-    from_account_id: Optional[str] = None,
-    to_account_id: Optional[str] = None,
+    from_account_id: Optional[Union[str, UUID]] = None,
+    to_account_id: Optional[Union[str, UUID]] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> List[Transfer]:
     """List user transfers with optional filters."""
+    user_id = _to_uuid(user_id)
     query = db.query(Transfer).filter(Transfer.user_id == user_id)
     
     if transfer_type is not None:
         query = query.filter(Transfer.type == transfer_type)
     
     if from_account_id is not None:
+        from_account_id = _to_uuid(from_account_id)
         query = query.filter(Transfer.from_account_id == from_account_id)
     
     if to_account_id is not None:
+        to_account_id = _to_uuid(to_account_id)
         query = query.filter(Transfer.to_account_id == to_account_id)
     
     if start_date is not None:
@@ -101,25 +112,31 @@ def get_transfers(
 
 def get_transfer(
     db: Session,
-    transfer_id: str,
-    user_id: str
+    transfer_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> Optional[Transfer]:
     """Get single transfer verifying ownership."""
+    transfer_id = _to_uuid(transfer_id)
+    user_id = _to_uuid(user_id)
     return db.query(Transfer).filter(
         Transfer.id == transfer_id,
         Transfer.user_id == user_id
     ).first()
 
 
-def get_transfer_by_id(db: Session, transfer_id: str) -> Optional[Transfer]:
+def get_transfer_by_id(
+        db: Session,
+        transfer_id: Union[str, UUID]
+        ) -> Optional[Transfer]:
     """Get transfer by ID (without ownership verification)."""
+    transfer_id = _to_uuid(transfer_id)
     return db.query(Transfer).filter(Transfer.id == transfer_id).first()
 
 
 def create_transfer(
     db: Session,
     transfer: TransferCreate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Transfer:
     """
     Create new transfer and update current_balance of both accounts.
@@ -131,9 +148,12 @@ def create_transfer(
     Raises:
         ValueError: If account not found, invalid direction, etc.
     """
+    user_id = _to_uuid(user_id)
+    from_account_id = _to_uuid(transfer.from_account_id)
+    to_account_id = _to_uuid(transfer.to_account_id)
     # Verify source account exists and belongs to user
     from_account = db.query(Account).filter(
-        Account.id == transfer.from_account_id,
+        Account.id == from_account_id,
         Account.user_id == user_id
     ).first()
     
@@ -142,7 +162,7 @@ def create_transfer(
     
     # Verify destination account exists and belongs to user
     to_account = db.query(Account).filter(
-        Account.id == transfer.to_account_id,
+        Account.id == to_account_id,
         Account.user_id == user_id
     ).first()
     
@@ -150,7 +170,7 @@ def create_transfer(
         raise ValueError("Destination account not found")
     
     # Verify accounts are different
-    if transfer.from_account_id == transfer.to_account_id:
+    if transfer.from_account_id == to_account_id:
         raise ValueError("Source and destination accounts must be different")
     
     # Validate transfer direction based on type
@@ -163,8 +183,8 @@ def create_transfer(
     # Create the transfer
     db_transfer = Transfer(
         user_id=user_id,
-        from_account_id=transfer.from_account_id,
-        to_account_id=transfer.to_account_id,
+        from_account_id=from_account_id,
+        to_account_id=to_account_id,
         type=transfer.type,
         amount=transfer.amount,
         date=transfer.date,
@@ -193,9 +213,9 @@ def create_transfer(
 
 def update_transfer(
     db: Session,
-    transfer_id: str,
+    transfer_id: Union[str, UUID],
     transfer_update: TransferUpdate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Optional[Transfer]:
     """
     Update existing transfer and recalculate balances if necessary.
@@ -238,8 +258,8 @@ def update_transfer(
         raise ValueError("Fee cannot be negative")
     
     # Determine new values (or keep old)
-    new_from_account_id = update_data.get("from_account_id", old_from_account_id)
-    new_to_account_id = update_data.get("to_account_id", old_to_account_id)
+    new_from_account_id = _to_uuid(update_data.get("from_account_id")) if "from_account_id" in update_data else old_from_account_id
+    new_to_account_id = _to_uuid(update_data.get("to_account_id")) if "to_account_id" in update_data else old_to_account_id
     new_type = update_data.get("type", db_transfer.type)
     
     # Validate source and destination are different
@@ -249,7 +269,7 @@ def update_transfer(
     # Always fetch and validate both accounts (they might have been deactivated/deleted)
     new_from_account = db.query(Account).filter(
         Account.id == new_from_account_id,
-        Account.user_id == user_id
+        Account.user_id == _to_uuid(user_id)
     ).first()
     
     if not new_from_account:
@@ -260,7 +280,7 @@ def update_transfer(
     
     new_to_account = db.query(Account).filter(
         Account.id == new_to_account_id,
-        Account.user_id == user_id
+        Account.user_id == _to_uuid(user_id)
     ).first()
     
     if not new_to_account:
@@ -289,6 +309,11 @@ def update_transfer(
         else:
             old_to_account.current_balance -= old_amount
     
+    if "from_account_id" in update_data:
+        update_data["from_account_id"] = new_from_account_id
+    if "to_account_id" in update_data:
+        update_data["to_account_id"] = new_to_account_id
+        
     # Apply updates to transfer
     for field, value in update_data.items():
         setattr(db_transfer, field, value)
@@ -315,8 +340,8 @@ def update_transfer(
 
 def delete_transfer(
     db: Session,
-    transfer_id: str,
-    user_id: str
+    transfer_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> bool:
     """
     Delete transfer and restore current_balance of both accounts.
@@ -346,7 +371,7 @@ def delete_transfer(
 
 def get_transfers_by_type(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     transfer_type: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
@@ -364,7 +389,7 @@ def get_transfers_by_type(
 
 def get_loans_summary(
     db: Session,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> dict:
     """Calculate loans summary (given and received)."""
     loans_given = get_transfers_by_type(db, user_id, "loan_given")
@@ -386,7 +411,7 @@ def get_loans_summary(
 
 def get_transfer_statistics(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> dict:

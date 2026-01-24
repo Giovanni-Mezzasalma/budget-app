@@ -7,17 +7,22 @@ Balance Strategy:
 - current_balance: Updated by transactions and transfers
 """
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Union
 from decimal import Decimal
-import uuid
+from uuid import UUID
 
 from app.models.account import Account
 from app.schemas.account import AccountCreate, AccountUpdate
 
+def _to_uuid(value: Union[str, UUID]) -> UUID:
+    """Convert string to UUID if necessary."""
+    if isinstance(value, str):
+        return UUID(value)
+    return value
 
 def get_accounts(
     db: Session, 
-    user_id: str, 
+    user_id: Union[str, UUID], 
     skip: int = 0, 
     limit: int = 100,
     is_active: Optional[bool] = None,
@@ -37,6 +42,7 @@ def get_accounts(
     Returns:
         List of Account objects
     """
+    user_id = _to_uuid(user_id)
     query = db.query(Account).filter(Account.user_id == user_id)
     
     if is_active is not None:
@@ -50,8 +56,8 @@ def get_accounts(
 
 def get_account(
     db: Session, 
-    account_id: str, 
-    user_id: str
+    account_id: Union[str, UUID], 
+    user_id: Union[str, UUID]
 ) -> Optional[Account]:
     """
     Get single account verifying ownership.
@@ -64,24 +70,27 @@ def get_account(
     Returns:
         Account object if found and belongs to user, None otherwise
     """
+    account_id = _to_uuid(account_id)
+    user_id = _to_uuid(user_id)
     return db.query(Account).filter(
         Account.id == account_id,
         Account.user_id == user_id
     ).first()
 
 
-def get_account_by_id(db: Session, account_id: str) -> Optional[Account]:
+def get_account_by_id(db: Session, account_id: Union[str, UUID]) -> Optional[Account]:
     """
     Get account by ID (without ownership verification).
     Use only internally when ownership already verified.
     """
+    account_id = _to_uuid(account_id)
     return db.query(Account).filter(Account.id == account_id).first()
 
 
 def create_account(
     db: Session, 
     account: AccountCreate, 
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Account:
     """
     Create new account for user.
@@ -97,6 +106,7 @@ def create_account(
     Returns:
         Created Account object
     """
+    user_id = _to_uuid(user_id)
     db_account = Account(
         user_id=user_id,
         name=account.name,
@@ -119,9 +129,9 @@ def create_account(
 
 def update_account(
     db: Session,
-    account_id: str,
+    account_id: Union[str, UUID],
     account_update: AccountUpdate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Optional[Account]:
     """
     Update existing account.
@@ -158,8 +168,8 @@ def update_account(
 
 def delete_account(
     db: Session, 
-    account_id: str, 
-    user_id: str
+    account_id: Union[str, UUID], 
+    user_id: Union[str, UUID]
 ) -> bool:
     """
     Delete account (hard delete).
@@ -185,8 +195,8 @@ def delete_account(
 
 def deactivate_account(
     db: Session, 
-    account_id: str, 
-    user_id: str
+    account_id: Union[str, UUID], 
+    user_id: Union[str, UUID]
 ) -> Optional[Account]:
     """
     Deactivate account (soft delete).
@@ -213,7 +223,7 @@ def deactivate_account(
 
 def update_account_balance(
     db: Session,
-    account_id: str,
+    account_id: Union[str, UUID],
     amount: Decimal,
     operation: str
 ) -> Optional[Account]:
@@ -233,6 +243,7 @@ def update_account_balance(
         This function does NOT commit - caller must manage the transaction.
         Only current_balance is modified, initial_balance remains unchanged.
     """
+    account_id = _to_uuid(account_id)
     account = db.query(Account).filter(Account.id == account_id).first()
     
     if not account:
@@ -248,7 +259,7 @@ def update_account_balance(
     return account
 
 
-def get_total_balance(db: Session, user_id: str, is_active: Optional[bool] = True) -> Decimal:
+def get_total_balance(db: Session, user_id: Union[str, UUID], is_active: Optional[bool] = True) -> Decimal:
     """
     Calculate total current_balance of all accounts for a user.
     
@@ -269,7 +280,7 @@ def get_total_balance(db: Session, user_id: str, is_active: Optional[bool] = Tru
     return total
 
 
-def get_accounts_summary(db: Session, user_id: str) -> dict:
+def get_accounts_summary(db: Session, user_id: Union[str, UUID]) -> dict:
     """
     Calculate financial summary for user's accounts.
     
@@ -387,7 +398,7 @@ def get_accounts_summary(db: Session, user_id: str) -> dict:
     }
 
 
-def verify_all_balances(db: Session, user_id: str) -> List[dict]:
+def verify_all_balances(db: Session, user_id: Union[str, UUID]) -> List[dict]:
     """
     Verify balance integrity for all user accounts.
     
@@ -411,7 +422,7 @@ def verify_all_balances(db: Session, user_id: str) -> List[dict]:
     return discrepancies
 
 
-def fix_account_balance(db: Session, account_id: str, user_id: str) -> Optional[Account]:
+def fix_account_balance(db: Session, account_id: Union[str, UUID], user_id: Union[str, UUID]) -> Optional[Account]:
     """
     Recalculate and fix current_balance from transactions/transfers.
     

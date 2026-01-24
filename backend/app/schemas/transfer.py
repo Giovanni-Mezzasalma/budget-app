@@ -14,6 +14,7 @@ Tipi di trasferimento:
 from datetime import datetime, date as date_type
 from decimal import Decimal
 from typing import Optional, List
+from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -95,8 +96,8 @@ TRANSFER_TYPE_DIRECTION_RULES = {
 
 class TransferBase(BaseModel):
     """Base transfer schema with common fields."""
-    from_account_id: str = Field(..., description="Source account ID")
-    to_account_id: str = Field(..., description="Destination account ID")
+    from_account_id: UUID = Field(..., description="Source account ID")
+    to_account_id: UUID = Field(..., description="Destination account ID")
     amount: Decimal = Field(..., gt=0, description="Transfer amount (always positive)")
     type: str = Field(default="generic", description="Transfer type: generic, withdrawal, deposit, savings, investment, loan_given, loan_received")
     date: date_type = Field(..., description="Transfer date")
@@ -151,7 +152,7 @@ class TransferBase(BaseModel):
     
     @field_validator('to_account_id')
     @classmethod
-    def validate_different_accounts(cls, v: str, info) -> str:
+    def validate_different_accounts(cls, v: UUID, info) -> UUID:
         """Ensure source and destination accounts are different."""
         from_account = info.data.get('from_account_id')
         if from_account and v == from_account:
@@ -166,8 +167,8 @@ class TransferCreate(TransferBase):
 
 class TransferUpdate(BaseModel):
     """Schema for updating an existing transfer."""
-    from_account_id: Optional[str] = Field(None, description="Source account ID")
-    to_account_id: Optional[str] = Field(None, description="Destination account ID")
+    from_account_id: Optional[UUID] = Field(None, description="Source account ID")
+    to_account_id: Optional[UUID] = Field(None, description="Destination account ID")
     amount: Optional[Decimal] = Field(None, gt=0, description="Transfer amount")
     type: Optional[str] = Field(None, description="Transfer type")
     date: Optional[date_type] = Field(None, description="Transfer date")
@@ -226,7 +227,7 @@ class TransferUpdate(BaseModel):
     
     @field_validator('to_account_id')
     @classmethod
-    def validate_different_accounts(cls, v: Optional[str], info) -> Optional[str]:
+    def validate_different_accounts(cls, v: Optional[UUID], info) -> Optional[UUID]:
         """Ensure source and destination accounts are different if both provided."""
         if v is None:
             return v
@@ -238,10 +239,10 @@ class TransferUpdate(BaseModel):
 
 class TransferResponse(BaseModel):
     """Schema for transfer response."""
-    id: str = Field(..., description="Transfer unique identifier")
-    user_id: str = Field(..., description="Owner user ID")
-    from_account_id: str = Field(..., description="Source account ID")
-    to_account_id: str = Field(..., description="Destination account ID")
+    id: UUID = Field(..., description="Transfer unique identifier")
+    user_id: UUID = Field(..., description="Owner user ID")
+    from_account_id: UUID = Field(..., description="Source account ID")
+    to_account_id: UUID = Field(..., description="Destination account ID")
     type: str = Field(..., description="Transfer type")
     amount: Decimal = Field(..., description="Transfer amount")
     date: date_type = Field(..., description="Transfer date")

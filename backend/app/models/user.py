@@ -5,21 +5,20 @@ User database model.
 from datetime import datetime
 from typing import List
 from sqlalchemy import String, Boolean, DateTime, Index
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-import uuid
-
-
+import uuid as uuid_lib
 class User(Base):
     """User model for authentication and user management."""
     
     __tablename__ = "users"
     
     # Primary Key
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid_lib.uuid4,
         index=True
     )
     

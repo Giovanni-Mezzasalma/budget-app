@@ -3031,9 +3031,9 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 - [x] **Azione:** Documentare, non richiede fix immediato
 
 ##### H. UUID come String(36) invece di UUID nativo
-- [ ] **Nota:** I model usano `String(36)` invece del tipo UUID nativo PostgreSQL
-- [ ] **Impatto:** Funziona ma perde ottimizzazioni PostgreSQL
-- [ ] **Azione:** Nessuna per MVP, considerare per futuro refactoring
+- [x] **Nota:** I model usano `String(36)` invece del tipo UUID nativo PostgreSQL
+- [x] **Impatto:** Funziona ma perde ottimizzazioni PostgreSQL
+- [x] **Azione:** è stata effettuata la modifica da `String(36)` a UIID
 
 ##### I. Commenti misti italiano/inglese
 - [ ] **Nota:** Inconsistenza nella lingua dei commenti e docstring

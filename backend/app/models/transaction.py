@@ -8,7 +8,8 @@ from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, DateTime, Date, Numeric, Boolean, ForeignKey, Index, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-import uuid
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+import uuid as uuid_lib
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -22,35 +23,35 @@ class Transaction(Base):
     __tablename__ = "transactions"
     
     # Primary Key
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid_lib.uuid4,
         index=True
     )
     
     # Foreign Keys
-    user_id: Mapped[str] = mapped_column(
-        String(36),
+    user_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     
-    account_id: Mapped[str] = mapped_column(
-        String(36),
+    account_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     
-    category_id: Mapped[str] = mapped_column(
-        String(36),
+    category_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("categories.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
-    
+        
     # Transaction Information
     amount: Mapped[Decimal] = mapped_column(
         Numeric(15, 2),

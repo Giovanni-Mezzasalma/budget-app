@@ -6,9 +6,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime, Numeric, ForeignKey, Index
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-import uuid
+import uuid as uuid_lib
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -33,16 +34,16 @@ class Account(Base):
     __tablename__ = "accounts"
     
     # Primary Key
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid_lib.uuid4,
         index=True
     )
     
     # Foreign Keys
-    user_id: Mapped[str] = mapped_column(
-        String(36),
+    user_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True

@@ -3,20 +3,28 @@ Category CRUD Operations
 Database operations per Category model con struttura gerarchica
 """
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
+from uuid import UUID
 
 from app.models.category import Category
 from app.schemas.category import CategoryCreate, CategoryUpdate
 
+def _to_uuid(value: Union[str, UUID, None]) -> Optional[UUID]:
+    """Convert string to UUID if necessary."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return UUID(value)
+    return value
 
 def get_categories(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     skip: int = 0,
     limit: int = 100,
     category_type: Optional[str] = None,
     is_active: Optional[bool] = None,
-    parent_id: Optional[str] = None,
+    parent_id: Optional[Union[str, UUID]] = None,
     only_main: bool = False
 ) -> List[Category]:
     """
@@ -32,6 +40,7 @@ def get_categories(
         parent_id: Filtra per categoria padre
         only_main: Se True, restituisce solo categorie principali (senza parent)
     """
+    user_id = _to_uuid(user_id)
     query = db.query(Category).filter(Category.user_id == user_id)
     
     if category_type is not None:
@@ -41,6 +50,7 @@ def get_categories(
         query = query.filter(Category.is_active == is_active)
     
     if parent_id is not None:
+        parent_id = _to_uuid(parent_id)
         query = query.filter(Category.parent_id == parent_id)
     
     if only_main:
@@ -51,7 +61,7 @@ def get_categories(
 
 def get_categories_tree(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     is_active: Optional[bool] = True
 ) -> Dict[str, List[Category]]:
     """
@@ -85,40 +95,46 @@ def get_categories_tree(
 
 def get_category(
     db: Session,
-    category_id: str,
-    user_id: str
+    category_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> Optional[Category]:
     """
     Recupera singola categoria verificando ownership.
     """
+    category_id = _to_uuid(category_id)
+    user_id = _to_uuid(user_id)
     return db.query(Category).filter(
         Category.id == category_id,
         Category.user_id == user_id
     ).first()
 
 
-def get_category_by_id(db: Session, category_id: str) -> Optional[Category]:
+def get_category_by_id(db: Session, category_id: Union[str, UUID]) -> Optional[Category]:
     """
     Recupera categoria per ID (senza verifica ownership).
     """
+    category_id = _to_uuid(category_id)
     return db.query(Category).filter(Category.id == category_id).first()
 
 
 def create_category(
     db: Session,
     category: CategoryCreate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Category:
     """
     Crea nuova categoria per l'utente.
     """
+    user_id = _to_uuid(user_id)
+    parent_id = _to_uuid(category.parent_id) if category.parent_id else None
+
     db_category = Category(
         user_id=user_id,
         name=category.name,
         type=category.type,
         color=category.color,
         icon=category.icon,
-        parent_id=category.parent_id,
+        parent_id=parent_id,
         is_active=True
     )
     
@@ -131,9 +147,9 @@ def create_category(
 
 def update_category(
     db: Session,
-    category_id: str,
+    category_id: Union[str, UUID],
     category_update: CategoryUpdate,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Optional[Category]:
     """
     Aggiorna categoria esistente.
@@ -145,6 +161,9 @@ def update_category(
     
     update_data = category_update.model_dump(exclude_unset=True)
     
+    if 'parent_id' in update_data and update_data['parent_id'] is not None:
+        update_data['parent_id'] = _to_uuid(update_data['parent_id'])
+
     for field, value in update_data.items():
         setattr(db_category, field, value)
     
@@ -156,8 +175,8 @@ def update_category(
 
 def delete_category(
     db: Session,
-    category_id: str,
-    user_id: str
+    category_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> bool:
     """
     Elimina categoria (hard delete).
@@ -176,8 +195,8 @@ def delete_category(
 
 def deactivate_category(
     db: Session,
-    category_id: str,
-    user_id: str
+    category_id: Union[str, UUID],
+    user_id: Union[str, UUID]
 ) -> Optional[Category]:
     """
     Disattiva categoria (soft delete).
@@ -194,7 +213,7 @@ def deactivate_category(
     return db_category
 
 
-def seed_default_categories(db: Session, user_id: str) -> List[Category]:
+def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Category]:
     """
     Crea categorie predefinite per un nuovo utente.
     Struttura basata sul file Excel:
@@ -202,7 +221,8 @@ def seed_default_categories(db: Session, user_id: str) -> List[Category]:
     - Categorie principali (parent_id=None)
     - Sottocategorie (parent_id=categoria)
     """
-    
+    user_id = _to_uuid(user_id)
+
     created_categories = []
     
     # ========================================================================
@@ -426,7 +446,7 @@ def seed_default_categories(db: Session, user_id: str) -> List[Category]:
 
 def get_category_statistics(
     db: Session,
-    user_id: str
+    user_id: Union[str, UUID]
 ) -> Dict:
     """
     Restituisce statistiche sulle categorie dell'utente.

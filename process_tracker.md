@@ -316,7 +316,7 @@
 - [x] ✅ Non richiede fix, solo nota per riferimento futuro
 
 ##### H-J. Altri Minori
-- [ ] Nota UUID String(36) documentata (futuro refactoring)
+- [x] UUID String(36), modifica effettuata da `String(36)` a UIID
 - [ ] Commenti: decisione lingua presa
 - [ ] CORS_ORIGINS: testato parsing da .env
 

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 
 class ChartType(str, Enum):
@@ -45,8 +46,8 @@ class CustomChartUpdate(BaseModel):
 
 class CustomChartResponse(CustomChartBase):
     """Schema risposta custom chart"""
-    id: str = Field(..., description="Chart unique identifier")
-    user_id: str = Field(..., description="Owner user ID")
+    id: UUID = Field(..., description="Chart unique identifier")
+    user_id: UUID = Field(..., description="Owner user ID")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
     

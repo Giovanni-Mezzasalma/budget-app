@@ -5,7 +5,8 @@ Calculations and aggregations for statistics and reports.
 Uses current_balance for all balance-related calculations.
 """
 from sqlalchemy.orm import Session
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Union
+from uuid import UUID
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -14,13 +15,20 @@ from app.models.transfer import Transfer
 from app.models.account import Account
 from app.models.category import Category
 
+def _to_uuid(value: Union[str, UUID, None]) -> Optional[UUID]:
+    """Convert string to UUID if necessary."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return UUID(value)
+    return value
 
 def calculate_summary(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    account_id: Optional[str] = None
+    account_id: Optional[Union[str, UUID]] = None
 ) -> Dict[str, Any]:
     """
     Calculate complete financial summary.
@@ -35,6 +43,7 @@ def calculate_summary(
     Returns:
         Dict with totals, metrics, and period info
     """
+    user_id = _to_uuid(user_id)
     # Default: current month
     if not start_date:
         today = date.today()
@@ -50,6 +59,7 @@ def calculate_summary(
     )
     
     if account_id:
+        account_id = _to_uuid(account_id)
         query = query.filter(Transaction.account_id == account_id)
     
     transactions = query.all()
@@ -112,9 +122,9 @@ def calculate_summary(
 
 def calculate_monthly_trend(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     months: int = 12,
-    account_id: Optional[str] = None
+    account_id: Optional[Union[str, UUID]] = None
 ) -> Dict[str, Any]:
     """
     Calculate monthly trend of income and expenses.
@@ -128,6 +138,7 @@ def calculate_monthly_trend(
     Returns:
         Dict with monthly data and period info
     """
+    user_id = _to_uuid(user_id)
     today = date.today()
     start_date = date(today.year, today.month, 1) - timedelta(days=30 * (months - 1))
     start_date = date(start_date.year, start_date.month, 1)
@@ -139,6 +150,7 @@ def calculate_monthly_trend(
     )
     
     if account_id:
+        account_id = _to_uuid(account_id)
         query = query.filter(Transaction.account_id == account_id)
     
     transactions = query.all()
@@ -198,7 +210,7 @@ def calculate_monthly_trend(
 
 def calculate_totals_by_category(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     transaction_type: Optional[str] = None
@@ -216,6 +228,7 @@ def calculate_totals_by_category(
     Returns:
         Dict with totals by category and grand total
     """
+    user_id = _to_uuid(user_id)
     # Default: current month
     if not start_date:
         today = date.today()
@@ -290,7 +303,7 @@ def calculate_totals_by_category(
 
 def calculate_totals_by_account(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None
 ) -> Dict[str, Any]:
@@ -306,6 +319,7 @@ def calculate_totals_by_account(
     Returns:
         Dict with totals by account
     """
+    user_id = _to_uuid(user_id)
     # Default: current month
     if not start_date:
         today = date.today()
@@ -367,10 +381,10 @@ def calculate_totals_by_account(
 
 def calculate_daily_breakdown(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    account_id: Optional[str] = None
+    account_id: Optional[Union[str, UUID]] = None
 ) -> Dict[str, Any]:
     """
     Calculate daily breakdown of transactions.
@@ -385,6 +399,7 @@ def calculate_daily_breakdown(
     Returns:
         Dict with daily data
     """
+    user_id = _to_uuid(user_id)
     if not end_date:
         end_date = date.today()
     if not start_date:
@@ -398,6 +413,7 @@ def calculate_daily_breakdown(
     )
     
     if account_id:
+        account_id = _to_uuid(account_id)
         query = query.filter(Transaction.account_id == account_id)
     
     transactions = query.all()
@@ -460,7 +476,7 @@ def calculate_daily_breakdown(
 
 def calculate_year_comparison(
     db: Session,
-    user_id: str,
+    user_id: Union[str, UUID],
     year1: int,
     year2: int
 ) -> Dict[str, Any]:
@@ -476,6 +492,7 @@ def calculate_year_comparison(
     Returns:
         Dict with monthly comparison and yearly totals
     """
+    user_id = _to_uuid(user_id)
     result = {
         "year1": year1,
         "year2": year2,
