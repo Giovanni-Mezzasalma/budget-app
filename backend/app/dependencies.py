@@ -1,6 +1,6 @@
 """
 FastAPI Dependencies
-Gestisce autenticazione e autorizzazione con OAuth2PasswordBearer
+Manage authentication and authorization with OAuth2PasswordBearer
 """
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -12,8 +12,8 @@ from app.database import get_db
 from app.config import settings
 from app.models.user import User
 
-# OAuth2PasswordBearer - punta all'endpoint di login
-# Questo permette a Swagger di mostrare il form login integrato
+# OAuth2PasswordBearer - points to the login endpoint
+# This allows Swagger to display the built-in login form
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
@@ -22,11 +22,11 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Dependency per ottenere utente autenticato corrente.
-    Verifica JWT token e restituisce User object.
-    
+    Dependency to get the current authenticated user.
+    Verifies JWT token and returns User object.
+
     Raises:
-        HTTPException 401 se token invalido o utente non trovato
+    HTTPException 401 if invalid token or user not found
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,7 +35,7 @@ async def get_current_user(
     )
     
     try:
-        # Decodifica token
+        # Decode token
         payload = jwt.decode(
             token, 
             settings.SECRET_KEY, 
@@ -49,7 +49,7 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
-    # Recupera utente da database
+    # Retrieve user from database
     user = db.query(User).filter(User.id == user_id).first()
     
     if user is None:
@@ -68,7 +68,7 @@ async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """
-    Dependency per assicurarsi che utente sia attivo.
+    Dependency to ensure user is active.
     """
     if not current_user.is_active:
         raise HTTPException(

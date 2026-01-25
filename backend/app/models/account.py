@@ -171,5 +171,5 @@ class Account(Base):
         """
         calculated = self.recalculate_balance()
         difference = self.current_balance - calculated
-        is_valid = abs(difference) < Decimal("0.01")  # Tolleranza per arrotondamenti
+        is_valid = abs(difference) < Decimal("0.01")  # Rounding tolerance
         return is_valid, difference

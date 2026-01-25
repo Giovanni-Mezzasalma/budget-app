@@ -1,14 +1,14 @@
 """
-Script per resettare database in development
-ATTENZIONE: Cancella tutti i dati!
+Script to reset database in development
+WARNING: Deletes all data!
 """
 from app.database import Base, engine
-from app.models import *  # Import tutti i modelli
+from app.models import *  # Import all models
 import sys
 
 
 def reset_database():
-    """Droppa e ricrea tutte le tabelle"""
+    """Drop and recreate all tables"""
     print("⚠️  ATTENZIONE: Stai per cancellare TUTTI i dati!")
     confirm = input("Sei sicuro? Scrivi 'RESET' per confermare: ")
     

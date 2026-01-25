@@ -1,9 +1,9 @@
 /**
  * ACCOUNT MODAL COMPONENT
- * Modal per gestire i conti bancari:
- * - Visualizzare i conti esistenti
- * - Aggiungere nuovi conti
- * - Eliminare conti
+ * Modal for managing bank accounts:
+ * - View existing accounts
+ * - Add new accounts
+ * - Delete accounts
  */
 
 import React, { useState } from 'react';
@@ -11,7 +11,7 @@ import { calculateAccountBalance } from '../../utils/calculations';
 import { accountTypeLabels } from '../../utils/defaultData';
 
 function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, onDeleteAccount }) {
-  // Stato del form per nuovo conto
+  // New account form status
   const [formData, setFormData] = useState({
     name: '',
     type: 'current',
@@ -19,7 +19,7 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
   });
 
   /**
-   * Gestisce i cambiamenti nei campi del form
+   * Manages changes in form fields
    */
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,22 +27,22 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
   };
 
   /**
-   * Gestisce il submit del form
+   * Manages form submission
    */
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Crea l'oggetto conto
+    // Create the account object
     const account = {
       name: formData.name,
       type: formData.type,
       initialBalance: parseFloat(formData.initialBalance)
     };
     
-    // Chiama la funzione di aggiunta
+    // Call the add function
     onAddAccount(account);
     
-    // Reset del form
+    // Reset the form
     setFormData({
       name: '',
       type: 'current',
@@ -50,7 +50,7 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
     });
   };
 
-  // Se il modal non è aperto, non renderizza nulla
+  // If the modal is not open, it does not render anything
   if (!isOpen) return null;
 
   return (
@@ -61,7 +61,7 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
           <button className="close-btn" onClick={onClose}>&times;</button>
         </div>
 
-        {/* Lista dei conti esistenti */}
+        {/* List of existing accounts */}
         <div style={{ display: 'grid', gap: '15px', marginBottom: '30px' }}>
           {accounts.map(acc => {
             const balance = calculateAccountBalance(acc.id, accounts, transactions);
@@ -98,10 +98,10 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
           })}
         </div>
 
-        {/* Form per aggiungere nuovo conto */}
+        {/* Form to add new account */}
         <h3 style={{ marginTop: '30px', marginBottom: '15px' }}>Aggiungi Nuovo Conto</h3>
         <form onSubmit={handleSubmit}>
-          {/* Nome Conto */}
+          {/* Account Name */}
           <div className="form-group">
             <label>Nome Conto</label>
             <input
@@ -113,7 +113,7 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
             />
           </div>
 
-          {/* Tipo e Saldo Iniziale */}
+          {/* Type and Initial Balance */}
           <div className="form-row">
             <div className="form-group">
               <label>Tipo</label>
@@ -142,7 +142,7 @@ function AccountModal({ isOpen, onClose, accounts, transactions, onAddAccount, o
             </div>
           </div>
 
-          {/* Pulsante submit */}
+          {/* Submit button */}
           <button type="submit" className="btn btn-info" style={{ width: '100%' }}>
             Aggiungi Conto
           </button>

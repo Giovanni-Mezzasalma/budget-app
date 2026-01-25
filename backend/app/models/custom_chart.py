@@ -1,6 +1,6 @@
 """
 CustomChart Model
-Gestisce grafici personalizzati utente
+Manages user custom charts
 """
 from sqlalchemy import String, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
@@ -15,7 +15,7 @@ from ..schemas.custom_chart import ChartType
 
 
 class CustomChart(Base):
-    """Modello CustomChart per grafici salvati"""
+    """CustomChart template for saved charts"""
     
     __tablename__ = "custom_charts"
     
@@ -37,7 +37,7 @@ class CustomChart(Base):
     name = mapped_column(String(100), nullable=False)
     chart_type = mapped_column(SQLEnum(ChartType), nullable=False)
     
-    # Configuration (JSONB per flessibilità)
+    # Configuration (JSONB for flexibility)
     config = mapped_column(JSONB, nullable=False)
     filters = mapped_column(JSONB)
     

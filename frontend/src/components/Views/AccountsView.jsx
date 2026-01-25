@@ -1,6 +1,6 @@
 /**
  * ACCOUNTS VIEW COMPONENT
- * Vista che mostra tutti i conti bancari con i loro saldi attuali
+ * View showing all bank accounts with their current balances
  */
 
 import React from 'react';
@@ -13,20 +13,20 @@ function AccountsView({ accounts, transactions }) {
       <h2>I Tuoi Conti</h2>
       <div className="accounts-grid">
         {accounts.map((acc) => {
-          // Calcola il saldo attuale del conto
+          // Calculate the current account balance
           const balance = calculateAccountBalance(acc.id, accounts, transactions);
 
           return (
             <div key={acc.id} className="account-card">
-              {/* Tipo di conto */}
+              {/* Account Type */}
               <div className="account-type">
                 {accountTypeLabels[acc.type]}
               </div>
               
-              {/* Nome del conto */}
+              {/* Account Name */}
               <div className="account-name">{acc.name}</div>
               
-              {/* Saldo del conto */}
+              {/* Account balance */}
               <div className="account-balance">€{balance.toFixed(2)}</div>
             </div>
           );

@@ -3036,8 +3036,8 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 - [x] **Azione:** è stata effettuata la modifica da `String(36)` a UIID
 
 ##### I. Commenti misti italiano/inglese
-- [ ] **Nota:** Inconsistenza nella lingua dei commenti e docstring
-- [ ] **Azione:** Uniformare (suggerimento: inglese per codice, italiano per docs utente)
+- [x] **Nota:** Inconsistenza nella lingua dei commenti e docstring
+- [x] **Azione:** Uniformare (suggerimento: inglese per codice, italiano per docs utente)
 
 ##### J. CORS_ORIGINS parsing
 - [ ] **Nota:** `.env.example` usa stringa JSON, `config.py` si aspetta lista

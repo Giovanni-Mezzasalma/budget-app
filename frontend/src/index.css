@@ -1,9 +1,9 @@
 /**
  * GLOBAL STYLES
- * Stili CSS globali e reset base
+ * Global CSS styles and base reset
  */
 
-/* Reset CSS base */
+/* Reset base CSS */
 * {
   margin: 0;
   padding: 0;
@@ -22,7 +22,7 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* Scrollbar personalizzata */
+/* Personalized Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

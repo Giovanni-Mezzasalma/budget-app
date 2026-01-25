@@ -4,14 +4,14 @@
 # ============================================
 
 # ==================== CORE FRAMEWORK ====================
-# FastAPI framework per API REST
+# FastAPI framework for API REST
 fastapi==0.115.0
 
-# Server ASGI per FastAPI
+# Server ASGI for FastAPI
 uvicorn[standard]==0.32.0
 
 # ==================== DATABASE ====================
-# PostgreSQL adapter per Python
+# PostgreSQL adapter for Python
 psycopg2-binary==2.9.10
 
 # ORM (Object-Relational Mapping)
@@ -32,7 +32,7 @@ bcrypt==4.0.1
 python-multipart==0.0.20
 
 # ==================== VALIDATION ====================
-# Data validation con Pydantic
+# Data validation with Pydantic
 pydantic==2.10.3
 pydantic-settings==2.7.0
 
@@ -50,7 +50,7 @@ pytest==8.3.4
 # Async testing support
 pytest-asyncio==0.24.0
 
-# HTTP client per testing
+# HTTP client for testing
 httpx==0.28.1
 
 # Test coverage

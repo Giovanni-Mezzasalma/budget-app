@@ -1,6 +1,6 @@
 /**
  * CUSTOM CHARTS VIEW COMPONENT
- * Vista per la gestione e visualizzazione dei grafici personalizzati
+ * View for managing and displaying custom graphs
  */
 
 import React from 'react';
@@ -8,7 +8,7 @@ import CustomChart from '../Charts/CustomChart';
 
 function CustomChartsView({ savedCharts, transactions, accounts, onCreateChart, onEditChart, onDeleteChart }) {
   
-  // Se non ci sono grafici salvati, mostra messaggio vuoto
+  // If there are no saved graphs, show blank message
   if (savedCharts.length === 0) {
     return (
       <div className="card">
@@ -46,10 +46,10 @@ function CustomChartsView({ savedCharts, transactions, accounts, onCreateChart, 
         </button>
       </div>
 
-      {/* Renderizza tutti i grafici salvati */}
+      {/* Render all saved graphs */}
       {savedCharts.map((chart) => (
         <div key={chart.id} className="custom-chart-card">
-          {/* Header del grafico con titolo e pulsanti */}
+          {/* Chart header with title and buttons */}
           <div className="chart-header">
             <div className="chart-title">{chart.title}</div>
             <div>
@@ -69,7 +69,7 @@ function CustomChartsView({ savedCharts, transactions, accounts, onCreateChart, 
             </div>
           </div>
 
-          {/* Componente del grafico */}
+          {/* Chart Component */}
           <CustomChart 
             config={chart} 
             transactions={transactions} 

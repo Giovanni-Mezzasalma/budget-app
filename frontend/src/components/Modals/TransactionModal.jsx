@@ -1,12 +1,12 @@
 /**
  * TRANSACTION MODAL COMPONENT
- * Modal per aggiungere una nuova transazione (entrata o spesa)
+ * Modal to add a new transaction (income or expense)
  */
 
 import React, { useState, useEffect } from 'react';
 
 function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
-  // Stato del form
+  // Form Status
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'expense-necessity',
@@ -16,20 +16,20 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
     description: ''
   });
 
-  // Array delle categorie disponibili per il tipo selezionato
+  // Array of categories available for the selected type
   const [availableCategories, setAvailableCategories] = useState([]);
 
   /**
-   * Aggiorna le categorie disponibili quando cambia il tipo di transazione
+   * Update available categories when the transaction type changes
    */
   useEffect(() => {
     const cats = categories[formData.type];
     
     if (Array.isArray(cats)) {
-      // Categorie semplici (array)
+      // Simple categories (array)
       setAvailableCategories(cats.map(cat => ({ value: cat, label: cat, group: null })));
     } else {
-      // Categorie con gruppi (oggetto)
+      // Categories with groups (object)
       const categoriesWithGroups = [];
       Object.keys(cats).forEach(group => {
         cats[group].forEach(cat => {
@@ -39,12 +39,12 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
       setAvailableCategories(categoriesWithGroups);
     }
     
-    // Reset della categoria quando cambia il tipo
+    // Reset category when type changes
     setFormData(prev => ({ ...prev, category: '' }));
   }, [formData.type, categories]);
 
   /**
-   * Gestisce i cambiamenti nei campi del form
+   * Manages changes in form fields
    */
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -52,19 +52,19 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
   };
 
   /**
-   * Gestisce il submit del form
+   * Manages form submission
    */
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Crea l'oggetto transazione
+    // Create the transaction object
     const transaction = {
       ...formData,
       account: parseInt(formData.account),
       amount: parseFloat(formData.amount)
     };
     
-    // Chiama la funzione di salvataggio
+    // Call the save function
     onSave(transaction);
     
     // Reset del form
@@ -78,10 +78,10 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
     });
   };
 
-  // Se il modal non è aperto, non renderizza nulla
+  // If the modal is not open, it does not render anything
   if (!isOpen) return null;
 
-  // Raggruppa le categorie per gruppo se necessario
+  // Group categories by group if necessary
   const categoryGroups = {};
   availableCategories.forEach(cat => {
     if (cat.group) {
@@ -99,7 +99,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Data */}
+          {/* Date */}
           <div className="form-group">
             <label>Data</label>
             <input
@@ -111,7 +111,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
             />
           </div>
 
-          {/* Tipo */}
+          {/* Type */}
           <div className="form-group">
             <label>Tipo</label>
             <select
@@ -127,7 +127,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
             </select>
           </div>
 
-          {/* Categoria e Conto */}
+          {/* Category and Account */}
           <div className="form-row">
             <div className="form-group">
               <label>Categoria</label>
@@ -139,7 +139,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
               >
                 <option value="">Seleziona</option>
                 {Object.keys(categoryGroups).length > 0 ? (
-                  // Categorie con gruppi
+                  // Categories with groups
                   Object.keys(categoryGroups).map(group => (
                     <optgroup key={group} label={group}>
                       {categoryGroups[group].map(cat => (
@@ -150,7 +150,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
                     </optgroup>
                   ))
                 ) : (
-                  // Categorie semplici
+                  // Simple categories
                   availableCategories.map(cat => (
                     <option key={cat.value} value={cat.value}>
                       {cat.label}
@@ -178,7 +178,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
             </div>
           </div>
 
-          {/* Importo */}
+          {/* Amount */}
           <div className="form-group">
             <label>Importo (€)</label>
             <input
@@ -192,7 +192,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
             />
           </div>
 
-          {/* Descrizione */}
+          {/* Description */}
           <div className="form-group">
             <label>Descrizione (opzionale)</label>
             <input
@@ -203,7 +203,7 @@ function TransactionModal({ isOpen, onClose, onSave, accounts, categories }) {
             />
           </div>
 
-          {/* Pulsanti */}
+          {/* Buttons */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
               Aggiungi

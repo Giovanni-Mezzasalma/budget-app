@@ -1,7 +1,7 @@
 /**
  * CATEGORY CHART COMPONENT
- * Grafico a barre che mostra il confronto delle spese
- * per categoria (top 10 categorie)
+ * Bar chart showing expense comparison
+ * by category (top 10 categories)
  */
 
 import React from 'react';
@@ -17,7 +17,7 @@ import {
 import { Bar } from 'react-chartjs-2';
 import { calculateCategoryTotals } from '../../utils/calculations';
 
-// Registra i componenti di Chart.js necessari
+// Register the necessary Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -28,15 +28,15 @@ ChartJS.register(
 );
 
 function CategoryChart({ transactions }) {
-  // Calcola i totali per categoria
+// Calculate totals by category
   const categoryTotals = calculateCategoryTotals(transactions);
   
-  // Ordina e prende le prime 10 categorie
+  // Sort and get the first 10 categories
   const sorted = Object.entries(categoryTotals)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  // Se non ci sono dati, non renderizza il grafico
+  // If there is no data, do not render the graph
   if (sorted.length === 0) {
     return (
       <div className="chart-container">
@@ -47,7 +47,7 @@ function CategoryChart({ transactions }) {
     );
   }
 
-  // Configurazione dei dati per il grafico
+  // Configuring data for the chart
   const chartData = {
     labels: sorted.map(([cat]) => cat),
     datasets: [{
@@ -57,7 +57,7 @@ function CategoryChart({ transactions }) {
     }]
   };
 
-  // Opzioni di configurazione del grafico
+  // Chart configuration options
   const options = {
     responsive: true,
     maintainAspectRatio: false,

@@ -1,14 +1,14 @@
 """
 Transfer-related Pydantic schemas for request/response validation.
 
-Tipi di trasferimento:
-- generic: Trasferimento generico (giroconto)
-- withdrawal: Prelievo (Conto → Contanti)
-- deposit: Versamento (Contanti → Conto)
-- savings: Risparmio (Corrente → Risparmio)
-- investment: Investimento (Corrente → Investimento)
-- loan_given: Prestito dato (Corrente → Prestiti a terzi)
-- loan_received: Prestito ricevuto (Prestiti a terzi → Corrente)
+Transfer types:
+- generic: Generic transfer (transfer)
+- withdrawal: Withdrawal (Account → Cash)
+- deposit: Deposit (Cash → Account)
+- savings: Savings (Current → Savings)
+- investment: Investment (Current → Investment)
+- loan_given: Loan given (Current → Loans to third parties)
+- loan_received: Loan received (Loans to third parties → Current)
 """
 
 from datetime import datetime, date as date_type
@@ -18,18 +18,18 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 
-# Tipi validi per i trasferimenti
+# Valid types for transfers
 VALID_TRANSFER_TYPES = [
-    "generic",        # Trasferimento generico / Giroconto
-    "withdrawal",     # Prelievo (Conto → Contanti)
-    "deposit",        # Versamento (Contanti → Conto)
-    "savings",        # Risparmio (Corrente → Risparmio)
-    "investment",     # Investimento (Corrente → Investimento)
-    "loan_given",     # Prestito dato (Corrente → Prestiti a terzi)
-    "loan_received",  # Prestito ricevuto (Prestiti a terzi → Corrente)
+    "generic",        # Generic Transfer / Bank Transfer
+    "withdrawal",     # Withdrawal (Account → Cash)
+    "deposit",        # Deposit (Cash → Account)
+    "savings",        # Savings (Current → Savings)
+    "investment",     # Investment (Current → Investment)
+    "loan_given",     # Loan given (Current → Loans to third parties)
+    "loan_received",  # Loan received (Loans to third parties → Current)
 ]
 
-# Labels italiane per i tipi
+# Italian labels for types
 TRANSFER_TYPE_LABELS = {
     "generic": "Trasferimento",
     "withdrawal": "Prelievo",
@@ -40,7 +40,7 @@ TRANSFER_TYPE_LABELS = {
     "loan_received": "Prestito ricevuto",
 }
 
-# Descrizioni uso per i tipi
+# Usage descriptions for types
 TRANSFER_TYPE_USAGE = {
     "generic": "Giroconto generico",
     "withdrawal": "Conto → Contanti",
@@ -51,44 +51,44 @@ TRANSFER_TYPE_USAGE = {
     "loan_received": "Prestiti a terzi → Corrente",
 }
 
-# Regole di direzione per tipo di trasferimento
-# Definisce quali tipi di account sono validi come origine/destinazione per ogni tipo di transfer
-# None significa "qualsiasi tipo di account"
-# Regole di direzione per tipo di trasferimento
+# Transfer Type Direction Rules
+# Defines which account types are valid as source/destination for each transfer type.
+# None means "any account type."
+# Transfer Type Direction Rules
 TRANSFER_TYPE_DIRECTION_RULES = {
     "generic": {
-        "from_account_types": None,  # Qualsiasi
-        "to_account_types": None,    # Qualsiasi
+        "from_account_types": None,  # Any
+        "to_account_types": None,    # Any
         "description": "Trasferimento generico tra qualsiasi account"
     },
     "withdrawal": {
-        "from_account_types": ["checking", "savings"],  # Da conto bancario
-        "to_account_types": ["cash"],                   # A contanti
+        "from_account_types": ["checking", "savings"],  # From bank account
+        "to_account_types": ["cash"],                   # To cash
         "description": "Prelievo da conto a contanti"
     },
     "deposit": {
-        "from_account_types": ["cash"],                 # Da contanti
-        "to_account_types": ["checking", "savings"],    # A conto bancario
+        "from_account_types": ["cash"],                 # From cash
+        "to_account_types": ["checking", "savings"],    # To bank account
         "description": "Versamento da contanti a conto"
     },
     "savings": {
-        "from_account_types": ["checking"],             # Da conto corrente
-        "to_account_types": ["savings"],                # A risparmio
+        "from_account_types": ["checking"],             # From bank account
+        "to_account_types": ["savings"],                # To savings
         "description": "Accantonamento risparmio"
     },
     "investment": {
-        "from_account_types": ["checking", "savings"],  # Da conto
-        "to_account_types": ["investment"],             # A investimento
+        "from_account_types": ["checking", "savings"],  # From bank account
+        "to_account_types": ["investment"],             # To investment
         "description": "Investimento"
     },
     "loan_given": {
-        "from_account_types": ["checking", "savings", "cash"],  # Da conto/contanti
-        "to_account_types": ["loan"],                           # A prestiti
+        "from_account_types": ["checking", "savings", "cash"],  # From bank account/cash
+        "to_account_types": ["loan"],                           # To loan
         "description": "Prestito dato a terzi"
     },
     "loan_received": {
-        "from_account_types": ["loan"],                         # Da prestiti
-        "to_account_types": ["checking", "savings", "cash"],    # A conto/contanti
+        "from_account_types": ["loan"],                         # From loan
+        "to_account_types": ["checking", "savings", "cash"],    # To bank account
         "description": "Restituzione prestito da terzi"
     },
 }

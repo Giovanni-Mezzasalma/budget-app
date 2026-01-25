@@ -1,6 +1,6 @@
 """
 Custom Charts Router
-Gestione grafici personalizzati utente
+User custom chart management
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -23,10 +23,10 @@ async def get_custom_charts(
     limit: int = Query(100, ge=1, le=100, description="Numero massimo di risultati")
 ):
     """
-    Lista tutti i grafici personalizzati dell'utente corrente.
-    
-    - **skip**: Offset per paginazione (default: 0)
-    - **limit**: Numero massimo risultati (default: 100, max: 100)
+    Lists all custom charts for the current user.
+
+    - **skip**: Offset for pagination (default: 0)
+    - **limit**: Maximum number of results (default: 100, max: 100)
     """
     charts = custom_chart_crud.get_custom_charts(
         db,
@@ -44,14 +44,14 @@ async def create_custom_chart(
     db: Session = Depends(get_db)
 ):
     """
-    Crea un nuovo grafico personalizzato.
-    
-    - **name**: Nome descrittivo del grafico
-    - **chart_type**: Tipo di grafico (line, bar, pie, area)
-    - **config**: Configurazione completa del grafico (JSON)
-    - **filters**: Filtri applicati al grafico (JSON, opzionale)
-    
-    Esempio config per grafico a linee:
+    Create a new custom chart.
+
+    - **name**: Descriptive name of the chart
+    - **chart_type**: Chart type (line, bar, pie, area)
+    - **config**: Complete chart configuration (JSON)
+    - **filters**: Filters applied to the chart (JSON, optional)
+
+    Example config for a line chart:
 ```json
     {
         "dataKey": "amount",
@@ -84,7 +84,7 @@ async def get_custom_chart(
     db: Session = Depends(get_db)
 ):
     """
-    Recupera i dettagli di un singolo grafico personalizzato.
+    Retrieve details for a single custom chart.
     """
     chart = custom_chart_crud.get_custom_chart(
         db,
@@ -109,9 +109,9 @@ async def update_custom_chart(
     db: Session = Depends(get_db)
 ):
     """
-    Aggiorna un grafico personalizzato esistente.
-    
-    Puoi aggiornare solo i campi che vuoi modificare.
+    Update an existing custom chart.
+
+    You can update only the fields you want to change.
     """
     updated_chart = custom_chart_crud.update_custom_chart(
         db,
@@ -136,7 +136,7 @@ async def delete_custom_chart(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina un grafico personalizzato.
+    Delete a custom chart.
     """
     success = custom_chart_crud.delete_custom_chart(
         db,

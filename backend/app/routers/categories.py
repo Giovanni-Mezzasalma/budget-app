@@ -1,6 +1,6 @@
 """
 Categories Router
-Gestione categorie transazioni utente con struttura gerarchica
+User transaction category management with hierarchical structure
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -34,14 +34,14 @@ async def get_categories(
     only_main: bool = Query(False, description="Se true, restituisce solo categorie principali (senza parent)")
 ):
     """
-    Lista tutte le categorie dell'utente corrente.
-    
-    - **skip**: Offset per paginazione (default: 0)
-    - **limit**: Numero massimo risultati (default: 100, max: 500)
-    - **type**: Filtra per macro categoria (income, expense_necessity, expense_extra)
-    - **is_active**: Filtra solo attive (true) o inattive (false)
-    - **parent_id**: Filtra sottocategorie di una specifica categoria
-    - **only_main**: Se true, esclude le sottocategorie
+    Lists all categories for the current user.
+
+    - **skip**: Offset for pagination (default: 0)
+    - **limit**: Maximum number of results (default: 100, max: 500)
+    - **type**: Filter by macro category (income, expense_necessity, expense_extra)
+    - **is_active**: Filter only active (true) or inactive (false)
+    - **parent_id**: Filter subcategories of a specific category
+    - **only_main**: If true, excludes subcategories
     """
     # Valida il tipo se fornito
     if type is not None and type not in VALID_CATEGORY_TYPES:
@@ -70,9 +70,9 @@ async def get_categories_tree(
     is_active: Optional[bool] = Query(True, description="Filtra per stato attivo/inattivo")
 ):
     """
-    Restituisce le categorie organizzate ad albero per macro categoria.
+    Returns categories organized in a tree by macro category.    
     
-    Struttura risposta:
+    Response structure:
     ```json
     {
         "income": [
@@ -104,13 +104,13 @@ async def get_categories_statistics(
     db: Session = Depends(get_db)
 ):
     """
-    Restituisce statistiche sulle categorie dell'utente.
-    
-    Risposta include:
-    - Totale categorie
-    - Conteggio per tipo
-    - Categorie principali vs sottocategorie
-    - Attive vs inattive
+    Returns statistics on the user's categories.
+
+    Response includes:
+    - Category total
+    - Count by type
+    - Parent categories vs. subcategories
+    - Active vs. inactive
     """
     stats = category_crud.get_category_statistics(
         db,
@@ -126,15 +126,15 @@ async def create_category(
     db: Session = Depends(get_db)
 ):
     """
-    Crea una nuova categoria.
-    
-    - **name**: Nome categoria (es. "Ristoranti", "Bonus")
-    - **type**: Macro categoria (income, expense_necessity, expense_extra)
-    - **color**: Colore HEX per UI (es. #3B82F6)
-    - **icon**: Icona/emoji per UI
-    - **parent_id**: ID categoria padre per creare una sottocategoria (opzionale)
-    
-    Esempio creazione sottocategoria:
+    Create a new category.
+
+    - **name**: Category name (e.g., "Restaurants", "Bonus")
+    - **type**: Category macro (income, expense_necessity, expense_extra)
+    - **color**: HEX color for UI (e.g., #3B82F6)
+    - **icon**: Icon/emoji for UI
+    - **parent_id**: Parent category ID to create a subcategory (optional)
+
+    Example: Subcategory creation:
     ```json
     {
         "name": "Netflix",
@@ -143,7 +143,7 @@ async def create_category(
     }
     ```
     """
-    # Se specificato parent_id, verifica che esista e appartenga all'utente
+    # If parent_id is specified, check that it exists and belongs to the user
     if category.parent_id:
         parent = category_crud.get_category(db, category.parent_id, str(current_user.id))
         if not parent:
@@ -151,13 +151,13 @@ async def create_category(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Parent category not found"
             )
-        # Verifica che il tipo sia lo stesso del parent
+        # Check that the type is the same as the parent
         if parent.type != category.type:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Category type must match parent category type ({parent.type})"
             )
-        # Verifica che il parent non sia già una sottocategoria (max 2 livelli)
+        # Check that the parent is not already a subcategory (max 2 levels)
         if parent.parent_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,7 +178,7 @@ async def get_category(
     db: Session = Depends(get_db)
 ):
     """
-    Recupera dettagli di una singola categoria con le sue sottocategorie.
+    Retrieve details of a single category with its subcategories.
     """
     category = category_crud.get_category(
         db,
@@ -203,13 +203,13 @@ async def update_category(
     db: Session = Depends(get_db)
 ):
     """
-    Aggiorna una categoria esistente.
-    
-    Puoi aggiornare solo i campi che vuoi modificare.
-    
-    ⚠️ Se cambi il `type`, tutte le sottocategorie verranno aggiornate di conseguenza.
+    Update an existing category.
+
+    You can only update the fields you want to change.
+
+    ⚠️ If you change the "type", all subcategories will be updated accordingly.
     """
-    # Verifica esistenza categoria
+    # Check category existence
     existing = category_crud.get_category(db, category_id, str(current_user.id))
     if not existing:
         raise HTTPException(
@@ -217,9 +217,9 @@ async def update_category(
             detail="Category not found"
         )
     
-    # Se si sta aggiornando parent_id, verifica validità
+    # If updating parent_id, check validity
     if category_update.parent_id is not None:
-        # Non può essere se stesso
+        # It can't be himself
         if category_update.parent_id == category_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -233,14 +233,14 @@ async def update_category(
                 detail="Parent category not found"
             )
         
-        # Verifica che non si crei un ciclo
+        # Make sure that no loop is created
         if parent.parent_id == category_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot set parent to a subcategory of this category"
             )
     
-    # Se si cambia il tipo, aggiorna anche le sottocategorie
+    # If you change the type, also update the subcategories
     if category_update.type is not None and category_update.type != existing.type:
         for sub in existing.subcategories:
             sub.type = category_update.type
@@ -263,16 +263,16 @@ async def delete_category(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina una categoria.
-    
-    ⚠️ **Attenzione**: 
-    - Elimina anche tutte le sottocategorie
-    - Di default, non puoi eliminare categorie con transazioni associate
-    - Usa `force=true` per forzare l'eliminazione (le transazioni rimarranno orfane)
-    
-    💡 Considera di disattivare la categoria invece di eliminarla.
+    Delete a category.
+
+    ⚠️ **Warning**:
+    - Also deletes all subcategories.
+    - By default, you cannot delete categories with associated transactions.
+    - Use `force=true` to force the deletion (the transactions will be orphaned).
+
+    💡 Consider deactivating the category instead of deleting it.
     """
-    # Verifica se la categoria esiste
+    # Check if the category exists
     category = category_crud.get_category(db, category_id, str(current_user.id))
     if not category:
         raise HTTPException(
@@ -280,7 +280,7 @@ async def delete_category(
             detail="Category not found"
         )
     
-    # Verifica se ci sono transazioni associate (incluse sottocategorie)
+    # Check if there are associated transactions (including subcategories)
     has_transactions = len(category.transactions) > 0
     for sub in category.subcategories:
         if len(sub.transactions) > 0:
@@ -316,12 +316,12 @@ async def deactivate_category(
     db: Session = Depends(get_db)
 ):
     """
-    Disattiva una categoria (soft delete).
-    
-    La categoria non verrà eliminata ma sarà nascosta dalle liste.
-    Può essere riattivata con PUT impostando is_active=true.
-    
-    - **include_subcategories**: Se true (default), disattiva anche tutte le sottocategorie
+    Deactivates a category (soft delete).
+
+    The category will not be deleted but will be hidden from the lists.
+    It can be reactivated with PUT by setting is_active=true.
+
+    - **include_subcategories**: If true (default), also deactivates all subcategories.
     """
     category = category_crud.get_category(db, category_id, str(current_user.id))
     if not category:
@@ -330,7 +330,7 @@ async def deactivate_category(
             detail="Category not found"
         )
     
-    # Disattiva sottocategorie se richiesto
+    # Disable subcategories if required
     if include_subcategories:
         for sub in category.subcategories:
             sub.is_active = False
@@ -350,16 +350,16 @@ async def seed_default_categories(
     db: Session = Depends(get_db)
 ):
     """
-    Crea le categorie predefinite per l'utente.
-    
-    Struttura basata su:
-    - **Entrate**: Reddito, Affitto, Vendita, Rimborsi, Altro
-    - **Spese di Necessità**: Casa, Trasporti, Salute, Figli, Istruzione, Altro
-    - **Spese Extra**: Svago, Animali
-    
-    Ogni categoria principale ha le sue sottocategorie.
-    
-    ⚠️ Funziona solo se l'utente non ha ancora categorie.
+    Create default categories for the user.
+
+    Structure based on:
+    - **Income**: Income, Rent, Sales, Reimbursements, Other
+    - **Necessary Expenses**: Housing, Transportation, Health, Children, Education, Other
+    - **Extra Expenses**: Entertainment, Pets
+
+    Each main category has its own subcategories.
+
+    ⚠️ Only works if the user doesn't have any categories yet.
     """
     # Verifica se l'utente ha già categorie
     existing = category_crud.get_categories(db, str(current_user.id), limit=1)
@@ -380,12 +380,12 @@ async def delete_all_categories(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina TUTTE le categorie dell'utente.
-    
-    ⚠️ **ATTENZIONE**: Operazione irreversibile!
-    
-    Utile per resettare e ricreare le categorie di default.
-    Richiede `confirm=true` come parametro.
+    Deletes ALL user categories.
+
+    ⚠️ **WARNING**: This operation is irreversible!
+
+    Useful for resetting and recreating default categories.
+    Requires `confirm=true` as a parameter.
     """
     if not confirm:
         raise HTTPException(
@@ -393,14 +393,14 @@ async def delete_all_categories(
             detail="You must confirm deletion by setting confirm=true"
         )
     
-    # Prendi tutte le categorie dell'utente
+    # Get all user categories
     all_categories = category_crud.get_categories(
         db, 
         str(current_user.id), 
         limit=1000
     )
     
-    # Verifica se qualche categoria ha transazioni
+    # Check if any category has transactions
     for cat in all_categories:
         if len(cat.transactions) > 0:
             raise HTTPException(
@@ -408,9 +408,9 @@ async def delete_all_categories(
                 detail=f"Cannot delete all categories: '{cat.name}' has transactions associated. Delete transactions first."
             )
     
-    # Elimina tutte (le sottocategorie vengono eliminate automaticamente per cascade)
+    # Delete all (subcategories are automatically deleted by cascade)
     for cat in all_categories:
-        if cat.parent_id is None:  # Solo categorie principali
+        if cat.parent_id is None:  # Main categories only
             db.delete(cat)
     
     db.commit()

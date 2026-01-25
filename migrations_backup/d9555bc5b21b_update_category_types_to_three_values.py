@@ -19,14 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Aggiorna le categorie esistenti di tipo 'expense' a 'expense_necessity'
+    # Update existing categories of type 'expense' to 'expense necessity'
     op.execute("""
         UPDATE categories 
         SET type = 'expense_necessity' 
         WHERE type = 'expense'
     """)
     
-    # Aggiorna le transazioni esistenti
+    # Update existing transactions
     op.execute("""
         UPDATE transactions 
         SET type = 'expense_necessity' 

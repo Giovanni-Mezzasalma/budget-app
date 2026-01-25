@@ -1,6 +1,6 @@
 """
 Transactions Router
-Gestione transazioni (entrate e uscite) utente
+User transaction management (income and expenditure)
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -42,19 +42,19 @@ async def get_transactions(
     search: Optional[str] = Query(None, description="Cerca in descrizione e note")
 ):
     """
-    Lista tutte le transazioni dell'utente con filtri opzionali.
-    
-    **Filtri disponibili:**
-    - **account_id**: Filtra per specifico account
-    - **category_id**: Filtra per specifica categoria
-    - **type**: Filtra per tipo (income, expense_necessity, expense_extra)
-    - **start_date / end_date**: Filtra per periodo
-    - **min_amount / max_amount**: Filtra per range importo
-    - **search**: Cerca testo in descrizione e note
-    
-    **Ordinamento:** Per data decrescente (più recenti prima)
+    List all user transactions with optional filters.
+
+    **Available filters:**
+    - **account_id**: Filter by specific account
+    - **category_id**: Filter by specific category
+    - **type**: Filter by type (income, expense_necessity, expense_extra)
+    - **start_date / end_date**: Filter by period
+    - **min_amount / max_amount**: Filter by amount range
+    - **search**: Search for text in descriptions and notes
+
+    **Sort:** By date descending (newest first)
     """
-    # Valida il tipo se fornito
+    # Validate type if provided
     if type is not None and type not in VALID_TRANSACTION_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -88,17 +88,17 @@ async def get_transactions_summary(
     account_id: Optional[str] = Query(None, description="Filtra per account")
 ):
     """
-    Restituisce il riepilogo delle transazioni.
-    
-    **Risposta include:**
-    - Totale entrate (income)
-    - Totale spese di necessità (expense_necessity)
-    - Totale spese extra (expense_extra)
-    - Totale spese (necessity + extra)
-    - Saldo netto (entrate - spese)
-    - Numero transazioni
-    
-    **Esempio risposta:**
+    Returns a summary of transactions.
+
+    **Response includes:**
+    - Total income
+    - Total necessary expenses (expense_necessity)
+    - Total extra expenses (expense_extra)
+    - Total expenses (necessity + extra)
+    - Net balance (income - expenses)
+    - Number of transactions
+
+    **Example response:**
     ```json
     {
         "total_income": 3500.00,
@@ -129,10 +129,10 @@ async def get_monthly_summary(
     db: Session = Depends(get_db)
 ):
     """
-    Restituisce il riepilogo per un mese specifico.
-    
-    - **year**: Anno (es. 2025)
-    - **month**: Mese (1-12)
+    Returns the summary for a specific month.
+
+    - **year**: Year (e.g., 2025)
+    - **month**: Month (1-12)
     """
     if month < 1 or month > 12:
         raise HTTPException(
@@ -163,25 +163,25 @@ async def create_transaction(
     db: Session = Depends(get_db)
 ):
     """
-    Crea una nuova transazione.
-    
-    **Campi richiesti:**
-    - **account_id**: ID dell'account
-    - **category_id**: ID della categoria
-    - **amount**: Importo (sempre positivo)
-    - **date**: Data della transazione
-    
-    **Campi opzionali:**
-    - **description**: Descrizione breve
-    - **notes**: Note aggiuntive
-    - **tags**: Lista di tag per filtraggio
-    
-    ⚠️ **Nota:** Il tipo della transazione (income/expense_necessity/expense_extra) 
-    viene determinato automaticamente dalla categoria selezionata.
-    
-    ✅ Il balance dell'account viene aggiornato automaticamente.
-    
-    **Esempio:**
+    Create a new transaction.
+
+    **Required fields:**
+    - **account_id**: Account ID
+    - **category_id**: Category ID
+    - **amount**: Amount (always positive)
+    - **date**: Transaction date
+
+    **Optional fields:**
+    - **description**: Short description
+    - **notes**: Additional notes
+    - **tags**: List of tags for filtering
+
+    ⚠️ **Note:** The transaction type (income/expense_necessity/expense_extra)
+    is automatically determined by the selected category.
+
+    ✅ The account balance is updated automatically.
+
+    **Example:**
     ```json
     {
         "account_id": "uuid-account",
@@ -192,7 +192,7 @@ async def create_transaction(
     }
     ```
     """
-    # Verifica che l'account esista e appartenga all'utente
+    # Verify that the account exists and belongs to the user
     account = account_crud.get_account(db, transaction.account_id, str(current_user.id))
     if not account:
         raise HTTPException(
@@ -200,7 +200,7 @@ async def create_transaction(
             detail="Account not found"
         )
     
-    # Verifica che la categoria esista e appartenga all'utente
+    # Verify that the category exists and belongs to the user
     category = category_crud.get_category(db, transaction.category_id, str(current_user.id))
     if not category:
         raise HTTPException(
@@ -208,7 +208,7 @@ async def create_transaction(
             detail="Category not found"
         )
     
-    # Verifica che la categoria sia attiva
+    # Make sure the category is active
     if not category.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -236,9 +236,9 @@ async def get_transaction(
     db: Session = Depends(get_db)
 ):
     """
-    Recupera i dettagli di una singola transazione.
-    
-    Include informazioni su account e categoria associati.
+    Retrieves the details of a single transaction.
+
+    Includes information about the associated account and category.
     """
     transaction = transaction_crud.get_transaction(
         db,
@@ -252,7 +252,7 @@ async def get_transaction(
             detail="Transaction not found"
         )
     
-    # Costruisci risposta con dettagli
+    # Build response with details
     response = TransactionWithDetails(
         id=transaction.id,
         user_id=transaction.user_id,
@@ -287,16 +287,16 @@ async def update_transaction(
     db: Session = Depends(get_db)
 ):
     """
-    Aggiorna una transazione esistente.
-    
-    Puoi aggiornare solo i campi che vuoi modificare.
-    
-    ⚠️ **Nota:** Se cambi la categoria, il tipo della transazione verrà aggiornato 
-    automaticamente per corrispondere al tipo della nuova categoria.
-    
-    ✅ I balance degli account vengono ricalcolati automaticamente.
+    Update an existing transaction.
+
+    You can only update the fields you want to change.
+
+    ⚠️ **Note:** If you change the category, the transaction type will be automatically updated
+    to match the new category type.
+
+    ✅ Account balances are automatically recalculated.
     """
-    # Verifica che la transazione esista
+    # Verify that the transaction exists
     existing = transaction_crud.get_transaction(db, transaction_id, str(current_user.id))
     if not existing:
         raise HTTPException(
@@ -304,7 +304,7 @@ async def update_transaction(
             detail="Transaction not found"
         )
     
-    # Se si sta cambiando account, verifica che esista
+    # If you are changing accounts, please check that it exists
     if transaction_update.account_id is not None:
         account = account_crud.get_account(db, transaction_update.account_id, str(current_user.id))
         if not account:
@@ -313,7 +313,7 @@ async def update_transaction(
                 detail="Account not found"
             )
     
-    # Se si sta cambiando categoria, verifica che esista e sia attiva
+    # If you are changing categories, check that they exist and are active
     if transaction_update.category_id is not None:
         category = category_crud.get_category(db, transaction_update.category_id, str(current_user.id))
         if not category:
@@ -349,9 +349,9 @@ async def delete_transaction(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina una transazione.
-    
-    ✅ Il balance dell'account viene ripristinato automaticamente.
+    Delete a transaction.
+
+    ✅ Your account balance is automatically restored.
     """
     success = transaction_crud.delete_transaction(
         db,
@@ -376,11 +376,11 @@ async def get_totals_by_category(
     end_date: Optional[date] = Query(None, description="Data fine periodo")
 ):
     """
-    Restituisce i totali delle transazioni raggruppati per categoria.
-    
-    Utile per grafici a torta o analisi per categoria.
-    
-    **Risposta:** Dict con category_id come chiave e totale come valore.
+    Returns transaction totals grouped by category.
+
+    Useful for pie charts or category analysis.
+
+    **Answer:** Dict with category_id as the key and total as the value.
     """
     totals = transaction_crud.get_transactions_by_category(
         db,
@@ -389,7 +389,7 @@ async def get_totals_by_category(
         end_date=end_date
     )
     
-    # Arricchisci con nomi categorie
+    # Enrich with category names
     result = []
     for category_id, total in totals.items():
         category = category_crud.get_category(db, category_id, str(current_user.id))

@@ -1,6 +1,6 @@
 # ============================================
 # BUDGET APP - Backend Dockerfile
-# Multi-stage build per ottimizzazione
+# Multi-stage build for optimization
 # ============================================
 
 # ==================== STAGE 1: Base ====================

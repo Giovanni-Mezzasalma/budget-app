@@ -2,8 +2,8 @@
 Account-related Pydantic schemas for request/response validation.
 
 Balance Strategy:
-- initial_balance: Impostato solo alla creazione, poi immutabile
-- current_balance: Aggiornato automaticamente, read-only per l'utente
+- initial_balance: Set only at creation, then immutable
+- current_balance: Updated automatically, read-only for the user
 """
 
 from datetime import datetime
@@ -64,8 +64,8 @@ class AccountCreate(AccountBase):
     """
     Schema for creating a new account.
     
-    initial_balance viene impostato alla creazione e non può essere modificato successivamente.
-    current_balance viene inizializzato automaticamente allo stesso valore.
+    Initial_balance is set at creation and cannot be changed subsequently.
+    Current_balance is automatically initialized to the same value.
     """
     initial_balance: Decimal = Field(
         default=Decimal("0.00"), 
@@ -85,9 +85,9 @@ class AccountUpdate(BaseModel):
     """
     Schema for updating an existing account.
     
-    Note: initial_balance e current_balance NON sono modificabili direttamente.
-    - initial_balance è immutabile dopo la creazione
-    - current_balance viene aggiornato solo tramite transazioni/trasferimenti
+    Note: Initial_balance and current_balance are NOT directly editable.
+    - Initial_balance is immutable after creation.
+    - Current_balance is only updated through transactions/transfers.
     """
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="Account name")
     type: Optional[str] = Field(None, description="Account type")

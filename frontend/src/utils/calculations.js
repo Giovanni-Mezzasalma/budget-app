@@ -1,38 +1,38 @@
 /**
  * CALCULATIONS UTILITIES
- * Contiene tutte le funzioni di calcolo per l'applicazione:
- * - Calcolo del saldo dei conti
- * - Calcolo delle statistiche mensili
- * - Filtraggio delle transazioni per periodo
+ * Contains all the calculation functions for the application:
+ * - Account balance calculation
+ * - Monthly statistics calculation
+ * - Transaction filtering by period
  */
 
 /**
- * Calcola il saldo di un conto specifico
- * @param {number} accountId - ID del conto
- * @param {Array} accounts - Array di tutti i conti
- * @param {Array} transactions - Array di tutte le transazioni
- * @returns {number} - Saldo calcolato
+ * Calculate the balance of a specific account
+ * @param {number} accountId - Account ID
+ * @param {Array} accounts - Array of all accounts
+ * @param {Array} transactions - Array of all transactions
+ * @returns {number} - Balance calculated
  */
 export const calculateAccountBalance = (accountId, accounts, transactions) => {
-  // Trova il conto nell'array
+  // Find the account in the array
   const account = accounts.find(a => a.id === accountId);
   
-  // Parte dal saldo iniziale del conto
+  // It starts from the initial balance of the account
   let balance = account ? account.initialBalance : 0;
 
-  // Scorre tutte le transazioni e aggiorna il saldo
+  // Scroll through all transactions and update your balance
   transactions.forEach(t => {
     if (t.type === 'transfer') {
-      // Se è un trasferimento, toglie dal conto di origine e aggiunge a quello di destinazione
+      // If it's a transfer, it deducts from the source account and adds to the destination account.
       if (t.fromAccount === accountId) balance -= t.amount;
       if (t.toAccount === accountId) balance += t.amount;
     } else if (t.account === accountId) {
-      // Se è una transazione normale sul conto
+      // If it is a normal transaction on the account
       if (t.type === 'income') {
-        // Le entrate aumentano il saldo
+        // Revenue increases the balance
         balance += t.amount;
       } else {
-        // Le uscite diminuiscono il saldo
+        // Expenditures decrease the balance
         balance -= t.amount;
       }
     }
@@ -42,18 +42,18 @@ export const calculateAccountBalance = (accountId, accounts, transactions) => {
 };
 
 /**
- * Calcola le statistiche per un insieme di transazioni
- * @param {Array} transactions - Array di transazioni da analizzare
- * @returns {Object} - Oggetto con tutte le statistiche calcolate
+ * Calculate statistics for a set of transactions
+ * @param {Array} transactions - Array of transactions to analyze
+ * @returns {Object} - Object with all statistics calculated
  */
 export const calculateStats = (transactions) => {
-  // Inizializza i contatori
+  // Initialize the counters
   let income = 0;
   let expenseNecessity = 0;
   let expenseExtra = 0;
   let withdrawals = 0;
 
-  // Somma gli importi per tipo di transazione
+  // Adds the amounts by transaction type
   transactions.forEach(t => {
     if (t.type === 'income') income += t.amount;
     else if (t.type === 'expense-necessity') expenseNecessity += t.amount;
@@ -61,7 +61,7 @@ export const calculateStats = (transactions) => {
     else if (t.type === 'withdrawal') withdrawals += t.amount;
   });
 
-  // Calcola i totali
+  // Calculate the totals
   const totalExpenses = expenseNecessity + expenseExtra + withdrawals;
   const net = income - totalExpenses;
 
@@ -76,11 +76,11 @@ export const calculateStats = (transactions) => {
 };
 
 /**
- * Filtra le transazioni per un mese e anno specifici
- * @param {Array} transactions - Array di tutte le transazioni
- * @param {number} month - Mese (0-11)
- * @param {number} year - Anno
- * @returns {Array} - Array di transazioni filtrate
+ * Filter transactions for a specific month and year
+ * @param {Array} transactions - Array of all transactions
+ * @param {number} month - Month (0-11)
+ * @param {number} year - Year
+ * @returns {Array} - Array of filtered transactions
  */
 export const filterTransactionsByMonth = (transactions, month, year) => {
   return transactions.filter(t => {
@@ -90,18 +90,18 @@ export const filterTransactionsByMonth = (transactions, month, year) => {
 };
 
 /**
- * Calcola i totali per categoria da un array di transazioni
- * @param {Array} transactions - Array di transazioni da analizzare
- * @returns {Object} - Oggetto con categoria come chiave e totale come valore
+ * Calculate category totals from an array of transactions
+ * @param {Array} transactions - Array of transactions to analyze
+ * @returns {Object} - Object with category as key and total as value
  */
 export const calculateCategoryTotals = (transactions) => {
   const categoryTotals = {};
   
-  // Filtra solo le spese (escluse entrate e trasferimenti)
+  // Filter expenses only (excluding income and transfers)
   transactions
     .filter(t => t.type !== 'income' && t.type !== 'transfer')
     .forEach(t => {
-      // Somma l'importo per ogni categoria
+      // Add the amount for each category
       categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
     });
 
@@ -121,29 +121,29 @@ export const calculateTotalBalance = (accounts, transactions) => {
 };
 
 /**
- * Ottiene i dati degli ultimi N mesi per i grafici
- * @param {number} months - Numero di mesi da includere
- * @param {number} currentMonth - Mese corrente (0-11)
- * @param {number} currentYear - Anno corrente
- * @param {Array} transactions - Array di tutte le transazioni
- * @returns {Array} - Array di oggetti con dati mensili
+ * Gets data from the last N months for charts
+ * @param {number} months - Number of months to include
+ * @param {number} currentMonth - Current Month (0-11)
+ * @param {number} currentYear - Current Year
+ * @param {Array} transactions - Array of all transactions
+ * @returns {Array} - Array of objects with monthly data
  */
 export const getLastMonthsData = (months, currentMonth, currentYear, transactions) => {
   const data = [];
 
-  // Cicla all'indietro partendo dal mese corrente
+  // Cycle backwards from the current month
   for (let i = months - 1; i >= 0; i--) {
     const date = new Date(currentYear, currentMonth - i, 1);
     const month = date.getMonth();
     const year = date.getFullYear();
     
-    // Filtra le transazioni per questo mese
+    // Filter transactions for this month
     const monthTrans = filterTransactionsByMonth(transactions, month, year);
     
-    // Calcola le statistiche per il mese
+   // Calculate statistics for the month
     const stats = calculateStats(monthTrans);
     
-    // Aggiungi i dati all'array
+    // Add data to the array
     data.push({
       label: date.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }),
       date: date,
@@ -158,9 +158,9 @@ export const getLastMonthsData = (months, currentMonth, currentYear, transaction
 };
 
 /**
- * Ordina le transazioni per data (dalla più recente alla più vecchia)
- * @param {Array} transactions - Array di transazioni da ordinare
- * @returns {Array} - Array di transazioni ordinato
+ * Sort transactions by date (newest to oldest)
+ * @param {Array} transactions - Array of transactions to sort
+ * @returns {Array} - Sorted array of transactions
  */
 export const sortTransactionsByDate = (transactions) => {
   return [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));

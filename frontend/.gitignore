@@ -1,4 +1,4 @@
-# Dipendenze
+# Dipendencies
 /node_modules
 /.pnp
 .pnp.js
@@ -6,7 +6,7 @@
 # Testing
 /coverage
 
-# Produzione
+# Production
 /build
 
 # Misc

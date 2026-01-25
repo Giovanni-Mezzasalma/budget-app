@@ -1,6 +1,6 @@
 """
 Analytics Router
-Statistiche e dashboard data per Budget App
+Statistics and data dashboard for Budget App
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -24,21 +24,21 @@ async def get_summary(
     account_id: Optional[str] = Query(None, description="Filtra per account specifico")
 ):
     """
-    Restituisce il riepilogo finanziario completo.
-    
-    **Metriche calcolate:**
-    - Totale entrate (income)
-    - Totale spese necessità (expense_necessity)
-    - Totale spese extra (expense_extra)
-    - Totale spese combinate
-    - Saldo netto (income - expenses)
-    - Balance totale accounts
-    - Numero transazioni nel periodo
-    
-    **Filtri opzionali:**
-    - `start_date`: Data inizio (default: inizio mese corrente)
-    - `end_date`: Data fine (default: oggi)
-    - `account_id`: Filtra per singolo account
+    Returns the complete financial summary.
+
+    **Calculated metrics:**
+    - Total income
+    - Total expense necessity (expense_necessity)
+    - Total extra expenses (expense_extra)
+    - Total combined expenses
+    - Net balance (income - expenses)
+    - Total account balance
+    - Number of transactions in the period
+
+    **Optional filters:**
+    - `start_date`: Start date (default: start of the current month)
+    - `end_date`: End date (default: today)
+    - `account_id`: Filter by individual account
     """
     return analytics_crud.calculate_summary(
         db=db,
@@ -57,19 +57,19 @@ async def get_monthly_trend(
     account_id: Optional[str] = Query(None, description="Filtra per account specifico")
 ):
     """
-    Restituisce il trend mensile di entrate e uscite.
-    
-    **Dati restituiti per ogni mese:**
-    - Totale income
-    - Totale expense_necessity
-    - Totale expense_extra
-    - Totale expenses combinato
-    - Saldo netto
-    - Numero transazioni
-    
-    **Parametri:**
-    - `months`: Numero di mesi passati da analizzare (1-24, default: 12)
-    - `account_id`: Filtra per singolo account
+    Returns the monthly trend of income and expenses.
+
+    Data returned for each month:
+    - Total income
+    - Total expense_necessity
+    - Total expense_extra
+    - Total combined expenses
+    - Net balance
+    - Number of transactions
+
+    Parameters:
+    - `months`: Number of past months to analyze (1-24, default: 12)
+    - `account_id`: Filter by individual account
     """
     return analytics_crud.calculate_monthly_trend(
         db=db,
@@ -88,11 +88,11 @@ async def get_totals_by_category(
     transaction_type: Optional[str] = Query(None, description="Filtra per tipo: income, expense_necessity, expense_extra")
 ):
     """
-    Restituisce i totali raggruppati per categoria.
-    
-    Utile per grafici a torta e analisi per categoria.
-    
-    **Risposta:** Lista ordinata per totale decrescente con dettagli categoria.
+    Returns totals grouped by category.
+
+    Useful for pie charts and category analysis.
+
+    **Answer:** List sorted by descending total with category details.
     """
     return analytics_crud.calculate_totals_by_category(
         db=db,
@@ -111,13 +111,13 @@ async def get_totals_by_account(
     end_date: Optional[date] = Query(None, description="Data fine periodo")
 ):
     """
-    Restituisce i totali raggruppati per account.
-    
-    Include:
-    - Balance attuale account
-    - Totale income per account
-    - Totale expenses per account
-    - Numero transazioni
+    Returns totals grouped by account.
+
+    Includes:
+    - Current account balance
+    - Total income per account
+    - Total expenses per account
+    - Number of transactions
     """
     return analytics_crud.calculate_totals_by_account(
         db=db,
@@ -136,9 +136,9 @@ async def get_daily_breakdown(
     account_id: Optional[str] = Query(None, description="Filtra per account")
 ):
     """
-    Restituisce breakdown giornaliero delle transazioni.
-    
-    Utile per grafici a linee/area con granularità giornaliera.
+    Returns a daily breakdown of transactions.
+
+    Useful for line/area charts with daily granularity.
     """
     return analytics_crud.calculate_daily_breakdown(
         db=db,
@@ -157,9 +157,9 @@ async def get_year_comparison(
     year2: int = Query(..., description="Secondo anno da confrontare")
 ):
     """
-    Confronta due anni side-by-side.
-    
-    Restituisce totali mensili per entrambi gli anni per facile confronto.
+    Compare two years side-by-side.
+
+    Returns monthly totals for both years for easy comparison.
     """
     return analytics_crud.calculate_year_comparison(
         db=db,

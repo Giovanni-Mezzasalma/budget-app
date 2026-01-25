@@ -1,7 +1,7 @@
 /**
  * TREND CHART COMPONENT
- * Grafico a linee che mostra l'andamento di entrate, uscite e netto
- * negli ultimi mesi
+ * Line chart showing the trend of income, expenses, and net
+ * over the last few months
  */
 
 import React from 'react';
@@ -18,7 +18,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
-// Registra i componenti di Chart.js necessari
+// Register the necessary Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -31,7 +31,7 @@ ChartJS.register(
 );
 
 function TrendChart({ data }) {
-  // Configurazione dei dati per il grafico
+  // Configuring the data for the chart
   const chartData = {
     labels: data.map(d => d.label),
     datasets: [
@@ -62,7 +62,7 @@ function TrendChart({ data }) {
     ]
   };
 
-  // Opzioni di configurazione del grafico
+  // Chart configuration options
   const options = {
     responsive: true,
     maintainAspectRatio: false,

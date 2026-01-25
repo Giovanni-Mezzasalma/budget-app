@@ -1,12 +1,12 @@
 /**
  * TRANSFER MODAL COMPONENT
- * Modal per aggiungere un trasferimento tra conti
+ * Modal for adding a transfer between accounts
  */
 
 import React, { useState } from 'react';
 
 function TransferModal({ isOpen, onClose, onSave, accounts }) {
-  // Stato del form
+  // Form Status
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     operationType: 'Trasferimento',
@@ -17,7 +17,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
   });
 
   /**
-   * Gestisce i cambiamenti nei campi del form
+   * Manages changes in form fields
    */
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,18 +25,18 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
   };
 
   /**
-   * Gestisce il submit del form
+   * Manages form submission
    */
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validazione: i conti devono essere diversi
+    // Validation: Accounts must be different
     if (formData.fromAccount === formData.toAccount) {
       alert('I conti di origine e destinazione devono essere diversi');
       return;
     }
     
-    // Crea l'oggetto trasferimento
+    // Create the transfer object
     const transfer = {
       ...formData,
       fromAccount: parseInt(formData.fromAccount),
@@ -44,10 +44,10 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
       amount: parseFloat(formData.amount)
     };
     
-    // Chiama la funzione di salvataggio
+    // Call the save function
     onSave(transfer);
     
-    // Reset del form
+    // Reset the form
     setFormData({
       date: new Date().toISOString().split('T')[0],
       operationType: 'Trasferimento',
@@ -58,7 +58,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
     });
   };
 
-  // Se il modal non è aperto, non renderizza nulla
+  // If the modal is not open, it does not render anything
   if (!isOpen) return null;
 
   return (
@@ -70,7 +70,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Data */}
+          {/* Date */}
           <div className="form-group">
             <label>Data</label>
             <input
@@ -82,7 +82,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
             />
           </div>
 
-          {/* Tipo Operazione */}
+          {/* Operation Type */}
           <div className="form-group">
             <label>Tipo Operazione</label>
             <select
@@ -97,7 +97,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
             </select>
           </div>
 
-          {/* Da Conto e A Conto */}
+          {/* From Account and To Account */}
           <div className="form-row">
             <div className="form-group">
               <label>Da Conto</label>
@@ -134,7 +134,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
             </div>
           </div>
 
-          {/* Importo */}
+          {/* Amount */}
           <div className="form-group">
             <label>Importo (€)</label>
             <input
@@ -148,7 +148,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
             />
           </div>
 
-          {/* Descrizione */}
+          {/* Description */}
           <div className="form-group">
             <label>Descrizione (opzionale)</label>
             <input
@@ -159,7 +159,7 @@ function TransferModal({ isOpen, onClose, onSave, accounts }) {
             />
           </div>
 
-          {/* Pulsanti */}
+          {/* Buttons */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button type="submit" className="btn btn-success" style={{ flex: 1 }}>
               Trasferisci

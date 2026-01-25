@@ -1,18 +1,18 @@
 /**
- * APP.JSX - Componente principale dell'applicazione
- * Gestisce tutto lo stato globale e coordina i vari componenti
+ * APP.JSX - Core application component
+ * Manages all global state and coordinates the various components
  */
 
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-// Import degli hooks personalizzati
+// Import custom hooks
 import useLocalStorage from './hooks/useLocalStorage';
 
-// Import dei dati di default
+// Import default data
 import { defaultCategories, defaultAccounts } from './utils/defaultData';
 
-// Import dei componenti
+// Import components
 import Header from './components/Header/Header';
 import Dashboard from './components/Views/Dashboard';
 import AccountsView from './components/Views/AccountsView';
@@ -21,7 +21,7 @@ import CategoriesView from './components/Views/CategoriesView';
 import CustomChartsView from './components/Views/CustomChartsView';
 import AnalysisView from './components/Views/AnalysisView';
 
-// Import dei modali
+// Import modals
 import TransactionModal from './components/Modals/TransactionModal';
 import TransferModal from './components/Modals/TransferModal';
 import AccountModal from './components/Modals/AccountModal';
@@ -29,20 +29,20 @@ import CategoryModal from './components/Modals/CategoryModal';
 import ChartConfigModal from './components/Modals/ChartConfigModal';
 
 function App() {
-  // ===== STATO DELL'APPLICAZIONE =====
+  // ===== APPLICATION STATUS =====
   
-  // Dati principali (persistenti in localStorage)
+  // Main data (persistent in localStorage)
   const [accounts, setAccounts] = useLocalStorage('accounts', defaultAccounts);
   const [transactions, setTransactions] = useLocalStorage('transactions', []);
   const [categories, setCategories] = useLocalStorage('categories', JSON.parse(JSON.stringify(defaultCategories)));
   const [savedCharts, setSavedCharts] = useLocalStorage('customCharts', []);
   
-  // Stato della UI (non persistente)
+  // UI State (non-persistent)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Stato dei modali (aperti/chiusi)
+  // Modal status (open/closed)
   const [modals, setModals] = useState({
     transaction: false,
     transfer: false,
@@ -51,51 +51,51 @@ function App() {
     chartConfig: false
   });
   
-  // Stato per il grafico in editing (null se nuovo grafico)
+  // Status for the graph in editing (null if new graph)
   const [editingChart, setEditingChart] = useState(null);
 
-  // ===== GESTIONE MODALI =====
+  // ===== MODAL MANAGEMENT =====
   
   /**
-   * Apre un modal specifico
+   * Opens a specific modal
    */
   const openModal = (modalName) => {
     setModals(prev => ({ ...prev, [modalName]: true }));
   };
   
   /**
-   * Chiude un modal specifico
+   * Closes a specific modal
    */
   const closeModal = (modalName) => {
     setModals(prev => ({ ...prev, [modalName]: false }));
-    // Se chiudiamo il modal del grafico, resetta l'editing
+    // If we close the chart modal, it resets the editing
     if (modalName === 'chartConfig') {
       setEditingChart(null);
     }
   };
 
-  // ===== GESTIONE CONTI =====
+  // ===== ACCOUNT MANAGEMENT =====
   
   /**
-   * Aggiunge un nuovo conto
+   * Add a new account
    */
   const addAccount = (accountData) => {
     const newAccount = {
       ...accountData,
-      id: Date.now() // Usa timestamp come ID univoco
+      id: Date.now() // Use timestamp as unique ID
     };
     setAccounts([...accounts, newAccount]);
   };
   
   /**
-   * Elimina un conto e tutte le sue transazioni
+   * Delete an account and all its transactions
    */
   const deleteAccount = (accountId) => {
     if (window.confirm('Sei sicuro? Questo eliminerà anche tutte le transazioni associate.')) {
-      // Rimuove il conto
+      // Remove the account
       setAccounts(accounts.filter(a => a.id !== accountId));
       
-      // Rimuove tutte le transazioni associate
+      // Removes all associated transactions
       setTransactions(transactions.filter(t => {
         if (t.type === 'transfer') {
           return t.fromAccount !== accountId && t.toAccount !== accountId;
@@ -105,35 +105,35 @@ function App() {
     }
   };
 
-  // ===== GESTIONE TRANSAZIONI =====
+  // ===== TRANSACTION MANAGEMENT =====
   
   /**
-   * Aggiunge una nuova transazione
+   * Add a new transaction
    */
   const addTransaction = (transactionData) => {
     const newTransaction = {
       ...transactionData,
-      id: Date.now() // Usa timestamp come ID univoco
+      id: Date.now() // Use timestamp as unique ID
     };
     setTransactions([...transactions, newTransaction]);
     closeModal('transaction');
   };
   
   /**
-   * Aggiunge un nuovo trasferimento
+   * Add a new transfer
    */
   const addTransfer = (transferData) => {
     const newTransfer = {
       ...transferData,
       type: 'transfer',
-      id: Date.now() // Usa timestamp come ID univoco
+      id: Date.now() // Use timestamp as unique ID
     };
     setTransactions([...transactions, newTransfer]);
     closeModal('transfer');
   };
   
   /**
-   * Elimina una transazione
+   * Delete a transaction
    */
   const deleteTransaction = (transactionId) => {
     if (window.confirm('Sei sicuro di voler eliminare questa transazione?')) {
@@ -141,17 +141,17 @@ function App() {
     }
   };
 
-  // ===== GESTIONE CATEGORIE =====
+  // ===== CATEGORY MANAGEMENT =====
   
   /**
-   * Aggiorna le categorie
+   * Update categories
    */
   const updateCategories = (newCategories) => {
     setCategories(newCategories);
   };
   
   /**
-   * Ripristina le categorie ai valori di default
+   * Reset categories to default values
    */
   const resetCategories = () => {
     if (window.confirm('Sei sicuro di voler ripristinare tutte le categorie ai valori di default? Questa azione non può essere annullata.')) {
@@ -160,10 +160,10 @@ function App() {
     }
   };
 
-  // ===== GESTIONE GRAFICI PERSONALIZZATI =====
+  // ===== CUSTOM GRAPHICS MANAGEMENT =====
   
   /**
-   * Apre il modal per creare un nuovo grafico
+   * Opens the modal for creating a new chart
    */
   const createNewChart = () => {
     setEditingChart(null);
@@ -171,7 +171,7 @@ function App() {
   };
   
   /**
-   * Apre il modal per modificare un grafico esistente
+   * Opens the modal for editing an existing chart
    */
   const editChart = (chartId) => {
     const chart = savedCharts.find(c => c.id === chartId);
@@ -182,18 +182,18 @@ function App() {
   };
   
   /**
-   * Salva un grafico (nuovo o modificato)
+   * Save a chart (new or modified)
    */
   const saveChart = (chartConfig) => {
     const existingIndex = savedCharts.findIndex(c => c.id === chartConfig.id);
     
     if (existingIndex >= 0) {
-      // Modifica grafico esistente
+      // Edit existing chart
       const updatedCharts = [...savedCharts];
       updatedCharts[existingIndex] = chartConfig;
       setSavedCharts(updatedCharts);
     } else {
-      // Aggiungi nuovo grafico
+      // Add new chart
       setSavedCharts([...savedCharts, chartConfig]);
     }
     
@@ -201,7 +201,7 @@ function App() {
   };
   
   /**
-   * Elimina un grafico personalizzato
+   * Delete a custom chart
    */
   const deleteChart = (chartId) => {
     if (window.confirm('Sei sicuro di voler eliminare questo grafico?')) {
@@ -213,7 +213,7 @@ function App() {
   
   return (
     <div className="App">
-      {/* Header con controlli e tabs */}
+      {/* Header with controls and tabs */}
       <Header
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
@@ -227,7 +227,7 @@ function App() {
         onOpenCategoryModal={() => openModal('category')}
       />
 
-      {/* Container principale con le varie viste */}
+      {/* Main container with the various views */}
       <div className="main-container">
         {/* Dashboard View */}
         {activeTab === 'dashboard' && (
@@ -289,9 +289,9 @@ function App() {
         )}
       </div>
 
-      {/* Modali */}
+      {/* Modals */}
       
-      {/* Modal per nuova transazione */}
+      {/* Modal for new transaction */}
       <TransactionModal
         isOpen={modals.transaction}
         onClose={() => closeModal('transaction')}
@@ -300,7 +300,7 @@ function App() {
         categories={categories}
       />
 
-      {/* Modal per nuovo trasferimento */}
+      {/* Modal for new transfer */}
       <TransferModal
         isOpen={modals.transfer}
         onClose={() => closeModal('transfer')}
@@ -308,7 +308,7 @@ function App() {
         accounts={accounts}
       />
 
-      {/* Modal per gestione conti */}
+      {/* Account management modal */}
       <AccountModal
         isOpen={modals.account}
         onClose={() => closeModal('account')}
@@ -318,7 +318,7 @@ function App() {
         onDeleteAccount={deleteAccount}
       />
 
-      {/* Modal per gestione categorie */}
+      {/* Modal for category management */}
       <CategoryModal
         isOpen={modals.category}
         onClose={() => closeModal('category')}
@@ -327,7 +327,7 @@ function App() {
         onResetCategories={resetCategories}
       />
 
-      {/* Modal per configurazione grafico */}
+      {/* Modal for graphic configuration */}
       <ChartConfigModal
         isOpen={modals.chartConfig}
         onClose={() => closeModal('chartConfig')}

@@ -1,7 +1,7 @@
 /**
  * TRANSACTIONS VIEW COMPONENT
- * Vista che mostra tutte le transazioni in formato tabella
- * con possibilità di eliminarle
+ * View showing all transactions in table format
+ * with the ability to delete them
  */
 
 import React from 'react';
@@ -9,14 +9,14 @@ import { filterTransactionsByMonth, sortTransactionsByDate } from '../../utils/c
 import { transactionTypeLabels } from '../../utils/defaultData';
 
 function TransactionsView({ accounts, transactions, selectedMonth, selectedYear, onDeleteTransaction }) {
-  // Filtra le transazioni per il mese selezionato
+  // Filter transactions for the selected month
   const filteredTransactions = filterTransactionsByMonth(transactions, selectedMonth, selectedYear);
   
-  // Ordina le transazioni per data (dalla più recente)
+  // Sort transactions by date (most recent first)
   const sortedTransactions = sortTransactionsByDate(filteredTransactions);
 
   /**
-   * Ottiene la classe CSS per il badge in base al tipo di transazione
+   * Gets the CSS class for the badge based on the transaction type
    */
   const getBadgeClass = (type) => {
     if (type === 'transfer') return 'badge-transfer';
@@ -27,7 +27,7 @@ function TransactionsView({ accounts, transactions, selectedMonth, selectedYear,
   };
 
   /**
-   * Ottiene l'etichetta del tipo di transazione
+   * Gets the transaction type label
    */
   const getTypeLabel = (transaction) => {
     if (transaction.type === 'transfer') {
@@ -37,7 +37,7 @@ function TransactionsView({ accounts, transactions, selectedMonth, selectedYear,
   };
 
   /**
-   * Ottiene il dettaglio della transazione (categoria e descrizione)
+   * Gets the transaction details (category and description)
    */
   const getTransactionDetail = (transaction) => {
     if (transaction.type === 'transfer') {
@@ -47,7 +47,7 @@ function TransactionsView({ accounts, transactions, selectedMonth, selectedYear,
   };
 
   /**
-   * Ottiene le informazioni sul conto/conti coinvolti
+   * Gets information about the account(s) involved
    */
   const getAccountInfo = (transaction) => {
     if (transaction.type === 'transfer') {
@@ -59,7 +59,7 @@ function TransactionsView({ accounts, transactions, selectedMonth, selectedYear,
     return acc?.name || '-';
   };
 
-  // Se non ci sono transazioni, mostra messaggio vuoto
+  // If there are no transactions, show blank message
   if (sortedTransactions.length === 0) {
     return (
       <div className="card">
@@ -88,23 +88,23 @@ function TransactionsView({ accounts, transactions, selectedMonth, selectedYear,
         <tbody>
           {sortedTransactions.map((t) => (
             <tr key={t.id}>
-              {/* Data */}
+              {/* Date */}
               <td>{new Date(t.date).toLocaleDateString('it-IT')}</td>
               
-              {/* Tipo con badge colorato */}
+              {/* Type with colored badge */}
               <td>
                 <span className={`badge ${getBadgeClass(t.type)}`}>
                   {getTypeLabel(t)}
                 </span>
               </td>
               
-              {/* Dettaglio (categoria/descrizione) */}
+              {/* Detail (category/description) */}
               <td>{getTransactionDetail(t)}</td>
               
-              {/* Informazioni conto */}
+              {/* Account Information */}
               <td>{getAccountInfo(t)}</td>
               
-              {/* Importo con colore e segno */}
+              {/* Amount with color and sign */}
               <td 
                 className="text-right" 
                 style={{ 
@@ -115,7 +115,7 @@ function TransactionsView({ accounts, transactions, selectedMonth, selectedYear,
                 {t.type === 'income' ? '+' : '-'}€{t.amount.toFixed(2)}
               </td>
               
-              {/* Pulsante elimina */}
+              {/* Delete button */}
               <td className="text-center">
                 <button 
                   className="btn-danger" 

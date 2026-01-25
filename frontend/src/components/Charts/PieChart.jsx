@@ -1,7 +1,7 @@
 /**
  * PIE CHART COMPONENT
- * Grafico a torta che mostra la distribuzione delle spese
- * per categoria (top 8 categorie)
+ * Pie chart showing the distribution of expenses
+ * by category (top 8 categories)
  */
 
 import React from 'react';
@@ -14,19 +14,19 @@ import {
 import { Pie } from 'react-chartjs-2';
 import { calculateCategoryTotals } from '../../utils/calculations';
 
-// Registra i componenti di Chart.js necessari
+// Register the necessary Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 function PieChart({ transactions }) {
-  // Calcola i totali per categoria
+  // Calculate totals by category
   const categoryTotals = calculateCategoryTotals(transactions);
   
-  // Ordina e prende le prime 8 categorie
+  // Sort and get the first 8 categories
   const sorted = Object.entries(categoryTotals)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
 
-  // Se non ci sono dati, non renderizza il grafico
+  // If there is no data, do not render the graph
   if (sorted.length === 0) {
     return (
       <div className="chart-container" style={{ height: '350px' }}>
@@ -37,7 +37,7 @@ function PieChart({ transactions }) {
     );
   }
 
-  // Configurazione dei dati per il grafico
+  // Configuring the data for the chart
   const chartData = {
     labels: sorted.map(([cat]) => cat),
     datasets: [{
@@ -49,7 +49,7 @@ function PieChart({ transactions }) {
     }]
   };
 
-  // Opzioni di configurazione del grafico
+  // Chart configuration options
   const options = {
     responsive: true,
     maintainAspectRatio: false,

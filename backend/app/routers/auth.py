@@ -1,6 +1,6 @@
 """
 Authentication Router
-Endpoints per registrazione, login e gestione profilo
+Endpoints for registration, login and profile management
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -24,11 +24,11 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """
-    Registrazione nuovo utente.
-    
-    - **email**: Email valida (deve essere unica)
-    - **password**: Minimo 8 caratteri, 1 numero, 1 maiuscola
-    - **full_name**: Nome completo
+    New user registration.
+
+    - **email**: Valid email (must be unique)
+    - **password**: Minimum 8 characters, 1 number, 1 uppercase letter
+    - **full_name**: Full name
     """
     # Check if user already exists
     existing_user = get_user_by_email(db, user_data.email)
@@ -60,12 +60,12 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """
-    Login con email e password per ottenere JWT token.
-    
-    Questo endpoint segue lo standard OAuth2 password flow.
-    Usa il campo 'username' per inserire l'email.
-    
-    Dopo il login, il token verrà automaticamente usato per le richieste successive.
+    Log in with your email and password to obtain a JWT token.
+
+    This endpoint follows the OAuth2 password flow standard.
+    Use the 'username' field to enter your email address.
+
+    After logging in, the token will be automatically used for subsequent requests.
     """
     # Authenticate user (form_data.username contiene l'email)
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -96,9 +96,9 @@ async def login_json(
     db: Session = Depends(get_db)
 ):
     """
-    Login con JSON body (alternativa a OAuth2 form).
-    
-    Usa questo endpoint se preferisci inviare JSON invece di form data.
+    Login with JSON body (alternative to OAuth2 form).
+
+    Use this endpoint if you prefer to send JSON instead of form data.
     """
     # Authenticate user
     user = authenticate_user(db, user_data.email, user_data.password)
@@ -128,8 +128,8 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Recupera informazioni utente autenticato corrente.
-    
-    Richiede JWT token valido (usa il pulsante Authorize).
+    Retrieves information about the current authenticated user.
+
+    Requires a valid JWT token (use the Authorize button).
     """
     return current_user

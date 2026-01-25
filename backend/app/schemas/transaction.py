@@ -1,10 +1,10 @@
 """
 Transaction-related Pydantic schemas for request/response validation.
 
-Tipi di transazione (derivano dalla categoria):
-- income: Entrate
-- expense_necessity: Spese di Necessità
-- expense_extra: Spese Extra
+Transaction types (derived from the category):
+- income: Income
+- expense_necessity: Necessity Expenses
+- expense_extra: Extra Expenses
 """
 
 from datetime import datetime, date as date_type
@@ -13,7 +13,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 
-# Tipi validi per le transazioni (stessi delle categorie)
+# Valid types for transactions (same as categories)
 VALID_TRANSACTION_TYPES = ["income", "expense_necessity", "expense_extra"]
 
 

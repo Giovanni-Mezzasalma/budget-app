@@ -1,6 +1,6 @@
 /**
- * APP.CSS - Stili principali dell'applicazione
- * Contiene tutti gli stili per layout, componenti, modali, form, tabelle, etc.
+ * APP.CSS - Main Application Styles
+ * Contains all styles for layouts, components, modals, forms, tables, etc.
  */
 
 /* ===== LAYOUT PRINCIPALE ===== */
@@ -179,7 +179,7 @@
   font-size: 13px;
 }
 
-/* ===== INPUTS E FORM ===== */
+/* ===== INPUTS AND FORM ===== */
 input,
 select,
 textarea {

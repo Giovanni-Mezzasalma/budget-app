@@ -1,22 +1,22 @@
 /**
  * CATEGORY MODAL COMPONENT
- * Modal per gestire le categorie e sottocategorie:
- * - Visualizzare categorie per tipo
- * - Aggiungere nuove categorie
- * - Eliminare categorie
- * - Aggiungere/eliminare gruppi
- * - Ripristinare categorie di default
+ * Modal for managing categories and subcategories:
+ * - View categories by type
+ * - Add new categories
+ * - Delete categories
+ * - Add/delete groups
+ * - Restore default categories
  */
 
 import React, { useState } from 'react';
 import { categoryTypeLabels } from '../../utils/defaultData';
 
 function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onResetCategories }) {
-  // Stato per tenere traccia dei valori degli input
+  // State to keep track of input values
   const [inputValues, setInputValues] = useState({});
 
   /**
-   * Aggiunge una categoria semplice (array)
+   * Adds a simple category (array)
    */
   const addSimpleCategory = (type) => {
     const value = inputValues[`new-${type}`]?.trim();
@@ -32,7 +32,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
   };
 
   /**
-   * Rimuove una categoria semplice (array)
+   * Removes a simple category (array)
    */
   const removeSimpleCategory = (type, index) => {
     if (window.confirm('Sei sicuro di voler eliminare questa categoria?')) {
@@ -43,7 +43,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
   };
 
   /**
-   * Aggiunge una sottocategoria in un gruppo
+   * Add a subcategory to a group
    */
   const addGroupCategory = (type, group) => {
     const value = inputValues[`new-${type}-${group}`]?.trim();
@@ -59,7 +59,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
   };
 
   /**
-   * Rimuove una sottocategoria da un gruppo
+   * Removes a subcategory from a group
    */
   const removeGroupCategory = (type, group, index) => {
     if (window.confirm('Sei sicuro di voler eliminare questa sottocategoria?')) {
@@ -70,7 +70,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
   };
 
   /**
-   * Aggiunge un nuovo gruppo
+   * Add a new group
    */
   const addNewGroup = (type) => {
     const value = inputValues[`new-group-${type}`]?.trim();
@@ -86,7 +86,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
   };
 
   /**
-   * Rimuove un gruppo intero
+   * Removes an entire group
    */
   const removeGroup = (type, group) => {
     if (window.confirm(`Sei sicuro di voler eliminare il gruppo "${group}" e tutte le sue sottocategorie?`)) {
@@ -97,13 +97,13 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
   };
 
   /**
-   * Gestisce i cambiamenti negli input
+   * Handles changes in inputs
    */
   const handleInputChange = (key, value) => {
     setInputValues(prev => ({ ...prev, [key]: value }));
   };
 
-  // Se il modal non è aperto, non renderizza nulla
+  // If the modal is not open, it does not render anything
   if (!isOpen) return null;
 
   return (
@@ -114,14 +114,14 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
           <button className="close-btn" onClick={onClose}>&times;</button>
         </div>
 
-        {/* Pulsante per ripristinare categorie default */}
+        {/* Button to restore default categories */}
         <div style={{ marginBottom: '20px' }}>
           <button className="btn btn-secondary btn-small" onClick={onResetCategories}>
             🔄 Ripristina Categorie di Default
           </button>
         </div>
 
-        {/* Manager delle categorie */}
+        {/* Category Manager */}
         <div className="category-manager">
           {Object.keys(categories).map((type) => {
             const cats = categories[type];
@@ -132,7 +132,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
                 <h4>{categoryTypeLabels[type]}</h4>
 
                 {isArray ? (
-                  // Categorie semplici (array)
+                  // Simple categories (array)
                   <>
                     <div className="subcategory-list">
                       {cats.map((cat, index) => (
@@ -164,7 +164,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
                     </div>
                   </>
                 ) : (
-                  // Categorie con gruppi (oggetto)
+                  // Categories with groups (object)
                   <>
                     {Object.keys(cats).map((group) => (
                       <div
@@ -228,7 +228,7 @@ function CategoryModal({ isOpen, onClose, categories, onUpdateCategories, onRese
                       </div>
                     ))}
 
-                    {/* Form per aggiungere nuovo gruppo */}
+                    {/* Form to add a new group */}
                     <div style={{ marginTop: '15px' }}>
                       <div className="add-subcategory">
                         <input

@@ -1,9 +1,9 @@
 """
 Category-related Pydantic schemas for request/response validation.
 
-Struttura gerarchica:
-- type: macro categoria (income, expense_necessity, expense_extra)
-- parent_id: riferimento alla categoria padre (per sottocategorie)
+Hierarchical structure:
+- type: macro category (income, expense_necessity, expense_extra)
+- parent_id: reference to the parent category (for subcategories)
 """
 
 from datetime import datetime
@@ -12,10 +12,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-# Tipi validi per le macro categorie
+# Valid types for macro categories
 VALID_CATEGORY_TYPES = ["income", "expense_necessity", "expense_extra"]
 
-# Labels per i tipi
+# Labels for types
 CATEGORY_TYPE_LABELS = {
     "income": "Entrate",
     "expense_necessity": "Spese di Necessità",
@@ -147,5 +147,5 @@ class CategoryTreeResponse(BaseModel):
     expense_extra: List[CategoryWithSubcategories] = Field(default=[], description="Extra expense categories")
 
 
-# Rebuild model per risolvere forward reference
+# Rebuild model to resolve forward reference
 CategoryWithSubcategories.model_rebuild()

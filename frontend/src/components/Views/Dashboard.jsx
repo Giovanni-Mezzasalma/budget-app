@@ -1,46 +1,46 @@
 /**
  * DASHBOARD COMPONENT
- * Vista dashboard principale che mostra:
- * - Patrimonio totale
- * - Entrate mensili
- * - Uscite mensili
- * - Netto mensile
+ * Main dashboard view showing:
+ * - Total Assets
+ * - Monthly Income
+ * - Monthly Expenses
+ * - Monthly Net Income
  */
 
 import React from 'react';
 import { calculateTotalBalance, calculateStats, filterTransactionsByMonth } from '../../utils/calculations';
 
 function Dashboard({ accounts, transactions, selectedMonth, selectedYear }) {
-  // Filtra le transazioni per il mese selezionato
+  // Filter transactions for the selected month
   const filteredTransactions = filterTransactionsByMonth(transactions, selectedMonth, selectedYear);
   
-  // Calcola le statistiche per il mese
+  // Calculate statistics for the month
   const stats = calculateStats(filteredTransactions);
   
-  // Calcola il patrimonio totale
+  // Calculate total assets
   const totalBalance = calculateTotalBalance(accounts, transactions);
 
   return (
     <div className="kpi-grid">
-      {/* KPI: Patrimonio Totale */}
+      {/* KPI: Total Assets */}
       <div className="kpi-card income">
         <div className="kpi-label">Patrimonio Totale</div>
         <div className="kpi-value">€{totalBalance.toFixed(2)}</div>
       </div>
 
-      {/* KPI: Entrate */}
+      {/* KPI: Revenue */}
       <div className="kpi-card income">
         <div className="kpi-label">Entrate</div>
         <div className="kpi-value">€{stats.income.toFixed(2)}</div>
       </div>
 
-      {/* KPI: Uscite Totali */}
+      {/* KPI: Total Expenses */}
       <div className="kpi-card expense">
         <div className="kpi-label">Uscite Totali</div>
         <div className="kpi-value">€{stats.totalExpenses.toFixed(2)}</div>
       </div>
 
-      {/* KPI: Netto Mensile */}
+      {/* KPI: Monthly Net */}
       <div className="kpi-card net">
         <div className="kpi-label">Netto Mensile</div>
         <div 

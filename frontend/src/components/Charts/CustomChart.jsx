@@ -1,7 +1,7 @@
 /**
  * CUSTOM CHART COMPONENT
- * Componente che renderizza un grafico personalizzato
- * in base alla configurazione salvata dall'utente
+ * Component that renders a custom chart
+ * based on the user's saved configuration
  */
 
 import React from 'react';
@@ -21,7 +21,7 @@ import {
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
 import { getChartData } from '../../utils/chartUtils';
 
-// Registra tutti i componenti di Chart.js necessari
+// Register all necessary Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -36,10 +36,10 @@ ChartJS.register(
 );
 
 function CustomChart({ config, transactions, accounts }) {
-  // Ottiene i dati del grafico in base alla configurazione
+  // Gets the chart data based on the configuration
   const chartData = getChartData(config, transactions, accounts);
 
-  // Opzioni base del grafico
+  // Basic chart options
   const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -50,7 +50,7 @@ function CustomChart({ config, transactions, accounts }) {
     }
   };
 
-  // Aggiunge le scale solo per grafici non circolari
+  // Add scales only for non-circular graphs
   const options = config.type === 'pie' || config.type === 'doughnut'
     ? baseOptions
     : {
@@ -62,7 +62,7 @@ function CustomChart({ config, transactions, accounts }) {
         }
       };
 
-  // Seleziona il componente del grafico in base al tipo
+  // Select the chart component based on its type
   const renderChart = () => {
     switch (config.type) {
       case 'line':

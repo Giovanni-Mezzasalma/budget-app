@@ -1,11 +1,11 @@
 /**
  * ANALYSIS VIEW COMPONENT
- * Vista per l'analisi avanzata con:
- * - Grafico andamento ultimi 6 mesi
- * - Grafico a torta delle spese mensili
- * - Grafico a barre per categoria
- * - Statistiche e medie
- * - Tabella di confronto mensile
+ * Advanced analysis view with:
+ * - 6-month trend graph
+ * - Monthly expense pie chart
+ * - Category bar chart
+ * - Statistics and averages
+ * - Monthly comparison table
  */
 
 import React from 'react';
@@ -15,38 +15,38 @@ import CategoryChart from '../Charts/CategoryChart';
 import { getLastMonthsData, calculateStats, filterTransactionsByMonth } from '../../utils/calculations';
 
 function AnalysisView({ transactions, selectedMonth, selectedYear }) {
-  // Ottiene i dati degli ultimi 6 mesi
+  // Gets data for the last 6 months
   const last6MonthsData = getLastMonthsData(6, selectedMonth, selectedYear, transactions);
   
-  // Calcola le statistiche per il mese corrente
+  // Calculate statistics for the current month
   const currentMonthTransactions = filterTransactionsByMonth(transactions, selectedMonth, selectedYear);
   const currentStats = calculateStats(currentMonthTransactions);
 
-  // Calcola le medie degli ultimi 6 mesi
+  // Calculate the averages of the last 6 months
   const avgIncome = last6MonthsData.reduce((sum, m) => sum + m.income, 0) / last6MonthsData.length;
   const avgExpenses = last6MonthsData.reduce((sum, m) => sum + m.expenses, 0) / last6MonthsData.length;
   const avgNet = last6MonthsData.reduce((sum, m) => sum + m.net, 0) / last6MonthsData.length;
   
-  // Calcola il tasso di risparmio
+  // Calculate the savings rate
   const savingsRate = currentStats.income > 0 ? ((currentStats.net / currentStats.income) * 100) : 0;
 
   return (
     <div className="card">
       <h2>📊 Analisi Standard</h2>
 
-      {/* Grafico andamento ultimi 6 mesi */}
+      {/* Trend graph for the last 6 months */}
       <h3>Andamento Ultimi 6 Mesi</h3>
       <TrendChart data={last6MonthsData} />
 
-      {/* Grafico a torta spese mensili */}
+      {/* Monthly Expenses Pie Chart */}
       <h3>Distribuzione Spese Mensili</h3>
       <PieChart transactions={currentMonthTransactions} />
 
-      {/* Grafico a barre per categoria */}
+      {/* Bar chart by category */}
       <h3>Confronto per Categoria (Top 10)</h3>
       <CategoryChart transactions={currentMonthTransactions} />
 
-      {/* Statistiche e medie */}
+      {/* Statistics and averages */}
       <h3>Statistiche e Medie</h3>
       <div className="stats-grid">
         <div className="stat-box">
@@ -67,7 +67,7 @@ function AnalysisView({ transactions, selectedMonth, selectedYear }) {
         </div>
       </div>
 
-      {/* Tabella di confronto mensile */}
+      {/* Monthly comparison table */}
       <h3>Confronto Mensile</h3>
       <div className="comparison-table">
         <table>
@@ -82,7 +82,7 @@ function AnalysisView({ transactions, selectedMonth, selectedYear }) {
           </thead>
           <tbody>
             {last6MonthsData.map((m, i) => {
-              // Calcola la variazione rispetto al mese precedente
+              // Calculate the change compared to the previous month
               let variation = '';
               if (i > 0) {
                 const diff = m.net - last6MonthsData[i - 1].net;

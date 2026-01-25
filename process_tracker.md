@@ -317,7 +317,7 @@
 
 ##### H-J. Altri Minori
 - [x] UUID String(36), modifica effettuata da `String(36)` a UIID
-- [ ] Commenti: decisione lingua presa
+- [x] Commenti: decisione lingua presa
 - [ ] CORS_ORIGINS: testato parsing da .env
 
 #### Test Finale Post-Correzioni

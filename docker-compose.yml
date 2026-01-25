@@ -2,7 +2,7 @@
 # BUDGET APP - Docker Compose Configuration
 # ============================================
 # 
-# Questo file orchestrera i seguenti servizi:
+# This file will orchestrate the following services:
 # - db: PostgreSQL 16 database
 # - backend: FastAPI application
 #

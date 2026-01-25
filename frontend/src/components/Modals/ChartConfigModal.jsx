@@ -1,45 +1,45 @@
 /**
  * CHART CONFIG MODAL COMPONENT
- * Modal per configurare grafici personalizzati:
- * - Impostare titolo, tipo di grafico e periodo
- * - Selezionare quali dati visualizzare
- * - Configurare opzioni specifiche per tipo di dati
+ * Modal for configuring custom charts:
+ * - Set the title, chart type, and time period
+ * - Select which data to display
+ * - Configure specific options for each data type
  */
 
 import React, { useState, useEffect } from 'react';
 
 function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editingChart }) {
-  // Stato del form
+  // Form Status
   const [formData, setFormData] = useState({
     title: '',
     type: 'line',
     period: 'last6',
     dataType: 'overview',
     options: {
-      // Opzioni per overview
+      // Overview Options
       showIncome: true,
       showExpenses: true,
       showNet: true,
       showNecessity: false,
       showExtra: false,
-      // Opzioni per custom period
+      // Custom period options
       startDate: '',
       endDate: '',
-      // Opzioni per accounts
+      // Account Options
       selectedAccounts: [],
-      // Opzioni per categoryDetail
+      // Options for categoryDetail
       category: ''
     }
   });
 
-  // Stato per controllare la visualizzazione delle sezioni
+  // Stato to control the display of the sections
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
   const [showOverviewOptions, setShowOverviewOptions] = useState(true);
   const [showAccountOptions, setShowAccountOptions] = useState(false);
   const [showCategoryInput, setShowCategoryInput] = useState(false);
 
   /**
-   * Carica i dati del grafico in editing quando il modal si apre
+   * Loads chart data into editing when the modal opens
    */
   useEffect(() => {
     if (editingChart) {
@@ -61,13 +61,13 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
         }
       });
       
-      // Imposta la visualizzazione delle sezioni
+      // Set the section display
       setShowCustomPeriod(editingChart.period === 'custom');
       setShowOverviewOptions(editingChart.dataType === 'overview');
       setShowAccountOptions(editingChart.dataType === 'accounts');
       setShowCategoryInput(editingChart.dataType === 'categoryDetail');
     } else {
-      // Reset per nuovo grafico
+      // Reset for new chart
       setFormData({
         title: '',
         type: 'line',
@@ -94,18 +94,18 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
   }, [editingChart, accounts, isOpen]);
 
   /**
-   * Gestisce i cambiamenti nei campi base del form
+   * Manages changes in basic form fields
    */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
-    // Gestisce la visualizzazione del periodo custom
+    // Manages custom period display
     if (name === 'period') {
       setShowCustomPeriod(value === 'custom');
     }
 
-    // Gestisce la visualizzazione delle opzioni dati
+    // Manages the display of data options
     if (name === 'dataType') {
       setShowOverviewOptions(value === 'overview');
       setShowAccountOptions(value === 'accounts');
@@ -114,7 +114,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
   };
 
   /**
-   * Gestisce i cambiamenti nelle opzioni (checkbox, select, ecc.)
+   * Handles changes in options (checkboxes, selects, etc.)
    */
   const handleOptionChange = (optionName, value) => {
     setFormData(prev => ({
@@ -124,7 +124,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
   };
 
   /**
-   * Gestisce il toggle dei checkbox per i conti
+   * Manages checkbox toggles for accounts
    */
   const handleAccountToggle = (accountId) => {
     setFormData(prev => {
@@ -143,7 +143,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
   };
 
   /**
-   * Ottiene tutte le categorie disponibili per la selezione
+   * Gets all categories available for selection
    */
   const getAllCategories = () => {
     const allCats = [];
@@ -162,12 +162,12 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
   };
 
   /**
-   * Gestisce il submit del form
+   * Manages form submission
    */
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Crea la configurazione del grafico
+    // Create chart configuration
     const config = {
       id: editingChart ? editingChart.id : Date.now(),
       title: formData.title,
@@ -177,11 +177,11 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
       options: { ...formData.options }
     };
     
-    // Chiama la funzione di salvataggio
+    // Call the save function
     onSave(config);
   };
 
-  // Se il modal non è aperto, non renderizza nulla
+  // If the modal is not open, it does not render anything
   if (!isOpen) return null;
 
   const allCategories = getAllCategories();
@@ -195,7 +195,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Titolo Grafico */}
+          {/* Graphic Title */}
           <div className="form-group">
             <label>Titolo Grafico</label>
             <input
@@ -208,7 +208,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
             />
           </div>
 
-          {/* Tipo, Periodo e Tipo Dati */}
+          {/* Type, Period and Data Type */}
           <div className="form-row-3">
             <div className="form-group">
               <label>Tipo Grafico</label>
@@ -242,7 +242,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
             </div>
           </div>
 
-          {/* Periodo Personalizzato */}
+          {/* Custom Period */}
           {showCustomPeriod && (
             <div className="form-row">
               <div className="form-group">
@@ -264,7 +264,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
             </div>
           )}
 
-          {/* Opzioni Categoria Specifica */}
+          {/* Specific Category Options */}
           {showCategoryInput && (
             <div className="form-group">
               <label>Seleziona Categoria</label>
@@ -282,7 +282,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
             </div>
           )}
 
-          {/* Opzioni Overview */}
+          {/* Options Overview */}
           {showOverviewOptions && (
             <div className="form-group">
               <label>Dati da Mostrare</label>
@@ -336,7 +336,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
             </div>
           )}
 
-          {/* Opzioni Conti */}
+          {/* Account Options */}
           {showAccountOptions && (
             <div className="form-group">
               <label>Conti da Includere</label>
@@ -356,7 +356,7 @@ function ChartConfigModal({ isOpen, onClose, onSave, accounts, categories, editi
             </div>
           )}
 
-          {/* Pulsanti */}
+          {/* Buttons */}
           <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
             <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
               Salva Grafico

@@ -1,23 +1,23 @@
 /**
  * CATEGORIES VIEW COMPONENT
- * Vista che mostra le spese raggruppate per categoria
- * per il mese selezionato
+ * View showing expenses grouped by category
+ * for the selected month
  */
 
 import React from 'react';
 import { filterTransactionsByMonth, calculateCategoryTotals } from '../../utils/calculations';
 
 function CategoriesView({ transactions, selectedMonth, selectedYear }) {
-  // Filtra le transazioni per il mese selezionato
+  // Filter transactions for the selected month
   const filteredTransactions = filterTransactionsByMonth(transactions, selectedMonth, selectedYear);
   
-  // Calcola i totali per categoria
+  // Calculate totals by category
   const categoryTotals = calculateCategoryTotals(filteredTransactions);
   
-  // Ordina le categorie per importo decrescente
+  // Sort categories by descending amount
   const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
 
-  // Se non ci sono spese, mostra messaggio vuoto
+  // If there are no charges, show empty message
   if (sortedCategories.length === 0) {
     return (
       <div className="card">
@@ -49,10 +49,10 @@ function CategoriesView({ transactions, selectedMonth, selectedYear }) {
               alignItems: 'center'
             }}
           >
-            {/* Nome categoria */}
+            {/* Category Name */}
             <span style={{ fontWeight: 600 }}>{category}</span>
             
-            {/* Importo totale */}
+            {/* Total amount */}
             <span style={{ 
               fontWeight: 'bold', 
               color: '#ef4444', 

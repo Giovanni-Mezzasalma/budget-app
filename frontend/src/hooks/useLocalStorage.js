@@ -1,50 +1,50 @@
 /**
  * CUSTOM HOOK: useLocalStorage
- * Hook personalizzato per gestire lo stato sincronizzato con localStorage
- * Permette di salvare automaticamente i dati nel browser
+ * Custom hook to manage the state synchronized with localStorage
+ * Allows data to be automatically saved in the browser
  */
 
 import { useState, useEffect } from 'react';
 
 /**
- * Hook per gestire lo stato con persistenza in localStorage
- * @param {string} key - Chiave per il localStorage
- * @param {*} defaultValue - Valore di default se non esiste nel localStorage
- * @returns {Array} - [valore, funzione setter] come useState
+ * Hook to manage state with persistence in localStorage
+ * @param {string} key - Key for localStorage
+ * @param {*} defaultValue - Default value if it does not exist in localStorage
+ * @returns {Array} - [value, setter function] as useState
  */
 function useLocalStorage(key, defaultValue) {
-  // Inizializza lo stato leggendo dal localStorage o usando il valore di default
+  // Initialize the state by reading from localStorage or using the default value
   const [value, setValue] = useState(() => {
     try {
-      // Prova a leggere dal localStorage
+      // Try reading from localStorage
       const saved = localStorage.getItem(key);
       
       if (saved) {
-        // Se esiste, parsifica il JSON
+        // If it exists, parse the JSON
         return JSON.parse(saved);
       }
       
-      // Se non esiste, usa il valore di default
+      // If it doesn't exist, use the default value
       return defaultValue;
     } catch (error) {
-      // In caso di errore (es. localStorage non disponibile), usa il default
+      // In case of error (e.g. localStorage not available), use the default
       console.error(`Error loading ${key} from localStorage:`, error);
       return defaultValue;
     }
   });
 
-  // Effetto che salva nel localStorage ogni volta che il valore cambia
+  // Effect that saves to localStorage every time the value changes
   useEffect(() => {
     try {
-      // Salva il valore come JSON nel localStorage
+      // Save the value as JSON in localStorage
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      // Gestisce eventuali errori (es. quota superata)
+      // Handles any errors (e.g. quota exceeded)
       console.error(`Error saving ${key} to localStorage:`, error);
     }
   }, [key, value]); // Esegui quando key o value cambiano
 
-  // Restituisce il valore e la funzione setter (come useState)
+  // Returns the value and the setter function (like useState)
   return [value, setValue];
 }
 

@@ -1,8 +1,8 @@
 """
 Custom Chart Schemas
-Validazione dati grafici personalizzati
+Custom Chart Data Validation
 
-Nota: ChartType enum è definito qui ed importato dal model per evitare duplicazioni.
+Note: The ChartType enum is defined here and imported from the model to avoid duplication.
 """
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
@@ -13,9 +13,9 @@ from uuid import UUID
 
 class ChartType(str, Enum):
     """
-    Tipi di grafici disponibili.
-    
-    Questo enum è la source of truth ed è importato anche dal model SQLAlchemy.
+    Available chart types.
+
+    This enum is the source of truth and is also imported from the SQLAlchemy model.
     """
     LINE = "line"
     BAR = "bar"
@@ -24,7 +24,7 @@ class ChartType(str, Enum):
 
 
 class CustomChartBase(BaseModel):
-    """Schema base custom chart"""
+    """Basic custom chart scheme"""
     name: str = Field(..., min_length=1, max_length=100, description="Nome del grafico")
     chart_type: ChartType = Field(..., description="Tipo di grafico")
     config: Dict[str, Any] = Field(..., description="Configurazione grafico (JSON)")
@@ -32,12 +32,12 @@ class CustomChartBase(BaseModel):
 
 
 class CustomChartCreate(CustomChartBase):
-    """Schema creazione custom chart"""
+    """Custom chart creation scheme"""
     pass
 
 
 class CustomChartUpdate(BaseModel):
-    """Schema aggiornamento custom chart"""
+    """Custom chart update scheme"""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     chart_type: Optional[ChartType] = None
     config: Optional[Dict[str, Any]] = None
@@ -45,7 +45,7 @@ class CustomChartUpdate(BaseModel):
 
 
 class CustomChartResponse(CustomChartBase):
-    """Schema risposta custom chart"""
+    """Custom chart response scheme"""
     id: UUID = Field(..., description="Chart unique identifier")
     user_id: UUID = Field(..., description="Owner user ID")
     created_at: datetime = Field(..., description="Creation timestamp")

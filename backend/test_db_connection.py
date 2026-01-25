@@ -1,6 +1,6 @@
 """
 Test Database Connection
-Script per verificare connessione a PostgreSQL
+Script to test connection to PostgreSQL
 """
 import psycopg2
 from dotenv import load_dotenv
@@ -12,7 +12,7 @@ load_dotenv()
 
 
 def test_connection():
-    """Test connessione al database PostgreSQL"""
+    """Testing the PostgreSQL Database Connection"""
     
     print("🔍 Testing database connection...")
     print(f"Host: {os.getenv('DB_HOST')}")
@@ -22,7 +22,7 @@ def test_connection():
     print("-" * 50)
     
     try:
-        # Tenta connessione
+        # Attempt connection
         conn = psycopg2.connect(
             host=os.getenv("DB_HOST"),
             port=os.getenv("DB_PORT"),
@@ -31,18 +31,18 @@ def test_connection():
             password=os.getenv("DB_PASSWORD")
         )
         
-        # Se arriviamo qui, connessione riuscita
+        # If we get here, connection successful
         print("✅ Database connection successful!")
         print(f"✅ Connected to: {os.getenv('DB_NAME')}")
         print(f"✅ PostgreSQL version: ", end="")
         
-        # Ottieni versione PostgreSQL
+        # Get PostgreSQL version
         cursor = conn.cursor()
         cursor.execute("SELECT version();")
         db_version = cursor.fetchone()
         print(db_version[0].split(',')[0])
         
-        # Chiudi connessione
+        # Close connection
         cursor.close()
         conn.close()
         

@@ -1,6 +1,6 @@
 """
 FastAPI Main Application
-Entry point dell'API Budget App
+Entry point of the Budget App API
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,14 +19,14 @@ from app.routers.analytics import router as analytics_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gestisce eventi startup e shutdown dell'applicazione.
+    Handles application startup and shutdown events.
     """
     # Startup
     print("🚀 Starting Budget App API...")
     print(f"📊 Database: {settings.DATABASE_URL.split('@')[-1]}")  # Mostra solo host/db, non password
     print(f"🔒 Debug mode: {settings.DEBUG}")
     
-    # In development, crea tabelle se non esistono
+    # In development, create tables if they don't exist
     if settings.DEBUG:
         print("⚠️  DEBUG MODE: Auto-creating tables if not exist...")
         Base.metadata.create_all(bind=engine)
@@ -83,7 +83,7 @@ app.include_router(analytics_router, prefix=settings.API_V1_PREFIX)
 @app.get("/", tags=["Health"])
 async def root():
     """
-    Root endpoint - verifica che l'API sia attiva.
+    Root endpoint - Verify that the API is active.
     """
     return {
         "message": "Budget App API is running",
@@ -95,7 +95,7 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """
-    Health check endpoint per monitoring.
+    Health check endpoint for monitoring.
     """
     return {
         "status": "healthy",

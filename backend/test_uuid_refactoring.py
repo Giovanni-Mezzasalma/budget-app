@@ -1,13 +1,13 @@
 """
-Test Script per UUID Refactoring
-Testa tutti gli endpoint principali e verifica che gli UUID funzionino correttamente.
+Test Script for UUID Refactoring
+Test all key endpoints and verify that UUIDs are working correctly.
 
-Uso:
-    python test_uuid_refactoring.py
+Usage:
+python test_uuid_refactoring.py
 
 Output:
-    - Console: risultati in tempo reale
-    - File: test_results_YYYYMMDD_HHMMSS.log
+- Console: Real-time results
+- File: test_results_YYYYMMDD_HHMMSS.log
 """
 
 import requests
@@ -16,11 +16,11 @@ import sys
 from datetime import datetime, date
 from typing import Optional, Dict, Any
 
-# Configurazione
+# Configuration
 BASE_URL = "http://localhost:8000"
 LOG_FILE = f"test_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
-# Colori per output console
+# Colors for console output
 class Colors:
     GREEN = '\033[92m'
     RED = '\033[91m'
@@ -161,7 +161,7 @@ class TestRunner:
         """Test user registration."""
         self.log("Test Registrazione Utente", "HEADER")
         
-        # Genera email unica per evitare conflitti
+        # Generate unique email to avoid conflicts
         unique_email = f"test_{datetime.now().strftime('%Y%m%d%H%M%S')}@example.com"
         self._test_email = unique_email  # Save email before API call
         
@@ -458,7 +458,7 @@ class TestRunner:
             self.test("Transaction user_id è UUID valido", self.is_valid_uuid(user_id))
             self.test("Transaction type derivato da category", result["data"].get("type") == "income")
         
-        # Verifica balance aggiornato
+        # Check balance updated
         result = self.api_call("GET", f"/api/v1/accounts/{self.account_id}")
         if result["status_code"] == 200 and result["data"]:
             current_balance = float(result["data"].get("current_balance"))
@@ -475,7 +475,7 @@ class TestRunner:
         
         self.test("CREATE Transaction (expense)", result["status_code"] == 201, f"- Status: {result['status_code']}")
         
-        # Verifica balance dopo expense
+        # Check balance dopo expense
         result = self.api_call("GET", f"/api/v1/accounts/{self.account_id}")
         if result["status_code"] == 200 and result["data"]:
             current_balance = float(result["data"].get("current_balance"))
@@ -516,7 +516,7 @@ class TestRunner:
             self.test("Transfer from_account_id è UUID valido", self.is_valid_uuid(from_account_id))
             self.test("Transfer to_account_id è UUID valido", self.is_valid_uuid(to_account_id))
         
-        # Verifica balances dopo transfer
+        # Check balances after transfer
         result1 = self.api_call("GET", f"/api/v1/accounts/{self.account_id}")
         result2 = self.api_call("GET", f"/api/v1/accounts/{self.account2_id}")
         
@@ -571,9 +571,9 @@ class TestRunner:
             result = self.api_call("DELETE", f"/api/v1/transactions/{self.transaction_id}")
             self.test("DELETE Transaction", result["status_code"] == 200, f"- Status: {result['status_code']}")
         
-        # Delete categories (skip - potrebbero avere transazioni)
-        
-        # Delete accounts (skip - cascade eliminerebbe dati)
+        # Delete categories (skip - they may have transactions)
+
+        # Delete accounts (skip - cascade would delete data)
         
         return True
     
@@ -605,7 +605,7 @@ class TestRunner:
         self.test_transactions_crud()
         self.test_transfers_crud()
         self.test_analytics()
-        # self.test_cleanup()  # Decommentare per pulire i dati di test
+        # self.test_cleanup()  # Uncomment to clean test data
         
         self.print_summary()
         self.save_log()

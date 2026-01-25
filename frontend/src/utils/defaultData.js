@@ -1,13 +1,13 @@
 /**
  * DEFAULT DATA
- * Contiene tutti i dati di default per l'applicazione:
- * - Categorie predefinite (entrate, spese necessità, spese extra, prelievi)
- * - Conti bancari di default
+ * Contains all the default data for the application:
+ * - Default categories (income, essential expenses, extra expenses, withdrawals)
+ * - Default bank accounts
  */
 
-// Categorie di default organizzate per tipo di transazione
+// Default categories organized by transaction type
 export const defaultCategories = {
-  // Categorie per le entrate (array semplice)
+  // Categories for income (simple array)
   income: [
     'Reddito Principale',
     'Reddito Secondario',
@@ -16,7 +16,7 @@ export const defaultCategories = {
     'Altro'
   ],
   
-  // Categorie per le spese di necessità (organizzate in gruppi)
+  // Categories for essential expenses (organized into groups)
   'expense-necessity': {
     'Casa': [
       'Mutuo/Affitto',
@@ -66,7 +66,7 @@ export const defaultCategories = {
     ]
   },
   
-  // Categorie per le spese extra (organizzate in gruppi)
+  // Categories for extra expenses (organized into groups)
   'expense-extra': {
     'Svago': [
       'Ristorazione',
@@ -88,11 +88,11 @@ export const defaultCategories = {
     ]
   },
   
-  // Categoria per i prelievi
+  // Category for withdrawals
   'withdrawal': ['Prelievo']
 };
 
-// Conti bancari predefiniti
+// Default bank accounts
 export const defaultAccounts = [
   {
     id: 1,
@@ -120,14 +120,14 @@ export const defaultAccounts = [
   }
 ];
 
-// Etichette per i tipi di conto (per la visualizzazione)
+// Account Type Labels (for display)
 export const accountTypeLabels = {
   'current': 'Corrente',
   'savings': 'Risparmio',
   'investment': 'Investimento'
 };
 
-// Etichette per i tipi di transazione (per la visualizzazione)
+// Transaction type labels (for display)
 export const transactionTypeLabels = {
   'income': 'Entrata',
   'expense-necessity': 'Necessità',
@@ -135,7 +135,7 @@ export const transactionTypeLabels = {
   'withdrawal': 'Prelievo'
 };
 
-// Etichette per i tipi di categoria (usate nel modal categorie)
+// Labels for category types (used in the category modal)
 export const categoryTypeLabels = {
   'income': 'Entrate',
   'expense-necessity': 'Spese di Necessità',

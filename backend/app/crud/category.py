@@ -1,6 +1,6 @@
 """
 Category CRUD Operations
-Database operations per Category model con struttura gerarchica
+Database operations for Category model with hierarchical structure
 """
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Union
@@ -28,17 +28,17 @@ def get_categories(
     only_main: bool = False
 ) -> List[Category]:
     """
-    Lista le categorie dell'utente.
-    
+    Lists the user's categories.
+
     Args:
-        db: Database session
-        user_id: ID utente proprietario
-        skip: Offset per paginazione
-        limit: Numero massimo risultati
-        category_type: Filtra per tipo (income, expense_necessity, expense_extra)
-        is_active: Filtra per stato attivo/inattivo
-        parent_id: Filtra per categoria padre
-        only_main: Se True, restituisce solo categorie principali (senza parent)
+    db: Database session
+    user_id: Owner user ID
+    skip: Offset for pagination
+    limit: Maximum number of results
+    category_type: Filter by type (income, expense_necessity, expense_extra)
+    is_active: Filter by active/inactive status
+    parent_id: Filter by parent category
+    only_main: If True, returns only main categories (no parent)
     """
     user_id = _to_uuid(user_id)
     query = db.query(Category).filter(Category.user_id == user_id)
@@ -65,11 +65,11 @@ def get_categories_tree(
     is_active: Optional[bool] = True
 ) -> Dict[str, List[Category]]:
     """
-    Restituisce le categorie organizzate ad albero per tipo.
-    
+    Returns categories organized in a tree by type.
+
     Returns:
-        Dict con chiavi 'income', 'expense_necessity', 'expense_extra'
-        Ogni valore è una lista di categorie principali con subcategories populate
+    Dict with keys 'income', 'expense_necessity', 'expense_extra'
+    Each value is a list of main categories with populated subcategories
     """
     # Prendi tutte le categorie principali (senza parent)
     main_categories = get_categories(
@@ -99,7 +99,7 @@ def get_category(
     user_id: Union[str, UUID]
 ) -> Optional[Category]:
     """
-    Recupera singola categoria verificando ownership.
+    Retrieve single category by verifying ownership.
     """
     category_id = _to_uuid(category_id)
     user_id = _to_uuid(user_id)
@@ -111,7 +111,7 @@ def get_category(
 
 def get_category_by_id(db: Session, category_id: Union[str, UUID]) -> Optional[Category]:
     """
-    Recupera categoria per ID (senza verifica ownership).
+    Retrieve category by ID (without ownership verification).
     """
     category_id = _to_uuid(category_id)
     return db.query(Category).filter(Category.id == category_id).first()
@@ -123,7 +123,7 @@ def create_category(
     user_id: Union[str, UUID]
 ) -> Category:
     """
-    Crea nuova categoria per l'utente.
+    Create new category for user.
     """
     user_id = _to_uuid(user_id)
     parent_id = _to_uuid(category.parent_id) if category.parent_id else None
@@ -152,7 +152,7 @@ def update_category(
     user_id: Union[str, UUID]
 ) -> Optional[Category]:
     """
-    Aggiorna categoria esistente.
+    Update existing category.
     """
     db_category = get_category(db, category_id, user_id)
     
@@ -179,8 +179,8 @@ def delete_category(
     user_id: Union[str, UUID]
 ) -> bool:
     """
-    Elimina categoria (hard delete).
-    Elimina anche tutte le sottocategorie (cascade).
+    Delete category (hard delete).
+    Delete also all subcategories (cascade).
     """
     db_category = get_category(db, category_id, user_id)
     
@@ -199,7 +199,7 @@ def deactivate_category(
     user_id: Union[str, UUID]
 ) -> Optional[Category]:
     """
-    Disattiva categoria (soft delete).
+    Deactivate category (soft delete).
     """
     db_category = get_category(db, category_id, user_id)
     
@@ -215,18 +215,18 @@ def deactivate_category(
 
 def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Category]:
     """
-    Crea categorie predefinite per un nuovo utente.
-    Struttura basata sul file Excel:
-    - 3 macro categorie (type): Entrate, Spese di Necessità, Spese Extra
-    - Categorie principali (parent_id=None)
-    - Sottocategorie (parent_id=categoria)
+    Create default categories for a new user.
+    Structure based on the Excel file:
+    - 3 macro categories (type): Income, Necessary Expenses, Extra Expenses
+    - Main categories (parent_id=None)
+    - Subcategories (parent_id=category)
     """
     user_id = _to_uuid(user_id)
 
     created_categories = []
     
     # ========================================================================
-    # ENTRATE (income)
+    # INCOME
     # ========================================================================
     income_structure = {
         "Reddito": {
@@ -260,7 +260,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
     }
     
     # ========================================================================
-    # SPESE DI NECESSITÀ (expense_necessity)
+    # NECESSARY EXPENSES
     # ========================================================================
     expense_necessity_structure = {
         "Casa": {
@@ -336,7 +336,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
     }
     
     # ========================================================================
-    # SPESE EXTRA (expense_extra)
+    # EXTRA EXPENSES
     # ========================================================================
     expense_extra_structure = {
         "Svago": {
@@ -367,7 +367,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
         }
     }
     
-    # Funzione helper per creare categoria con sottocategorie
+    # Helper function to create category with subcategories
     def create_category_with_subs(
         name: str, 
         cat_type: str, 
@@ -375,7 +375,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
         icon: str, 
         subcategories: List[str]
     ) -> Category:
-        # Crea categoria principale
+        # Create main category
         main_cat = Category(
             user_id=user_id,
             name=name,
@@ -386,17 +386,17 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
             is_active=True
         )
         db.add(main_cat)
-        db.flush()  # Per ottenere l'ID
+        db.flush()  # To get the ID
         created_categories.append(main_cat)
         
-        # Crea sottocategorie
+        # Create subcategories
         for sub_name in subcategories:
             sub_cat = Category(
                 user_id=user_id,
                 name=sub_name,
                 type=cat_type,
-                color=color,  # Eredita colore dal parent
-                icon=None,  # Sottocategorie senza icona
+                color=color,  # Inherit color from parent
+                icon=None,  # Subcategories without icon
                 parent_id=main_cat.id,
                 is_active=True
             )
@@ -405,7 +405,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
         
         return main_cat
     
-    # Crea tutte le categorie INCOME
+    # Create all INCOME categories
     for name, data in income_structure.items():
         create_category_with_subs(
             name=name,
@@ -415,7 +415,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
             subcategories=data["subcategories"]
         )
     
-    # Crea tutte le categorie EXPENSE_NECESSITY
+    # Create all EXPENSE_NECESSITY categories
     for name, data in expense_necessity_structure.items():
         create_category_with_subs(
             name=name,
@@ -425,7 +425,7 @@ def seed_default_categories(db: Session, user_id: Union[str, UUID]) -> List[Cate
             subcategories=data["subcategories"]
         )
     
-    # Crea tutte le categorie EXPENSE_EXTRA
+    # Create all EXPENSE_EXTRA categories
     for name, data in expense_extra_structure.items():
         create_category_with_subs(
             name=name,
@@ -449,7 +449,7 @@ def get_category_statistics(
     user_id: Union[str, UUID]
 ) -> Dict:
     """
-    Restituisce statistiche sulle categorie dell'utente.
+    Returns statistics about the user's categories.
     """
     all_categories = get_categories(db, user_id, limit=500)
     

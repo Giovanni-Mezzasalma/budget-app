@@ -1,6 +1,6 @@
 """
 Transfers Router
-Gestione trasferimenti tra account utente
+Managing transfers between user accounts
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -30,18 +30,18 @@ router = APIRouter(prefix="/transfers", tags=["Transfers"])
 @router.get("/types", response_model=List[TransferTypeInfo])
 async def get_transfer_types():
     """
-    Restituisce tutti i tipi di trasferimento disponibili.
-    
-    Utile per popolare dropdown nel frontend.
-    
-    **Tipi disponibili:**
-    - `generic`: Trasferimento generico / Giroconto
-    - `withdrawal`: Prelievo (Conto → Contanti)
-    - `deposit`: Versamento (Contanti → Conto)
-    - `savings`: Risparmio (Corrente → Risparmio)
-    - `investment`: Investimento (Corrente → Investimento)
-    - `loan_given`: Prestito dato (Corrente → Prestiti a terzi)
-    - `loan_received`: Prestito ricevuto (Prestiti a terzi → Corrente)
+    Returns all available transfer types.
+
+    Useful for populating dropdowns in the frontend.
+
+    **Available types:**
+    - `generic`: Generic transfer / Bank transfer
+    - `withdrawal`: Withdrawal (Account → Cash)
+    - `deposit`: Deposit (Cash → Account)
+    - `savings`: Savings (Current → Savings)
+    - `investment`: Investment (Current → Investment)
+    - `loan_given`: Loan given (Current → Loans to third parties)
+    - `loan_received`: Loan received (Loans to third parties → Current)
     """
     return [
         TransferTypeInfo(
@@ -55,10 +55,10 @@ async def get_transfer_types():
 @router.get("/types/rules")
 async def get_transfer_type_rules():
     """
-    Restituisce le regole di direzione per ogni tipo di trasferimento.
-    
-    Utile per validazione lato frontend e per mostrare all'utente
-    quali account sono validi per ogni tipo di trasferimento.
+    Returns the direction rules for each transfer type.
+
+    Useful for front-end validation and to show the user
+    which accounts are valid for each transfer type.
     """
     from app.schemas.transfer import TRANSFER_TYPE_DIRECTION_RULES, TRANSFER_TYPE_LABELS
     
@@ -87,15 +87,15 @@ async def get_transfers(
     end_date: Optional[date] = Query(None, description="Data fine periodo (YYYY-MM-DD)")
 ):
     """
-    Lista tutti i trasferimenti dell'utente con filtri opzionali.
-    
-    **Filtri disponibili:**
-    - **type**: Filtra per tipo di trasferimento
-    - **from_account_id**: Filtra per account di origine
-    - **to_account_id**: Filtra per account di destinazione
-    - **start_date / end_date**: Filtra per periodo
-    
-    **Ordinamento:** Per data decrescente (più recenti prima)
+    List all user transfers with optional filters.
+
+    **Available filters:**
+    - **type**: Filter by transfer type
+    - **from_account_id**: Filter by source account
+    - **to_account_id**: Filter by destination account
+    - **start_date / end_date**: Filter by period
+
+    **Sort:** By date descending (newest first)
     """
     # Valida il tipo se fornito
     if type is not None and type not in VALID_TRANSFER_TYPES:
@@ -127,14 +127,15 @@ async def get_transfer_statistics(
     end_date: Optional[date] = Query(None, description="Data fine periodo")
 ):
     """
-    Restituisce statistiche sui trasferimenti raggruppate per tipo.
-    
-    **Risposta include:**
-    - Numero totale trasferimenti
-    - Importo totale trasferito
-    - Totale commissioni pagate
-    - Media importo trasferimento
-    - Breakdown per tipo
+    Returns transfer statistics grouped by type.
+
+    Response includes:
+
+    - Total number of transfers
+    - Total amount transferred
+    - Total fees paid
+    - Average transfer amount
+    - Breakdown by type
     """
     stats = transfer_crud.get_transfer_statistics(
         db,
@@ -169,15 +170,16 @@ async def get_loans_summary(
     db: Session = Depends(get_db)
 ):
     """
-    Restituisce riepilogo dei prestiti (dati e ricevuti).
-    
-    Utile per la pagina dedicata ai prestiti.
-    
-    **Risposta include:**
-    - Totale prestiti dati
-    - Totale prestiti ricevuti
-    - Saldo netto (positivo = hai prestato di più)
-    - Lista dettagliata prestiti
+    Returns a summary of loans (issued and received).
+
+    Useful for the loans page.
+
+    Response includes:
+
+    - Total loans issued
+    - Total loans received
+    - Net balance (positive = you lent more)
+    - Detailed list of loans
     """
     summary = transfer_crud.get_loans_summary(
         db,
@@ -220,33 +222,33 @@ async def create_transfer(
     db: Session = Depends(get_db)
 ):
     """
-    Crea un nuovo trasferimento tra due account.
-    
-    **Campi richiesti:**
-    - **from_account_id**: ID dell'account di origine
-    - **to_account_id**: ID dell'account di destinazione
-    - **amount**: Importo da trasferire (sempre positivo)
-    - **date**: Data del trasferimento
-    
-    **Campi opzionali:**
-    - **type**: Tipo trasferimento (default: generic)
-    - **description**: Descrizione (es. "Prestito a Mario")
-    - **notes**: Note aggiuntive
-    - **exchange_rate**: Tasso di cambio
-    - **fee**: Commissione
-    
-    **Tipi disponibili:**
-    - `generic`: Giroconto generico
-    - `withdrawal`: Prelievo (Conto → Contanti)
-    - `deposit`: Versamento (Contanti → Conto)
-    - `savings`: Risparmio (Corrente → Risparmio)
-    - `investment`: Investimento (Corrente → Investimento)
-    - `loan_given`: Prestito dato
-    - `loan_received`: Prestito ricevuto
-    
-    ✅ I balance di entrambi gli account vengono aggiornati automaticamente.
-    
-    **Esempio prestito:**
+    Create a new transfer between two accounts.
+
+    **Required fields:**
+    - **from_account_id**: Source account ID
+    - **to_account_id**: Destination account ID
+    - **amount**: Amount to transfer (always positive)
+    - **date**: Transfer date
+
+    **Optional fields:**
+    - **type**: Transfer type (default: generic)
+    - **description**: Description (e.g., "Loan to Mario")
+    - **notes**: Additional notes
+    - **exchange_rate**: Exchange rate
+    - **fee**: Fee
+
+    **Available types:**
+    - `generic`: Generic transfer
+    - `withdrawal`: Withdrawal (Account → Cash)
+    - `deposit`: Deposit (Cash → Account)
+    - `savings`: Savings (Current → Savings)
+    - `investment`: Investment (Current → Investment)
+    - `loan_given`: Loan given
+    - `loan_received`: Loan received
+
+    ✅ The balances of both accounts are automatically updated.
+
+    **Loan example:**
 ```json
     {
         "from_account_id": "uuid-conto-corrente",
@@ -258,7 +260,7 @@ async def create_transfer(
     }
 ```
     """
-    # Verifica che entrambi gli account esistano e appartengano all'utente
+    # Verify that both accounts exist and belong to the user
     from_account = account_crud.get_account(db, transfer.from_account_id, str(current_user.id))
     if not from_account:
         raise HTTPException(
@@ -273,7 +275,7 @@ async def create_transfer(
             detail="Destination account not found"
         )
     
-    # Verifica che gli account siano attivi
+    # Verify that the accounts are active
     if not from_account.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -307,9 +309,9 @@ async def get_transfer(
     db: Session = Depends(get_db)
 ):
     """
-    Recupera i dettagli di un singolo trasferimento.
-    
-    Include informazioni sugli account e labels italiane.
+    Retrieve the details of a single transfer.
+
+    Includes account information and Italian labels.
     """
     transfer = transfer_crud.get_transfer(
         db,
@@ -323,7 +325,7 @@ async def get_transfer(
             detail="Transfer not found"
         )
     
-    # Costruisci risposta con dettagli
+    # Build response with details
     response = TransferWithDetails(
         id=transfer.id,
         user_id=transfer.user_id,
@@ -358,10 +360,10 @@ async def update_transfer(
     db: Session = Depends(get_db)
 ):
     """
-    Aggiorna un trasferimento esistente.
-    
-    ⚠️ Se modifichi amount, fee, exchange_rate o gli account,
-    i balance vengono ricalcolati automaticamente.
+    Update an existing transfer.
+
+    ⚠️ If you change the amount, fee, exchange rate, or accounts,
+    the balances are automatically recalculated.
     """
     existing = transfer_crud.get_transfer(db, transfer_id, str(current_user.id))
     if not existing:
@@ -418,9 +420,9 @@ async def delete_transfer(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina un trasferimento.
-    
-    ✅ I balance degli account vengono ripristinati automaticamente.
+    Cancel a transfer.
+
+    ✅ Account balances are automatically restored.
     """
     success = transfer_crud.delete_transfer(
         db,

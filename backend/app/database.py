@@ -1,5 +1,5 @@
 """
-Configurazione database e sessione SQLAlchemy
+SQLAlchemy database and session configuration
 """
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -9,23 +9,23 @@ from .config import settings
 # Engine SQLAlchemy
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,  # Verifica connessione prima di usarla
-    pool_size=10,  # Numero connessioni nel pool
-    max_overflow=20  # Connessioni extra se necessario
+    pool_pre_ping=True,  # Check connection before using it
+    pool_size=10,  # Number of connections in the pool
+    max_overflow=20  # Extra connections if needed
 )
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base class per modelli
+# Base class for models
 Base = declarative_base()
 
 
-# Dependency per ottenere sessione database
+# Dependency to get database session
 def get_db():
     """
-    Dependency che fornisce sessione database
-    Si chiude automaticamente dopo uso
+    Dependency that provides database session
+    Automatically closes after use
     """
     db = SessionLocal()
     try:

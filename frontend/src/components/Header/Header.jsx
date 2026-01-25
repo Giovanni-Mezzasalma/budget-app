@@ -1,10 +1,10 @@
 /**
  * HEADER COMPONENT
- * Componente header che contiene:
- * - Titolo dell'applicazione
- * - Pulsanti di azione rapida
- * - Selettori per mese e anno
- * - Tab di navigazione
+ * Header component containing:
+ * - Application title
+ * - Quick action buttons
+ * - Month and year selectors
+ * - Navigation tabs
  */
 
 import React from 'react';
@@ -22,16 +22,16 @@ function Header({
   onOpenAccountModal,
   onOpenCategoryModal
 }) {
-  // Array dei mesi per il selettore
+  // Array of months for the selector
   const months = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
 
-  // Array degli anni disponibili
+  // Array of available years
   const years = [2023, 2024, 2025, 2026];
 
-  // Array dei tab con icone e ID
+  // Array of tabs with icons and IDs
   const tabs = [
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'accounts', label: '🏦 Conti' },
@@ -43,10 +43,10 @@ function Header({
 
   return (
     <div className="header">
-      {/* Titolo principale */}
+      {/* Main Title */}
       <h1>💰 Gestione Bilancio Completa</h1>
 
-      {/* Pulsanti di azione rapida */}
+      {/* Quick action buttons */}
       <div className="quick-actions">
         <button className="btn btn-primary" onClick={onOpenTransactionModal}>
           💵 Entrata/Spesa
@@ -62,7 +62,7 @@ function Header({
         </button>
       </div>
 
-      {/* Controlli per mese e anno */}
+      {/* Checks by month and year */}
       <div className="controls">
         <select 
           value={selectedMonth} 
@@ -87,7 +87,7 @@ function Header({
         </select>
       </div>
 
-      {/* Tab di navigazione */}
+      {/* Navigation tabs */}
       <div className="tabs">
         {tabs.map((tab) => (
           <button

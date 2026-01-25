@@ -1,16 +1,16 @@
 /**
  * CHART UTILITIES
- * Contiene funzioni di utilità per la generazione dei dati dei grafici personalizzati
+ * Contains utility functions for generating custom chart data
  */
 
 import { filterTransactionsByMonth } from './calculations';
 
 /**
- * Ottiene i dati per un periodo specifico basato sulla configurazione
- * @param {string} period - Tipo di periodo ('last3', 'last6', 'last12', 'currentYear', 'custom')
- * @param {Object} options - Opzioni aggiuntive (startDate, endDate per periodo custom)
- * @param {Array} transactions - Array di tutte le transazioni
- * @returns {Array} - Array di dati mensili per il periodo specificato
+ * Gets data for a specific period based on your configuration
+ * @param {string} period - Period type ('last3', 'last6', 'last12', 'currentYear', 'custom')
+ * @param {Object} options - Additional options (startDate, endDate for custom period)
+ * @param {Array} transactions - Array of all transactions
+ * @returns {Array} - Array of monthly data for the specified period
  */
 export const getPeriodData = (period, options, transactions) => {
   const data = [];
@@ -19,7 +19,7 @@ export const getPeriodData = (period, options, transactions) => {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
-  // Determina il numero di mesi e le date in base al periodo selezionato
+  // Determines the number of months and dates based on the selected period
   switch (period) {
     case 'last3':
       months = 3;
@@ -31,13 +31,13 @@ export const getPeriodData = (period, options, transactions) => {
       months = 12;
       break;
     case 'currentYear':
-      // Anno corrente: da gennaio a dicembre
+      // Current year: from January to December
       startDate = new Date(currentYear, 0, 1);
       endDate = new Date(currentYear, 11, 31);
       months = 12;
       break;
     case 'custom':
-      // Periodo personalizzato: usa le date fornite nelle opzioni
+      // Custom period: Use the dates provided in the options
       if (options.startDate && options.endDate) {
         const start = new Date(options.startDate + '-01');
         const end = new Date(options.endDate + '-01');
@@ -45,14 +45,14 @@ export const getPeriodData = (period, options, transactions) => {
                 (end.getMonth() - start.getMonth()) + 1;
         startDate = start;
       } else {
-        months = 6; // Default se le date non sono fornite
+        months = 6; // Default if dates are not provided
       }
       break;
     default:
       months = 6;
   }
 
-  // Genera i dati per ogni mese del periodo
+  // Generate data for each month of the period
   for (let i = months - 1; i >= 0; i--) {
     const date = startDate ? 
       new Date(startDate.getFullYear(), startDate.getMonth() + (months - 1 - i), 1) :
@@ -61,7 +61,7 @@ export const getPeriodData = (period, options, transactions) => {
     const month = date.getMonth();
     const year = date.getFullYear();
     
-    // Filtra le transazioni per questo mese
+    // Filter transactions for this month
     const monthTrans = filterTransactionsByMonth(transactions, month, year);
 
     data.push({
@@ -75,15 +75,15 @@ export const getPeriodData = (period, options, transactions) => {
 };
 
 /**
- * Genera i dati per un grafico di panoramica (entrate/uscite/netto)
- * @param {Array} periodData - Dati mensili del periodo
- * @param {Object} config - Configurazione del grafico
- * @returns {Object} - Dati formattati per Chart.js
+ * Generate data for an overview chart (income/expense/net)
+ * @param {Array} periodData - Monthly data for the period
+ * @param {Object} config - Chart Setup
+ * @returns {Object} - Data formatted for Chart.js
  */
 export const getOverviewData = (periodData, config) => {
   const datasets = [];
   
-  // Dataset per le entrate
+  // Revenue Dataset
   if (config.options.showIncome) {
     datasets.push({
       label: 'Entrate',
@@ -98,7 +98,7 @@ export const getOverviewData = (periodData, config) => {
     });
   }
 
-  // Dataset per le uscite totali
+  // Dataset for total expenditures
   if (config.options.showExpenses) {
     datasets.push({
       label: 'Uscite',
@@ -113,7 +113,7 @@ export const getOverviewData = (periodData, config) => {
     });
   }
 
-  // Dataset per le spese di necessità
+  // Dataset for essential expenses
   if (config.options.showNecessity) {
     datasets.push({
       label: 'Spese Necessità',
@@ -128,7 +128,7 @@ export const getOverviewData = (periodData, config) => {
     });
   }
 
-  // Dataset per le spese extra
+  // Dataset for extra expenses
   if (config.options.showExtra) {
     datasets.push({
       label: 'Spese Extra',
@@ -143,7 +143,7 @@ export const getOverviewData = (periodData, config) => {
     });
   }
 
-  // Dataset per il netto
+  // Dataset for the net
   if (config.options.showNet) {
     datasets.push({
       label: 'Netto',
@@ -167,22 +167,22 @@ export const getOverviewData = (periodData, config) => {
 };
 
 /**
- * Genera i dati per un grafico delle categorie
- * @param {Array} periodData - Dati mensili del periodo
- * @param {Object} config - Configurazione del grafico
- * @returns {Object} - Dati formattati per Chart.js
+ * Generate data for a category chart
+ * @param {Array} periodData - Monthly data for the period
+ * @param {Object} config - Chart Setup
+ * @returns {Object} - Data formatted for Chart.js
  */
 export const getCategoriesData = (periodData, config) => {
   const categoryTotals = {};
   
-  // Somma le spese per categoria in tutto il periodo
+  // Add up the expenses per category over the entire period
   periodData.forEach(p => {
     p.transactions.filter(t => t.type !== 'income' && t.type !== 'transfer').forEach(t => {
       categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
     });
   });
 
-  // Ordina le categorie per importo decrescente e prende le prime 10
+  // Sort categories by decreasing amount and take the top 10
   const sorted = Object.entries(categoryTotals)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
@@ -202,17 +202,17 @@ export const getCategoriesData = (periodData, config) => {
 };
 
 /**
- * Genera i dati per un grafico dei conti
- * @param {Array} periodData - Dati mensili del periodo
- * @param {Object} config - Configurazione del grafico
- * @param {Array} accounts - Array di tutti i conti
- * @returns {Object} - Dati formattati per Chart.js
+ * Generate data for an accounts chart
+ * @param {Array} periodData - Monthly data for the period
+ * @param {Object} config - Chart Setup
+ * @param {Array} accounts - Array of all accounts
+ * @returns {Object} - Data formatted for Chart.js
  */
 export const getAccountsData = (periodData, config, accounts) => {
   const selectedAccounts = config.options.selectedAccounts || accounts.map(a => a.id);
   const datasets = [];
 
-  // Colori per i diversi conti
+  // Colors for different accounts
   const colors = ['#667eea', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   selectedAccounts.forEach((accId, index) => {
@@ -223,7 +223,7 @@ export const getAccountsData = (periodData, config, accounts) => {
       label: account.name,
       data: periodData.map(p => {
         let balance = 0;
-        // Calcola il saldo mensile per questo conto
+        // Calculate the monthly balance for this account
         p.transactions.forEach(t => {
           if (t.type === 'transfer') {
             if (t.fromAccount === accId) balance -= t.amount;
@@ -249,10 +249,10 @@ export const getAccountsData = (periodData, config, accounts) => {
 };
 
 /**
- * Genera i dati per un grafico di dettaglio di una categoria specifica
- * @param {Array} periodData - Dati mensili del periodo
- * @param {Object} config - Configurazione del grafico
- * @returns {Object} - Dati formattati per Chart.js
+ * Generate data for a detail chart of a specific category
+ * @param {Array} periodData - Monthly data for the period
+ * @param {Object} config - Chart Setup
+ * @returns {Object} - Data formatted for Chart.js
  */
 export const getCategoryDetailData = (periodData, config) => {
   const category = config.options.category;
@@ -274,17 +274,17 @@ export const getCategoryDetailData = (periodData, config) => {
 };
 
 /**
- * Genera i dati del grafico in base al tipo specificato nella configurazione
- * @param {Object} config - Configurazione del grafico personalizzato
- * @param {Array} transactions - Array di tutte le transazioni
- * @param {Array} accounts - Array di tutti i conti
- * @returns {Object} - Dati formattati per Chart.js
+ * Generates chart data based on the type specified in the configuration
+ * @param {Object} config - Configuring the custom chart
+ * @param {Array} transactions - Array of all transactions
+ * @param {Array} accounts - Array of all accounts
+ * @returns {Object} - Data formatted for Chart.js
  */
 export const getChartData = (config, transactions, accounts) => {
-  // Ottiene i dati per il periodo specificato
+  // Gets data for the specified period
   const periodData = getPeriodData(config.period, config.options, transactions);
   
-  // Genera i dati in base al tipo di visualizzazione
+  // Generate data based on the view type
   switch (config.dataType) {
     case 'overview':
       return getOverviewData(periodData, config);
