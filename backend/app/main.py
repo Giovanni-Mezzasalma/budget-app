@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting Budget App API...")
     print(f"📊 Database: {settings.DATABASE_URL.split('@')[-1]}")  # Mostra solo host/db, non password
     print(f"🔒 Debug mode: {settings.DEBUG}")
+    print(f"✅ CORS Origins: {settings.cors_origins}")
     
     # In development, create tables if they don't exist
     if settings.DEBUG:
@@ -64,7 +65,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

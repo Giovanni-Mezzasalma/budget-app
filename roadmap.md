@@ -3040,41 +3040,41 @@ Prima di procedere alla Fase 4 (Testing), è necessario effettuare una revisione
 - [x] **Azione:** Uniformare (suggerimento: inglese per codice, italiano per docs utente)
 
 ##### J. CORS_ORIGINS parsing
-- [ ] **Nota:** `.env.example` usa stringa JSON, `config.py` si aspetta lista
-- [ ] **Impatto:** Pydantic-settings dovrebbe gestirlo, ma verificare
-- [ ] **Azione:** Testare parsing da `.env`
+- [x] **Nota:** `.env.example` usa stringa JSON, `config.py` si aspetta lista
+- [x] **Impatto:** Pydantic-settings dovrebbe gestirlo, ma verificare
+- [X] **Azione:** Testare parsing da `.env`
 
 #### 3.7.4 - Checklist Correzioni
 
 **Critiche (fare ora):**
-- [ ] Decidere e implementare strategia balance (A/B/C)
-- [ ] Aggiornare commenti model per 3 tipi transazione
-- [ ] Correggere path in `run.py`: `app.main:app`
-- [ ] Correggere path in `Dockerfile`: `app.main:app`
+- [x] Decidere e implementare strategia balance (A/B/C)
+- [x] Aggiornare commenti model per 3 tipi transazione
+- [x] Correggere path in `run.py`: `app.main:app`
+- [x] Correggere path in `Dockerfile`: `app.main:app`
 
 **Medie (fare prima di Fase 6):**
-- [ ] Centralizzare `ChartType` enum
-- [ ] Verificare validazione `update_transfer`
-- [ ] Gestire file SQL obsoleti
+- [x] Centralizzare `ChartType` enum
+- [x] Verificare validazione `update_transfer`
+- [x] Gestire file SQL obsoleti
 
 **Minori (nice to have):**
-- [ ] Uniformare lingua commenti
-- [ ] Documentare nota su migration vuota
-- [ ] Testare parsing CORS_ORIGINS
+- [x] Uniformare lingua commenti
+- [X] Documentare nota su migration vuota
+- [x] Testare parsing CORS_ORIGINS
 
 #### 3.7.5 - Test Post-Correzioni
 
 Dopo le correzioni, verificare:
-- [ ] Server avvia senza errori: `python run.py` (o con path corretto)
-- [ ] Swagger UI accessibile: http://localhost:8000/docs
-- [ ] Test creazione transaction → balance aggiornato correttamente
-- [ ] Test creazione transfer → entrambi i balance aggiornati
-- [ ] Test analytics/summary → dati corretti
-- [ ] Nessun errore nei log
+- [x] Server avvia senza errori: `python run.py` (o con path corretto)
+- [x] Swagger UI accessibile: http://localhost:8000/docs
+- [x] Test creazione transaction → balance aggiornato correttamente
+- [x] Test creazione transfer → entrambi i balance aggiornati
+- [x] Test analytics/summary → dati corretti
+- [x] Nessun errore nei log
 
 #### 3.7.6 - Commit
-- [ ] Commit: `Code review fixes - Phase 3.7`
-- [ ] Push
+- [x] Commit: `Code review fixes - Phase 3.7`
+- [x] Push
 
 ---
 
@@ -3085,10 +3085,10 @@ Verifica che tutti questi endpoint funzionino E che le correzioni 3.7 siano appl
 [... resto del checkpoint esistente ...]
 
 **Aggiunte Fase 3.7:**
-- [ ] ✅ Path `run.py` e `Dockerfile` corretti
-- [ ] ✅ Strategia balance definita e implementata
-- [ ] ✅ Commenti model allineati con schema
-- [ ] ✅ Test post-correzioni passati
+- [x] ✅ Path `run.py` e `Dockerfile` corretti
+- [x] ✅ Strategia balance definita e implementata
+- [x] ✅ Commenti model allineati con schema
+- [x] ✅ Test post-correzioni passati
 
 ---
 

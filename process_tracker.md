@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** _______ | **Status:** 🟡 In corso (90% completato)
+**Data Inizio:** 21/11/2025 | **Data Fine:** 26/01/2026 | **Status:** ✅ Completato
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -322,22 +322,22 @@
 
 #### Test Finale Post-Correzioni
 
-- [ ] `cd backend && source venv/bin/activate`
-- [ ] `python -m app.main` o `python run.py` → Server UP
-- [ ] http://localhost:8000 → JSON response OK
-- [ ] http://localhost:8000/docs → Swagger UI OK
-- [ ] Login con utente esistente → Token OK
-- [ ] GET /accounts → Lista OK
-- [ ] POST /transactions (income) → Balance +amount
-- [ ] POST /transactions (expense) → Balance -amount
-- [ ] POST /transfers → From -amount, To +amount
-- [ ] GET /analytics/summary → Dati corretti
+- [x] `cd backend && source venv/bin/activate`
+- [x] `python -m app.main` o `python run.py` → Server UP
+- [x] http://localhost:8000 → JSON response OK
+- [x] http://localhost:8000/docs → Swagger UI OK
+- [x] Login con utente esistente → Token OK
+- [x] GET /accounts → Lista OK
+- [x] POST /transactions (income) → Balance +amount
+- [x] POST /transactions (expense) → Balance -amount
+- [x] POST /transfers → From -amount, To +amount
+- [x] GET /analytics/summary → Dati corretti
 
 #### Commit Fase 3.7
 
-- [ ] Tutti i file modificati staged
-- [ ] Commit message: `fix: Code review corrections - balance strategy, path fixes, type alignment`
-- [ ] Push completato
+- [x] Tutti i file modificati staged
+- [x] Commit message: `fix: Code review corrections - balance strategy, path fixes, type alignment`
+- [x] Push completato
 
 ---
 
@@ -385,7 +385,7 @@
 
 ## ✅ FASE 4: TESTING & DEBUG
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜
+**Data Inizio:** 26/01/2026 | **Data Fine:** _______ | **Status:** 🟡 In corso (90% completato)
 
 ### 4.1 - Setup Pytest
 - [ ] Pytest dependencies verificate

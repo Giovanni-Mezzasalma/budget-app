@@ -4,6 +4,7 @@ Manages environment variables and application settings.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field 
 from typing import Optional
 
 
@@ -30,12 +31,16 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # CORS
-    ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",  # React development server
-        "http://localhost:5173",  # Vite development server
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ]
+    cors_origins: list[str] = Field(  
+        default=[
+            "http://localhost:3000",  # React development server
+            "http://localhost:5173",  # Vite development server
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+        ],
+        validation_alias="CORS_ORIGINS",
+        description="Allowed origins for CORS (supports JSON string from .env)"
+    )
     
     # API
     API_V1_PREFIX: str = "/api/v1"
