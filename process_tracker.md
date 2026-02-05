@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** 26/01/2026 | **Status:** ✅ Completato
+**Data Inizio:** 21/11/2025 | **Data Fine:** ________ | **Status:** 🟡 In corso (90% completato)
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -318,7 +318,7 @@
 ##### H-J. Altri Minori
 - [x] UUID String(36), modifica effettuata da `String(36)` a UIID
 - [x] Commenti: decisione lingua presa
-- [ ] CORS_ORIGINS: testato parsing da .env
+- [x] CORS_ORIGINS: testato parsing da .env
 
 #### Test Finale Post-Correzioni
 
@@ -383,9 +383,99 @@
 
 ---
 
+## ✅ FASE 3.8: BACKEND VACATION PLANNING
+
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+
+**Tempo Stimato:** 3-4 giorni
+
+### 3.8.1 - Database Models
+- [ ] `vacation_settings.py` creato (maturazione separata: ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
+- [ ] `tracking_start_date` implementato (invece di carryover_year)
+- [ ] `initial_ferie_days` (in GIORNI), `initial_rol_hours`, `initial_permessi_hours` implementati
+- [ ] `vacation_entry.py` creato (NO malattia - solo ferie/rol/permesso)
+- [ ] `italian_holiday.py` creato
+- [ ] `user_holiday.py` creato
+- [ ] User model aggiornato con relationships
+- [ ] Models __init__.py aggiornato
+- [ ] Migration creata ed eseguita
+- [ ] Tabelle verificate in pgAdmin
+- [ ] Commit database models
+
+### 3.8.2 - Utility Functions
+- [ ] `easter.py` creato (calcolo Pasqua con validazione year >= 1583)
+- [ ] `bridge_days.py` creato (calcolo ponti con validazione weekend/festività)
+- [ ] `vacation_balance.py` RISCRITTO con maturazione separata:
+  - [ ] Calcolo separato per tipo (Ferie/ROL/Permessi)
+  - [ ] Conversione automatica ferie giorni → ore
+  - [ ] Totali aggregati (total_hours_available, total_days_available)
+  - [ ] Breakdown per tipo con hours_available
+- [ ] Utils __init__.py aggiornato
+- [ ] Commit utilities
+
+### 3.8.3 - Pydantic Schemas
+- [ ] `vacation.py` schemas creato:
+  - [ ] VacationSettingsBase con nuovi campi (ferie_days_per_month, etc.)
+  - [ ] BreakdownItem con hours_available, days_available
+  - [ ] VacationBalanceResponse con totali aggregati
+  - [ ] NO riferimenti a "malattia"
+- [ ] Schemas __init__.py aggiornato
+- [ ] Commit schemas
+
+### 3.8.4 - CRUD Operations
+- [ ] `vacation_settings.py` CRUD creato
+- [ ] `vacation_entry.py` CRUD creato con validazioni:
+  - [ ] Blocco inserimento weekend
+  - [ ] Blocco inserimento festività nazionali
+  - [ ] Blocco inserimento festività custom utente
+- [ ] `italian_holiday.py` CRUD creato
+- [ ] `user_holiday.py` CRUD creato con validazione date (es. 31 Feb)
+- [ ] CRUD __init__.py aggiornato
+- [ ] Commit CRUD
+
+### 3.8.5 - API Router
+- [ ] `vacation.py` router creato con endpoint:
+  - [ ] GET/PUT /vacation/settings (nuovi campi)
+  - [ ] POST/GET/PUT/DELETE /vacation/entries (con validazione festività)
+  - [ ] POST /vacation/entries/bulk (FIX validazione hours_per_day + skip festività)
+  - [ ] GET /vacation/balance (con breakdown completo + totali)
+  - [ ] GET /vacation/calendar (OTTIMIZZATO: 1 query invece di 4)
+  - [ ] GET /vacation/holidays
+  - [ ] GET /vacation/bridges
+  - [ ] POST/GET/DELETE /vacation/user-holidays
+- [ ] Router registrato in main.py
+- [ ] Commit router
+
+### 3.8.6 - Manual Testing
+- [ ] GET/PUT /vacation/settings testato (maturazione separata)
+- [ ] POST /vacation/entries testato (validazione weekend PASS)
+- [ ] POST /vacation/entries testato (validazione festività PASS)
+- [ ] POST /vacation/entries/bulk testato (skip festività PASS)
+- [ ] GET /vacation/balance testato (totali aggregati corretti)
+- [ ] GET /vacation/calendar testato (festività custom visibili)
+- [ ] Commit test results
+
+**CHECKPOINT FASE 3.8:**
+- [ ] ✅ Models con maturazione separata (Ferie/ROL/Permessi)
+- [ ] ✅ Tracking start date funzionante
+- [ ] ✅ Validazione weekend + festività attiva
+- [ ] ✅ Balance con totali aggregati corretto
+- [ ] ✅ NO malattia in sistema
+- [ ] ✅ Calcolo Pasqua corretto
+- [ ] ✅ Calcolo ponti corretto
+- [ ] ✅ Ready per FASE 4
+
+**Note Implementazione:**
+- Ferie: 1.83 giorni/mese = 22 giorni/anno
+- ROL: 2.67 ore/mese = 32 ore/anno
+- Permessi: 8.67 ore/mese = 104 ore/anno
+- Initial balance: ferie in GIORNI, ROL/Permessi in ORE
+
+---
+
 ## ✅ FASE 4: TESTING & DEBUG
 
-**Data Inizio:** 26/01/2026 | **Data Fine:** _______ | **Status:** 🟡 In corso (90% completato)
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
 
 ### 4.1 - Setup Pytest
 - [ ] Pytest dependencies verificate
@@ -441,12 +531,95 @@
 - [ ] ✅ Tutti i test passano
 - [ ] ✅ Coverage soddisfacente
 - [ ] ✅ CI/CD ready
+
+---
+
+## ✅ FASE 4.6: TESTING VACATION MODULE
+
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+
+**Tempo Stimato:** 1-2 giorni
+
+### 4.6.1 - Test Setup
+- [ ] Fixtures vacation aggiunte a conftest.py:
+  - [ ] `vacation_settings_data` con maturazione separata
+  - [ ] `vacation_settings_with_initial_balance`
+  - [ ] `vacation_entry_ferie_data` (date fisse per consistency)
+  - [ ] `vacation_entry_rol_data`
+  - [ ] `user_holiday_data`
+
+### 4.6.2 - Test Vacation Settings
+- [ ] `test_vacation_settings.py` creato:
+  - [ ] Test default settings (ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
+  - [ ] Test update accrual rates
+  - [ ] Test initial balance validation (balance_date < tracking_start_date)
+  - [ ] Test tracking_start_date required
+- [ ] Tutti i test passano
+
+### 4.6.3 - Test Vacation Entries
+- [ ] `test_vacation_entries.py` creato:
+  - [ ] Test create ferie (ore automatiche)
+  - [ ] Test create ROL (ore manuali obbligatorie)
+  - [ ] Test validazione weekend (FAIL atteso)
+  - [ ] Test validazione festività nazionali (FAIL atteso)
+  - [ ] Test duplicate date (FAIL atteso)
+  - [ ] Test update entry (solo note/ore)
+  - [ ] Test delete entry
+- [ ] Tutti i test passano
+
+### 4.6.4 - Test User Holidays
+- [ ] `test_user_holidays.py` creato:
+  - [ ] Test create patron saint (recurring=True)
+  - [ ] Test create company closure (recurring=False)
+  - [ ] Test validazione date invalide (31 Feb → FAIL)
+  - [ ] Test non-recurring senza year (FAIL atteso)
+  - [ ] Test delete
+- [ ] Tutti i test passano
+
+### 4.6.5 - Test Bulk Entries
+- [ ] `test_vacation_bulk.py` creato:
+  - [ ] Test bulk create settimana
+  - [ ] Test skip weekends
+  - [ ] Test skip festività (nazionali + custom)
+  - [ ] Test ROL bulk richiede hours_per_day
+  - [ ] Test validazione range date
+- [ ] Tutti i test passano
+
+### 4.6.6 - Test Balance & Calendar
+- [ ] `test_vacation_balance.py` creato:
+  - [ ] Test balance structure (totali aggregati presenti)
+  - [ ] Test breakdown per tipo (ferie, rol, permesso)
+  - [ ] Test with initial balance
+  - [ ] Test tracking_start_date calculation
+  - [ ] Test calendar month (festività nazionali + custom visibili)
+  - [ ] Test bridges calculation
+- [ ] Tutti i test passano
+
+### 4.6.7 - Coverage
+- [ ] `pytest tests/test_vacation*.py -v --cov=app.routers.vacation --cov=app.crud --cov=app.utils.vacation_balance`
+- [ ] Coverage vacation module ≥ 70%
+- [ ] Commit all vacation tests
+
+**CHECKPOINT FASE 4.6:**
+- [ ] ✅ Test settings con maturazione separata PASS
+- [ ] ✅ Test validazione weekend/festività PASS
+- [ ] ✅ Test balance con totali aggregati PASS
+- [ ] ✅ Test bulk con skip festività PASS
+- [ ] ✅ NO test malattia (rimossa)
+- [ ] ✅ Coverage ≥ 70%
 - [ ] ✅ Ready per FASE 5
 
 **Test Command:**
 ```bash
 pytest tests/ -v --cov=app
 ```
+**Test Scenarios Chiave:**
+- [ ] Ferie: ore automatiche = work_hours_per_day ✓
+- [ ] ROL: ore manuali obbligatorie ✓
+- [ ] Weekend: inserimento bloccato ✓
+- [ ] Festività: inserimento bloccato ✓
+- [ ] Balance: totali aggregati corretti ✓
+- [ ] Breakdown: separato per tipo ✓
 
 ---
 
@@ -548,6 +721,153 @@ pytest tests/ -v --cov=app
 - [ ] User B: create data
 - [ ] User A non vede dati User B ✓
 - [ ] User B non vede dati User A ✓
+
+---
+
+## ✅ FASE 5.9: FRONTEND VACATION MODULE
+
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+
+**Tempo Stimato:** 3-4 giorni
+
+### 5.9.1 - API Service
+- [ ] `vacationService.js` creato con endpoints:
+  - [ ] getSettings, updateSettings
+  - [ ] getEntries, createEntry, updateEntry, deleteEntry
+  - [ ] createBulkEntries (NUOVO)
+  - [ ] getBalance, getProjection
+  - [ ] getCalendarMonth
+  - [ ] getHolidays, getBridges
+  - [ ] getUserHolidays, createUserHoliday, deleteUserHoliday
+
+### 5.9.2 - Calendar Component
+- [ ] `VacationCalendar.jsx` creato (INVARIATO - già corretto)
+- [ ] Navigazione mesi funziona
+- [ ] Festività nazionali evidenziate
+- [ ] Festività custom evidenziate
+- [ ] Entries visibili
+- [ ] Click su giorno apre modal
+
+### 5.9.3 - Entry Modal
+- [ ] `VacationEntryModal.jsx` creato (INVARIATO - già corretto):
+  - [ ] FERIE: no input ore (automatiche)
+  - [ ] ROL/Permessi: input ore obbligatorio
+  - [ ] Edit mode: data/tipo DISABLED
+  - [ ] Elimina funzionante
+- [ ] CRUD entries funziona
+
+### 5.9.4 - Bulk Entry Modal (NUOVO)
+- [ ] `BulkEntryModal.jsx` creato:
+  - [ ] Form range date (start_date, end_date)
+  - [ ] Dropdown tipo (ferie/rol/permesso)
+  - [ ] Input ore (solo per ROL/Permessi)
+  - [ ] Checkbox "Skip weekend"
+  - [ ] Checkbox "Skip festività"
+  - [ ] Preview count approssimativo
+  - [ ] Submit crea multiple entries
+- [ ] Modal testato e funzionante
+
+### 5.9.5 - Balance Widget (COMPLETAMENTE RISCRITTO)
+- [ ] `VacationBalance.jsx` creato:
+  - [ ] Totale disponibile aggregato (GRANDE e prominente)
+  - [ ] Info tracking (data inizio + mesi lavorati)
+  - [ ] Breakdown per tipo (Ferie, ROL, Permessi):
+    - [ ] Maturate (ore + giorni)
+    - [ ] Usate (ore + giorni)
+    - [ ] Disponibili (ore + giorni)
+    - [ ] Progress bar per tipo
+  - [ ] Proiezione fine anno
+  - [ ] Info configurazione (espandibile)
+- [ ] Dati corretti visualizzati
+- [ ] Year selector funzionante
+
+### 5.9.6 - Settings Component (COMPLETAMENTE RISCRITTO)
+- [ ] `VacationSettings.jsx` creato:
+  - [ ] Sezione Ore Lavorative (work_hours_per_day)
+  - [ ] Sezione Maturazione Mensile:
+    - [ ] Ferie (giorni/mese) con anteprima annuale
+    - [ ] ROL (ore/mese) con anteprima annuale
+    - [ ] Permessi (ore/mese) con anteprima annuale
+    - [ ] Totale annuale calcolato
+  - [ ] Sezione Inizio Tracciamento (tracking_start_date)
+  - [ ] Sezione Saldo Iniziale (opzionale, collapsible):
+    - [ ] Mese/anno riferimento
+    - [ ] Ferie iniziali (in GIORNI)
+    - [ ] ROL iniziali (in ore)
+    - [ ] Permessi iniziali (in ore)
+  - [ ] Preset CCNL (Commercio, Metalmeccanico)
+  - [ ] Validazione: balance_date ≤ tracking_start_date
+- [ ] Salvataggio funziona
+
+### 5.9.7 - Bridge Opportunities
+- [ ] `BridgeOpportunities.jsx` creato (INVARIATO - già corretto)
+- [ ] Lista ponti corretta per anno
+- [ ] Descrizioni chiare
+
+### 5.9.8 - User Holidays Manager
+- [ ] `UserHolidaysManager.jsx` creato (INVARIATO - già corretto)
+- [ ] Form add patron saint
+- [ ] Form add company closure
+- [ ] Lista holidays con delete
+- [ ] Validazione date funzionante
+
+### 5.9.9 - Main Page
+- [ ] `VacationPage.jsx` creato:
+  - [ ] Tabs (Calendario, Riepilogo, Ponti, Festività, Impostazioni)
+  - [ ] Pulsante "Inserimento Multiplo" visibile su tab Calendario
+  - [ ] Tab switching funzionante
+- [ ] Tutti i componenti integrati
+
+### 5.9.10 - Styles
+- [ ] `vacation.css` creato con:
+  - [ ] Balance total card (gradient, prominente)
+  - [ ] Breakdown grid (3 colonne responsive)
+  - [ ] Progress bars per tipo
+  - [ ] Settings form (sezioni ben separate)
+  - [ ] Bulk modal styles
+  - [ ] Responsive design (mobile-friendly)
+
+### 5.9.11 - Integration
+- [ ] Route `/vacation` aggiunta in App.jsx
+- [ ] Link "🏖️ Ferie" aggiunto in Navbar
+- [ ] Dashboard widget opzionale (se desiderato)
+
+### 5.9.12 - Manual Testing
+- [ ] Settings: salvataggio maturazione separata PASS
+- [ ] Settings: tracking start date PASS
+- [ ] Settings: saldo iniziale (ferie in giorni) PASS
+- [ ] Calendar: festività nazionali visibili PASS
+- [ ] Calendar: festività custom visibili PASS
+- [ ] Entry modal: ferie NO ore, ROL/Permessi SÌ ore PASS
+- [ ] Entry modal: edit mode (data/tipo disabled) PASS
+- [ ] Bulk modal: apertura da pulsante PASS
+- [ ] Bulk modal: preview count PASS
+- [ ] Bulk modal: creazione multipla PASS
+- [ ] Balance: totali aggregati corretti PASS
+- [ ] Balance: breakdown per tipo corretto PASS
+- [ ] Bridges: lista ponti corretta PASS
+- [ ] User Holidays: CRUD funzionante PASS
+- [ ] Responsive: mobile test PASS
+
+**CHECKPOINT FASE 5.9:**
+- [ ] ✅ BulkEntryModal implementato e funzionante
+- [ ] ✅ Settings form con maturazione separata
+- [ ] ✅ Balance widget con totali aggregati
+- [ ] ✅ Tutti i componenti integrati
+- [ ] ✅ CSS completo e responsive
+- [ ] ✅ Test manuali passati
+- [ ] ✅ NO malattia in UI
+- [ ] ✅ Ready per FASE 6 (Deployment)
+
+**Features Implementate:**
+- ✅ Maturazione separata (Ferie/ROL/Permessi)
+- ✅ Tracking start date
+- ✅ Saldo iniziale (ferie in giorni!)
+- ✅ Inserimento multiplo (bulk)
+- ✅ Totali aggregati prominenti
+- ✅ Validazione festività
+- ✅ Preset CCNL
+- ✅ Mobile responsive
 
 ---
 

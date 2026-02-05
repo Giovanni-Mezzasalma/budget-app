@@ -3138,7 +3138,1727 @@ Verifica che tutti questi endpoints funzionino:
 6. [x] Chiama /analytics/summary (verifica dati corretti)
 7. [x] Tutto funziona end-to-end!
 
-**Tempo stimato:** 4-5 giorni  
+# FASE 3.8: Backend API - Vacation Planning (3-4 giorni)
+
+## 🎯 Obiettivo
+Implementare il backend completo per il modulo di gestione ferie per dipendenti, con calendario festività italiane, calcolo automatico Pasqua/Pasquetta, maturazione separata per tipo (Ferie/ROL/Permessi) e proiezione ore residue.
+
+**Target:** Utenti privati (dipendenti)  
+**Integrazione Budget:** Livello A - Leggera (widget in dashboard, nessuna automazione)
+
+---
+
+## 📋 Panoramica Funzionalità
+
+### Core Features
+- ✅ **Maturazione separata per tipo**: Ferie (giorni/mese), ROL (ore/mese), Permessi (ore/mese)
+- ✅ Configurazione ore giornaliere lavorative (default 8h, **configurabile dall'utente**)
+- ✅ **Data inizio tracciamento** invece di riporto anno precedente
+- ✅ **Saldo iniziale opzionale** per mese specifico (ferie in giorni, ROL/Permessi in ore)
+- ✅ Calendario annuale con festività italiane (fisse + mobili)
+- ✅ Festività custom utente (patrono, chiusure aziendali)
+- ✅ Inserimento ferie/ROL/permessi per giorno (**un solo tipo per giorno**)
+- ✅ **Validazione**: blocco inserimento in weekend e festività (nazionali + custom)
+- ✅ Ferie: ore automatiche da settings (no input manuale)
+- ✅ ROL/Permessi: ore inserite manualmente
+- ✅ Calcolo automatico Pasqua e Pasquetta (algoritmo Computus)
+- ✅ Proiezione ore residue mese per mese
+- ✅ Identificazione automatica "ponti"
+- ✅ **Vista riepilogo con totali aggregati**: ore + giorni per tipo + TOTALE disponibile
+
+### Decisioni Architetturali
+- **UniqueConstraint**: `(user_id, date)` - un solo tipo di assenza per giorno
+- **Festività custom**: tabella separata `UserHoliday` (flessibile per patrono + altre)
+- **Maturazione separata**: 3 campi distinti invece di unico `hours_per_month`
+- **Tracking start**: `tracking_start_date` (Date) invece di `carryover_year` (Integer)
+- **Saldo iniziale**: Ferie in **giorni**, ROL/Permessi in **ore**
+- **NO Malattia**: Rimosso completamente (non necessario per utenti privati)
+- **Shift domenica→lunedì**: rimandato a Fase 7
+
+---
+
+## 🗄️ 3.8.1 - Database Models
+
+### 3.8.1.1 - Crea model VacationSettings
+- [ ] 📝 Crea `backend/app/models/vacation_settings.py`
+
+```python
+"""
+VacationSettings model - User vacation configuration.
+
+NUOVA ARCHITETTURA:
+- Maturazione separata per tipo (Ferie in giorni/mese, ROL/Permessi in ore/mese)
+- Tracking start date invece di carryover year
+- Saldo iniziale opzionale per mese specifico
+"""
+from sqlalchemy import Column, Integer, Float, ForeignKey, Date
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+import uuid
+from datetime import date as date_type
+
+from app.database import Base
+from app.models.mixins import TimestampMixin
+
+
+class VacationSettings(Base, TimestampMixin):
+    """
+    User settings for vacation tracking.
+    
+    ARCHITETTURA:
+    - Maturazione separata per tipo (Ferie, ROL, Permessi)
+    - Tracking start: da quando l'utente inizia a maturare
+    - Saldo iniziale opzionale per gestire ore già maturate prima del tracking
+    
+    Attributes:
+        user_id: Owner of these settings (one per user)
+        work_hours_per_day: Hours in a work day (default 8, user configurable)
+        
+        ferie_days_per_month: Days of vacation accrued per month (default 1.83 = 22 days/year)
+        rol_hours_per_month: ROL hours accrued per month (default 2.67 = 32 hours/year)
+        permessi_hours_per_month: Permission hours accrued per month (default 8.67 = 104 hours/year)
+        
+        tracking_start_date: Date when tracking started (user employment/contract start)
+        
+        initial_balance_month: Optional month for initial balance (1-12)
+        initial_balance_year: Optional year for initial balance
+        initial_ferie_days: Initial vacation days (will be converted to hours internally)
+        initial_rol_hours: Initial ROL hours
+        initial_permessi_hours: Initial permission hours
+    """
+    __tablename__ = "vacation_settings"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        unique=True,  # One settings per user
+        nullable=False, 
+        index=True
+    )
+    
+    # Work configuration
+    work_hours_per_day = Column(Float, nullable=False, default=8.0)
+    
+    # Accrual rates (SEPARATE PER TYPE!)
+    ferie_days_per_month = Column(Float, nullable=False, default=1.83)     # ~22 days/year
+    rol_hours_per_month = Column(Float, nullable=False, default=2.67)      # ~32 hours/year
+    permessi_hours_per_month = Column(Float, nullable=False, default=8.67) # ~104 hours/year
+    
+    # Tracking start (when user started accruing)
+    tracking_start_date = Column(Date, nullable=False, default=date_type.today)
+    
+    # Optional: Initial balance for specific month (for migration from other systems)
+    initial_balance_month = Column(Integer, nullable=True)  # 1-12
+    initial_balance_year = Column(Integer, nullable=True)
+    initial_ferie_days = Column(Float, nullable=True, default=0.0)    # GIORNI (converted to hours internally)
+    initial_rol_hours = Column(Float, nullable=True, default=0.0)
+    initial_permessi_hours = Column(Float, nullable=True, default=0.0)
+    
+    # Relationships
+    user = relationship("User", back_populates="vacation_settings")
+    
+    def __repr__(self):
+        return (f"<VacationSettings(user_id={self.user_id}, "
+                f"ferie={self.ferie_days_per_month}d/m, "
+                f"rol={self.rol_hours_per_month}h/m, "
+                f"permessi={self.permessi_hours_per_month}h/m)>")
+```
+
+### 3.8.1.2 - Crea model VacationEntry
+- [ ] 📝 Crea `backend/app/models/vacation_entry.py`
+
+```python
+"""
+VacationEntry model - Individual vacation/leave entries.
+
+IMPORTANTE: Un solo tipo di assenza per giorno (UniqueConstraint su user_id + date).
+- Ferie: ore automatiche da work_hours_per_day (no input manuale)
+- ROL/Permessi: ore inserite manualmente dall'utente
+- MALATTIA: RIMOSSA (non necessaria per utenti privati)
+"""
+from sqlalchemy import Column, String, ForeignKey, Float, Date, Text, Enum, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+import uuid
+import enum
+
+from app.database import Base
+from app.models.mixins import TimestampMixin
+
+
+class VacationEntryType(str, enum.Enum):
+    """Types of vacation/leave entries."""
+    FERIE = "ferie"              # Regular vacation (hours automatic from settings)
+    PERMESSO = "permesso"        # Personal leave/permission (hours manual)
+    ROL = "rol"                  # Riduzione Orario Lavoro (hours manual)
+
+
+# Italian labels for entry types
+VACATION_ENTRY_TYPE_LABELS = {
+    "ferie": "Ferie",
+    "permesso": "Permesso",
+    "rol": "ROL (Riduzione Orario Lavoro)",
+}
+
+# Types that allow manual hour input (not ferie)
+MANUAL_HOURS_TYPES = ["permesso", "rol"]
+
+
+class VacationEntry(Base, TimestampMixin):
+    """
+    Individual vacation or leave entry.
+    
+    REGOLE:
+    - Un solo tipo per giorno (UniqueConstraint su user_id + date)
+    - Ferie: ore = work_hours_per_day da settings (automatico)
+    - ROL/Permessi: ore inserite manualmente
+    - NO weekend: validazione blocca inserimento
+    - NO festività: validazione blocca inserimento (nazionali + custom utente)
+    
+    Attributes:
+        user_id: Owner of this entry
+        date: Date of the entry
+        entry_type: Type of leave (ferie, permesso, rol)
+        hours: Number of hours (automatic for ferie, manual for others)
+        notes: Optional notes
+    """
+    __tablename__ = "vacation_entries"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, 
+        index=True
+    )
+    
+    date = Column(Date, nullable=False, index=True)
+    entry_type = Column(
+        Enum(VacationEntryType, name="vacation_entry_type"),
+        nullable=False,
+        default=VacationEntryType.FERIE
+    )
+    hours = Column(Float, nullable=False, default=8.0)
+    notes = Column(Text, nullable=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="vacation_entries")
+    
+    # IMPORTANTE: Un solo tipo per giorno!
+    __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='uq_user_date'),
+    )
+    
+    def __repr__(self):
+        return f"<VacationEntry(date={self.date}, type={self.entry_type}, hours={self.hours})>"
+```
+
+### 3.8.1.3 - Crea model ItalianHoliday
+- [ ] 📝 Crea `backend/app/models/italian_holiday.py`
+
+```python
+"""
+ItalianHoliday model - Italian public holidays.
+Pre-populated table with national holidays.
+"""
+from sqlalchemy import Column, String, Date, Boolean
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
+from app.database import Base
+
+
+class ItalianHoliday(Base):
+    """
+    Italian public holidays (national).
+    
+    This table is pre-populated with fixed holidays.
+    Mobile holidays (Easter Monday) are calculated and inserted dynamically.
+    
+    NOTE: Shift domenica→lunedì rimandato a Fase 7.
+    
+    Attributes:
+        date: Holiday date
+        name: Holiday name in Italian
+        name_en: Holiday name in English
+        is_fixed: True if same date every year (Dec 25), False for mobile (Pasquetta)
+        is_national: True if national holiday
+    """
+    __tablename__ = "italian_holidays"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    date = Column(Date, nullable=False, unique=True, index=True)
+    name = Column(String(100), nullable=False)
+    name_en = Column(String(100), nullable=True)
+    is_fixed = Column(Boolean, nullable=False, default=True)
+    is_national = Column(Boolean, nullable=False, default=True)
+    
+    def __repr__(self):
+        return f"<ItalianHoliday(date={self.date}, name={self.name})>"
+
+
+# Fixed Italian National Holidays: (month, day, name_it, name_en)
+FIXED_ITALIAN_HOLIDAYS = [
+    (1, 1, "Capodanno", "New Year's Day"),
+    (1, 6, "Epifania", "Epiphany"),
+    (4, 25, "Festa della Liberazione", "Liberation Day"),
+    (5, 1, "Festa dei Lavoratori", "Labour Day"),
+    (6, 2, "Festa della Repubblica", "Republic Day"),
+    (8, 15, "Ferragosto", "Assumption of Mary"),
+    (11, 1, "Tutti i Santi", "All Saints' Day"),
+    (12, 8, "Immacolata Concezione", "Immaculate Conception"),
+    (12, 25, "Natale", "Christmas Day"),
+    (12, 26, "Santo Stefano", "St. Stephen's Day"),
+]
+```
+
+### 3.8.1.4 - Crea model UserHoliday
+- [ ] 📝 Crea `backend/app/models/user_holiday.py`
+
+```python
+"""
+UserHoliday model - User custom holidays (patron saint, company closures, etc.).
+"""
+from sqlalchemy import Column, String, ForeignKey, Date, Boolean, Integer, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+import uuid
+import calendar
+
+from app.database import Base
+from app.models.mixins import TimestampMixin
+
+
+class UserHoliday(Base, TimestampMixin):
+    """
+    User-defined custom holidays.
+    
+    Use cases:
+    - Patron saint day (es. Sant'Ambrogio 7/12 Milano, San Giovanni 24/6 Torino)
+    - Company mandatory closures
+    - Other personal holidays
+    
+    Attributes:
+        user_id: Owner of this holiday
+        day: Day of month (1-31)
+        month: Month (1-12)
+        name: Holiday name
+        recurring: If True, repeats every year. If False, one-time only.
+        year: Only used if recurring=False (specific year)
+    """
+    __tablename__ = "user_holidays"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, 
+        index=True
+    )
+    
+    # Date components (allows recurring holidays)
+    day = Column(Integer, nullable=False)  # 1-31
+    month = Column(Integer, nullable=False)  # 1-12
+    name = Column(String(100), nullable=False)
+    
+    # Recurring = repeats every year (like patron saint)
+    # Non-recurring = specific year only
+    recurring = Column(Boolean, nullable=False, default=True)
+    year = Column(Integer, nullable=True)  # Only for non-recurring
+    
+    # Relationships
+    user = relationship("User", back_populates="user_holidays")
+    
+    # Unique: one holiday per user per day/month (for recurring)
+    # or per day/month/year (for non-recurring)
+    __table_args__ = (
+        UniqueConstraint('user_id', 'day', 'month', 'year', name='uq_user_holiday'),
+    )
+    
+    def __repr__(self):
+        return f"<UserHoliday(name={self.name}, {self.day}/{self.month}, recurring={self.recurring})>"
+    
+    def get_date_for_year(self, year: int):
+        """
+        Get the actual date for a specific year.
+        
+        Returns None if:
+        - Holiday is non-recurring and year doesn't match
+        - Date is invalid (e.g., Feb 30)
+        """
+        from datetime import date
+        
+        if not self.recurring and self.year and self.year != year:
+            return None
+        
+        try:
+            return date(year, self.month, self.day)
+        except ValueError:
+            # Invalid date (e.g., Feb 30)
+            return None
+    
+    def validate_date(self):
+        """Validate that day is valid for the given month."""
+        max_day = calendar.monthrange(2024, self.month)[1]  # Use leap year for validation
+        if self.day > max_day:
+            raise ValueError(f"Day {self.day} is invalid for month {self.month}")
+```
+
+### 3.8.1.5 - Update User Model
+- [ ] 📝 Modifica `backend/app/models/user.py` - aggiungi relationships
+
+```python
+# Add these lines to the User model relationships section:
+
+# Vacation relationships
+vacation_settings = relationship(
+    "VacationSettings", 
+    back_populates="user", 
+    uselist=False,  # One-to-one
+    cascade="all, delete-orphan"
+)
+vacation_entries = relationship(
+    "VacationEntry", 
+    back_populates="user", 
+    cascade="all, delete-orphan"
+)
+user_holidays = relationship(
+    "UserHoliday", 
+    back_populates="user", 
+    cascade="all, delete-orphan"
+)
+```
+
+### 3.8.1.6 - Update Models __init__.py
+- [ ] 📝 Modifica `backend/app/models/__init__.py`
+
+```python
+# Add these imports:
+from app.models.vacation_settings import VacationSettings
+from app.models.vacation_entry import VacationEntry, VacationEntryType, VACATION_ENTRY_TYPE_LABELS, MANUAL_HOURS_TYPES
+from app.models.italian_holiday import ItalianHoliday, FIXED_ITALIAN_HOLIDAYS
+from app.models.user_holiday import UserHoliday
+
+# Add to __all__ list:
+"VacationSettings",
+"VacationEntry",
+"VacationEntryType",
+"VACATION_ENTRY_TYPE_LABELS",
+"MANUAL_HOURS_TYPES",
+"ItalianHoliday",
+"FIXED_ITALIAN_HOLIDAYS",
+"UserHoliday",
+```
+
+### 3.8.1.7 - Generate Alembic Migration
+- [ ] Esegui: `alembic revision --autogenerate -m "Add vacation module tables with separate accrual rates"`
+- [ ] Verifica migration generata
+- [ ] **IMPORTANTE:** Se esiste già il modulo, creare migration per:
+  - Aggiungere nuove colonne (ferie_days_per_month, rol_hours_per_month, etc.)
+  - Migrare dati esistenti (hours_per_month → ferie_days_per_month)
+  - Rimuovere vecchie colonne (hours_per_month, carryover_hours, carryover_year)
+  - Rimuovere valore enum "malattia"
+- [ ] Esegui: `alembic upgrade head`
+
+### 3.8.1.8 - Commit models
+- [ ] Commit: `Add vacation module with separate accrual rates (Ferie/ROL/Permessi)`
+
+---
+
+## 🛠️ 3.8.2 - Utility Functions
+
+### 3.8.2.1 - Easter Calculator
+- [ ] 📝 Crea `backend/app/utils/easter.py`
+
+```python
+"""
+Easter date calculator using the Computus algorithm.
+Calculates Easter Sunday and Easter Monday (Pasquetta) for any year.
+"""
+from datetime import date, timedelta
+
+
+def calculate_easter_sunday(year: int) -> date:
+    """
+    Calculate Easter Sunday for a given year using the Anonymous Gregorian algorithm.
+    
+    This is the most widely used algorithm for calculating Easter,
+    valid for years 1583 and later (Gregorian calendar).
+    
+    Args:
+        year: The year to calculate Easter for (must be >= 1583)
+        
+    Returns:
+        date: Easter Sunday date
+        
+    Raises:
+        ValueError: If year < 1583
+    """
+    if year < 1583:
+        raise ValueError("Easter calculation only valid for years >= 1583 (Gregorian calendar)")
+    
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    
+    return date(year, month, day)
+
+
+def calculate_easter_monday(year: int) -> date:
+    """
+    Calculate Easter Monday (Pasquetta) for a given year.
+    
+    Easter Monday is the day after Easter Sunday.
+    
+    Args:
+        year: The year to calculate for
+        
+    Returns:
+        date: Easter Monday date
+    """
+    easter_sunday = calculate_easter_sunday(year)
+    return easter_sunday + timedelta(days=1)
+
+
+def get_easter_dates(year: int) -> dict:
+    """
+    Get both Easter Sunday and Monday for a year.
+    
+    Args:
+        year: The year to calculate for
+        
+    Returns:
+        dict with 'sunday' and 'monday' dates
+    """
+    sunday = calculate_easter_sunday(year)
+    return {
+        "sunday": sunday,
+        "monday": sunday + timedelta(days=1)
+    }
+```
+
+### 3.8.2.2 - Bridge Days Calculator
+- [ ] 📝 Crea `backend/app/utils/bridge_days.py`
+
+```python
+"""
+Bridge days (ponti) calculator for Italian holidays.
+Identifies opportunities to maximize days off with minimal vacation days.
+"""
+from datetime import date, timedelta
+from typing import List, Dict, Any, Set
+
+
+ITALIAN_WEEKDAYS = [
+    "Lunedì", "Martedì", "Mercoledì", "Giovedì", 
+    "Venerdì", "Sabato", "Domenica"
+]
+
+ITALIAN_MONTHS = {
+    1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile",
+    5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto",
+    9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
+}
+
+
+def get_italian_weekday(d: date) -> str:
+    """Get Italian weekday name."""
+    return ITALIAN_WEEKDAYS[d.weekday()]
+
+
+def is_weekend(d: date) -> bool:
+    """Check if date is Saturday (5) or Sunday (6)."""
+    return d.weekday() >= 5
+
+
+def find_bridge_opportunities(
+    holidays: List[Any], 
+    year: int,
+    user_holidays: List[Any] = None
+) -> List[Dict]:
+    """
+    Find bridge day opportunities for a given year.
+    
+    A "ponte" (bridge) is when a holiday falls on Tuesday or Thursday,
+    allowing to take Monday or Friday off to create a 4-day weekend.
+    
+    VALIDAZIONE: Verifica che il bridge_date non sia:
+    - Un weekend
+    - Già una festività (nazionale o utente)
+    
+    Args:
+        holidays: List of ItalianHoliday objects for the year
+        year: Year to analyze
+        user_holidays: Optional list of UserHoliday objects
+        
+    Returns:
+        List of bridge opportunities sorted by efficiency
+    """
+    opportunities = []
+    
+    # Build set of all holiday dates for quick lookup
+    holiday_dates: Set[date] = set()
+    for holiday in holidays:
+        if holiday.date.year == year:
+            holiday_dates.add(holiday.date)
+    
+    # Add user holidays to the set
+    if user_holidays:
+        for uh in user_holidays:
+            uh_date = uh.get_date_for_year(year)
+            if uh_date:
+                holiday_dates.add(uh_date)
+    
+    for holiday in holidays:
+        if holiday.date.year != year:
+            continue
+        
+        weekday = holiday.date.weekday()
+        
+        # Tuesday holiday (weekday=1): Monday is a bridge → 4 days off with 1 day
+        if weekday == 1:
+            bridge_date = holiday.date - timedelta(days=1)
+            # Skip if bridge is weekend or already a holiday
+            if not is_weekend(bridge_date) and bridge_date not in holiday_dates:
+                opportunities.append({
+                    "holiday_name": holiday.name,
+                    "holiday_date": holiday.date.isoformat(),
+                    "holiday_weekday": "Martedì",
+                    "bridge_date": bridge_date.isoformat(),
+                    "bridge_weekday": "Lunedì",
+                    "vacation_days_needed": 1,
+                    "total_days_off": 4,  # Sat + Sun + Mon + Tue
+                    "efficiency": 4.0,
+                    "description": f"Ponte {holiday.name}: prendi Lunedì {bridge_date.strftime('%d/%m')}"
+                })
+        
+        # Thursday holiday (weekday=3): Friday is a bridge → 4 days off with 1 day
+        elif weekday == 3:
+            bridge_date = holiday.date + timedelta(days=1)
+            # Skip if bridge is weekend or already a holiday
+            if not is_weekend(bridge_date) and bridge_date not in holiday_dates:
+                opportunities.append({
+                    "holiday_name": holiday.name,
+                    "holiday_date": holiday.date.isoformat(),
+                    "holiday_weekday": "Giovedì",
+                    "bridge_date": bridge_date.isoformat(),
+                    "bridge_weekday": "Venerdì",
+                    "vacation_days_needed": 1,
+                    "total_days_off": 4,  # Thu + Fri + Sat + Sun
+                    "efficiency": 4.0,
+                    "description": f"Ponte {holiday.name}: prendi Venerdì {bridge_date.strftime('%d/%m')}"
+                })
+        
+        # Wednesday holiday (weekday=2): can bridge both sides → 5 days off with 2 days
+        elif weekday == 2:
+            mon = holiday.date - timedelta(days=2)
+            tue = holiday.date - timedelta(days=1)
+            thu = holiday.date + timedelta(days=1)
+            fri = holiday.date + timedelta(days=2)
+            
+            # Check which side is available
+            mon_tue_available = (
+                not is_weekend(mon) and mon not in holiday_dates and
+                not is_weekend(tue) and tue not in holiday_dates
+            )
+            thu_fri_available = (
+                not is_weekend(thu) and thu not in holiday_dates and
+                not is_weekend(fri) and fri not in holiday_dates
+            )
+            
+            # Create separate opportunities for each side
+            if mon_tue_available:
+                opportunities.append({
+                    "holiday_name": holiday.name,
+                    "holiday_date": holiday.date.isoformat(),
+                    "holiday_weekday": "Mercoledì",
+                    "bridge_date": mon.isoformat(),
+                    "bridge_weekday": "Lunedì + Martedì",
+                    "vacation_days_needed": 2,
+                    "total_days_off": 5,
+                    "efficiency": 2.5,
+                    "description": f"Ponte prima di {holiday.name}: prendi Lunedì e Martedì per 5 giorni di riposo"
+                })
+            
+            if thu_fri_available:
+                opportunities.append({
+                    "holiday_name": holiday.name,
+                    "holiday_date": holiday.date.isoformat(),
+                    "holiday_weekday": "Mercoledì",
+                    "bridge_date": thu.isoformat(),
+                    "bridge_weekday": "Giovedì + Venerdì",
+                    "vacation_days_needed": 2,
+                    "total_days_off": 5,
+                    "efficiency": 2.5,
+                    "description": f"Ponte dopo {holiday.name}: prendi Giovedì e Venerdì per 5 giorni di riposo"
+                })
+    
+    # Sort by efficiency (best opportunities first)
+    opportunities.sort(key=lambda x: (-x["efficiency"], x["holiday_date"]))
+    
+    return opportunities
+```
+
+### 3.8.2.3 - Vacation Balance Calculator (RISCRITTA COMPLETAMENTE)
+- [ ] 📝 Crea `backend/app/utils/vacation_balance.py`
+
+```python
+"""
+Vacation balance calculator with separate tracking per type.
+
+NUOVA ARCHITETTURA:
+- Maturazione separata: Ferie (giorni/mese), ROL (ore/mese), Permessi (ore/mese)
+- Tracking start date invece di carryover year
+- Saldo iniziale opzionale (ferie in giorni, ROL/Permessi in ore)
+- Calcolo totali aggregati per vista dashboard
+
+Vista riepilogo:
+- Ferie:    maturate Xh / usate Yh / disponibili Zh = Zd
+- ROL:      maturate Xh / usate Yh / disponibili Zh = Zd
+- Permessi: maturate Xh / usate Yh / disponibili Zh = Zd
+- TOTALE:   disponibili Xh = Yd (somma di tutto)
+"""
+from datetime import date
+from typing import Dict, List, Any, Optional
+import calendar
+
+
+def calculate_months_between(start_date: date, end_date: date) -> int:
+    """
+    Calculate the number of complete months between two dates.
+    
+    Examples:
+        2025-03-01 to 2026-02-05 = 11 months
+        2025-03-15 to 2026-02-05 = 10 months (March not complete)
+    """
+    months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+    
+    # If we haven't reached the same day in the end month, subtract 1
+    if end_date.day < start_date.day:
+        months -= 1
+    
+    return max(0, months)
+
+
+def calculate_type_balance(
+    type_name: str,
+    accrual_per_month: float,
+    months_worked: int,
+    initial_hours: float,
+    entries: List[Any],
+    work_hours_per_day: float,
+    type_label: str
+) -> Dict:
+    """
+    Calculate balance for a single type (Ferie, ROL, or Permessi).
+    
+    Args:
+        type_name: "ferie", "rol", or "permesso"
+        accrual_per_month: Hours accrued per month (already converted to hours)
+        months_worked: Number of months worked since tracking started
+        initial_hours: Initial balance in hours
+        entries: List of VacationEntry objects for this type
+        work_hours_per_day: Hours per work day (for conversion to days)
+        type_label: Italian label for display
+        
+    Returns:
+        Dict with hours and days (accrued, used, available)
+    """
+    # Accrued
+    hours_accrued = initial_hours + (accrual_per_month * months_worked)
+    
+    # Used
+    hours_used = sum(e.hours for e in entries)
+    
+    # Available
+    hours_available = hours_accrued - hours_used
+    
+    # Convert to days
+    days_accrued = hours_accrued / work_hours_per_day
+    days_used = hours_used / work_hours_per_day
+    days_available = hours_available / work_hours_per_day
+    
+    return {
+        "type": type_name,
+        "label": type_label,
+        "hours_accrued": round(hours_accrued, 1),
+        "hours_used": round(hours_used, 1),
+        "hours_available": round(hours_available, 1),
+        "days_accrued": round(days_accrued, 1),
+        "days_used": round(days_used, 1),
+        "days_available": round(days_available, 1)
+    }
+
+
+def calculate_balance(
+    settings: Any,
+    entries: List[Any],
+    year: int,
+    month: Optional[int] = None
+) -> Dict:
+    """
+    Calculate vacation balance for a user with SEPARATE TRACKING per type.
+    
+    NUOVA LOGICA:
+    1. Calcola mesi lavorati da tracking_start_date
+    2. Per ogni tipo (Ferie, ROL, Permessi):
+       - Maturato = initial_hours + (accrual_per_month × months_worked)
+       - Usato = somma ore entries di quel tipo
+       - Disponibile = Maturato - Usato
+    3. Totali aggregati per dashboard
+    
+    Args:
+        settings: VacationSettings object
+        entries: List of VacationEntry objects
+        year: Year to calculate
+        month: Optional month (1-12). If None, calculates up to end of year or current month.
+        
+    Returns:
+        Dict with complete balance information including:
+        - breakdown: List per tipo con ore+giorni (maturate, usate, disponibili)
+        - total_hours_available: Somma ore disponibili (tutti i tipi)
+        - total_days_available: Somma giorni disponibili (tutti i tipi)
+        - tracking_start_date: Data inizio tracciamento
+        - months_worked: Mesi lavorati da tracking_start_date
+    """
+    today = date.today()
+    current_year = today.year
+    current_month = today.month
+    
+    # Determine calculation period
+    if month:
+        target_month = month
+    else:
+        target_month = 12 if year < current_year else current_month
+    
+    # Calculate target date (last day of target month)
+    _, last_day = calendar.monthrange(year, target_month)
+    target_date = date(year, target_month, last_day)
+    
+    # Calculate months worked from tracking start
+    months_worked = calculate_months_between(settings.tracking_start_date, target_date)
+    
+    # Separate entries by type
+    entries_by_type = {
+        "ferie": [e for e in entries if e.date.year == year and e.date.month <= target_month and e.entry_type.value == "ferie"],
+        "rol": [e for e in entries if e.date.year == year and e.date.month <= target_month and e.entry_type.value == "rol"],
+        "permesso": [e for e in entries if e.date.year == year and e.date.month <= target_month and e.entry_type.value == "permesso"],
+    }
+    
+    # Get work hours per day
+    hours_per_day = settings.work_hours_per_day or 8.0
+    
+    # === CALCULATE FERIE ===
+    # Convert initial_ferie_DAYS to hours
+    initial_ferie_hours = (settings.initial_ferie_days or 0.0) * hours_per_day
+    # Convert ferie_DAYS_per_month to hours_per_month
+    ferie_accrual_per_month = settings.ferie_days_per_month * hours_per_day
+    
+    ferie_data = calculate_type_balance(
+        type_name="ferie",
+        accrual_per_month=ferie_accrual_per_month,
+        months_worked=months_worked,
+        initial_hours=initial_ferie_hours,
+        entries=entries_by_type["ferie"],
+        work_hours_per_day=hours_per_day,
+        type_label="Ferie"
+    )
+    
+    # === CALCULATE ROL ===
+    rol_data = calculate_type_balance(
+        type_name="rol",
+        accrual_per_month=settings.rol_hours_per_month,
+        months_worked=months_worked,
+        initial_hours=settings.initial_rol_hours or 0.0,
+        entries=entries_by_type["rol"],
+        work_hours_per_day=hours_per_day,
+        type_label="ROL"
+    )
+    
+    # === CALCULATE PERMESSI ===
+    permessi_data = calculate_type_balance(
+        type_name="permesso",
+        accrual_per_month=settings.permessi_hours_per_month,
+        months_worked=months_worked,
+        initial_hours=settings.initial_permessi_hours or 0.0,
+        entries=entries_by_type["permesso"],
+        work_hours_per_day=hours_per_day,
+        type_label="Permessi"
+    )
+    
+    # === BUILD BREAKDOWN ===
+    breakdown = [ferie_data, rol_data, permessi_data]
+    
+    # === AGGREGATE TOTALS ===
+    total_hours_accrued = sum(b["hours_accrued"] for b in breakdown)
+    total_hours_used = sum(b["hours_used"] for b in breakdown)
+    total_hours_available = sum(b["hours_available"] for b in breakdown)
+    total_days_available = sum(b["days_available"] for b in breakdown)
+    
+    # === PROJECTED END OF YEAR ===
+    months_remaining = 12 - target_month if year == current_year else 0
+    ferie_projected = ferie_data["hours_available"] + (ferie_accrual_per_month * months_remaining)
+    rol_projected = rol_data["hours_available"] + (settings.rol_hours_per_month * months_remaining)
+    permessi_projected = permessi_data["hours_available"] + (settings.permessi_hours_per_month * months_remaining)
+    hours_projected_eoy = ferie_projected + rol_projected + permessi_projected
+    days_projected_eoy = hours_projected_eoy / hours_per_day
+    
+    return {
+        "year": year,
+        "month": target_month,
+        
+        # Tracking info
+        "tracking_start_date": settings.tracking_start_date,
+        "months_worked": months_worked,
+        
+        # Totals (aggregated across all types)
+        "total_hours_accrued": round(total_hours_accrued, 1),
+        "total_hours_used": round(total_hours_used, 1),
+        "total_hours_available": round(total_hours_available, 1),
+        "total_days_available": round(total_days_available, 1),
+        
+        # Projected end of year
+        "hours_projected_eoy": round(hours_projected_eoy, 1),
+        "days_projected_eoy": round(days_projected_eoy, 1),
+        
+        # Breakdown per type
+        "breakdown": breakdown,
+        
+        # Settings reference
+        "settings": {
+            "work_hours_per_day": hours_per_day,
+            "ferie_days_per_month": settings.ferie_days_per_month,
+            "rol_hours_per_month": settings.rol_hours_per_month,
+            "permessi_hours_per_month": settings.permessi_hours_per_month
+        }
+    }
+
+
+def calculate_monthly_projection(
+    settings: Any,
+    entries: List[Any],
+    year: int,
+    num_months: int = 12
+) -> List[Dict]:
+    """
+    Calculate month-by-month projection for a year.
+    
+    Shows cumulative accrued, used, and available hours for each month.
+    
+    Args:
+        settings: VacationSettings object
+        entries: List of VacationEntry objects for the year
+        year: Year to project
+        num_months: Number of months to project (default 12)
+        
+    Returns:
+        List of monthly projections
+    """
+    projections = []
+    
+    # Group entries by month (exclude malattia - already removed from enum)
+    entries_by_month = {}
+    for entry in entries:
+        if entry.date.year == year:
+            m = entry.date.month
+            entries_by_month.setdefault(m, 0.0)
+            entries_by_month[m] += entry.hours
+    
+    # Calculate cumulative balance
+    hours_per_day = settings.work_hours_per_day or 8.0
+    
+    # Initial balance (convert ferie days to hours)
+    initial_ferie_hours = (settings.initial_ferie_days or 0.0) * hours_per_day
+    initial_total = initial_ferie_hours + (settings.initial_rol_hours or 0.0) + (settings.initial_permessi_hours or 0.0)
+    
+    # Monthly accrual (convert ferie days to hours)
+    ferie_accrual_per_month = settings.ferie_days_per_month * hours_per_day
+    monthly_accrual = ferie_accrual_per_month + settings.rol_hours_per_month + settings.permessi_hours_per_month
+    
+    cumulative_accrued = initial_total
+    cumulative_used = 0.0
+    
+    for month in range(1, num_months + 1):
+        cumulative_accrued += monthly_accrual
+        cumulative_used += entries_by_month.get(month, 0.0)
+        balance = cumulative_accrued - cumulative_used
+        
+        projections.append({
+            "month": month,
+            "month_name": ITALIAN_MONTHS[month],
+            "hours_accrued_cumulative": round(cumulative_accrued, 1),
+            "hours_used_cumulative": round(cumulative_used, 1),
+            "hours_available": round(balance, 1),
+            "days_available": round(balance / hours_per_day, 1)
+        })
+    
+    return projections
+
+
+# Month names
+ITALIAN_MONTHS = {
+    1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile",
+    5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto",
+    9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
+}
+```
+
+### 3.8.2.4 - Export utils in __init__
+- [ ] 📝 Crea/Modifica `backend/app/utils/__init__.py`
+
+```python
+# Add these exports:
+from app.utils.easter import calculate_easter_sunday, calculate_easter_monday, get_easter_dates
+from app.utils.bridge_days import (
+    find_bridge_opportunities, 
+    get_italian_weekday, 
+    is_weekend, 
+    ITALIAN_WEEKDAYS,
+    ITALIAN_MONTHS
+)
+from app.utils.vacation_balance import calculate_balance, calculate_monthly_projection
+```
+
+### 3.8.2.5 - Commit utilities
+- [ ] Commit: `Add vacation utilities with separate accrual calculation`
+
+---
+
+## 📝 3.8.3 - Pydantic Schemas
+
+Continua nel prossimo messaggio...
+
+## 📝 3.8.3 - Pydantic Schemas (AGGIORNATI)
+
+### 3.8.3.1 - Crea vacation schemas
+- [ ] 📝 Crea `backend/app/schemas/vacation.py`
+
+**MODIFICHE PRINCIPALI:**
+- VacationSettingsBase: nuovi campi per maturazione separata
+- BreakdownItem: aggiungere hours_available, days_available (rimuovere note)
+- VacationBalanceResponse: aggiungere totali aggregati, rimuovere carryover
+- Rimuovere riferimenti a "malattia"
+
+```python
+"""
+Vacation-related Pydantic schemas for request/response validation.
+
+UPDATED: Separate accrual rates, tracking start date, aggregated totals
+"""
+from datetime import date as date_type, datetime
+from typing import Optional, List, Dict, Any
+from uuid import UUID
+from pydantic import BaseModel, Field, field_validator
+
+from app.models.vacation_entry import VacationEntryType, MANUAL_HOURS_TYPES
+
+
+# ==================== VACATION SETTINGS ====================
+
+class VacationSettingsBase(BaseModel):
+    """Base schema for vacation settings with separate accrual rates."""
+    work_hours_per_day: float = Field(default=8.0, ge=1, le=24)
+    
+    # Accrual rates (separate per type!)
+    ferie_days_per_month: float = Field(default=1.83, ge=0, le=10, 
+        description="Days of vacation accrued per month (default 1.83 = 22 days/year)")
+    rol_hours_per_month: float = Field(default=2.67, ge=0, le=200,
+        description="ROL hours accrued per month (default 2.67 = 32 hours/year)")
+    permessi_hours_per_month: float = Field(default=8.67, ge=0, le=200,
+        description="Permission hours accrued per month (default 8.67 = 104 hours/year)")
+    
+    # Tracking start
+    tracking_start_date: date_type = Field(description="Date when tracking started")
+    
+    # Initial balance (optional)
+    initial_balance_month: Optional[int] = Field(None, ge=1, le=12)
+    initial_balance_year: Optional[int] = Field(None, ge=2000, le=2100)
+    initial_ferie_days: float = Field(default=0.0, ge=0, description="Initial vacation DAYS")
+    initial_rol_hours: float = Field(default=0.0, ge=0, description="Initial ROL hours")
+    initial_permessi_hours: float = Field(default=0.0, ge=0, description="Initial permission hours")
+    
+    @field_validator('tracking_start_date')
+    @classmethod
+    def tracking_start_not_future(cls, v):
+        if v > date_type.today():
+            raise ValueError('Tracking start date cannot be in the future')
+        return v
+    
+    @field_validator('initial_balance_year')
+    @classmethod
+    def initial_balance_before_tracking(cls, v, info):
+        if v and 'initial_balance_month' in info.data and 'tracking_start_date' in info.data:
+            balance_month = info.data.get('initial_balance_month')
+            tracking_start = info.data.get('tracking_start_date')
+            if balance_month:
+                balance_date = date_type(v, balance_month, 1)
+                if balance_date > tracking_start:
+                    raise ValueError('Initial balance date must be before or equal to tracking start date')
+        return v
+
+
+class VacationSettingsCreate(VacationSettingsBase):
+    """Schema for creating vacation settings."""
+    pass
+
+
+class VacationSettingsUpdate(BaseModel):
+    """Schema for updating vacation settings (all fields optional)."""
+    work_hours_per_day: Optional[float] = Field(None, ge=1, le=24)
+    ferie_days_per_month: Optional[float] = Field(None, ge=0, le=10)
+    rol_hours_per_month: Optional[float] = Field(None, ge=0, le=200)
+    permessi_hours_per_month: Optional[float] = Field(None, ge=0, le=200)
+    tracking_start_date: Optional[date_type] = None
+    initial_balance_month: Optional[int] = Field(None, ge=1, le=12)
+    initial_balance_year: Optional[int] = Field(None, ge=2000, le=2100)
+    initial_ferie_days: Optional[float] = Field(None, ge=0)
+    initial_rol_hours: Optional[float] = Field(None, ge=0)
+    initial_permessi_hours: Optional[float] = Field(None, ge=0)
+
+
+class VacationSettingsResponse(VacationSettingsBase):
+    """Schema for vacation settings response."""
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ==================== VACATION ENTRY ====================
+
+class VacationEntryBase(BaseModel):
+    """Base schema for vacation entry."""
+    date: date_type = Field(..., description="Date of the entry")
+    entry_type: VacationEntryType = Field(
+        default=VacationEntryType.FERIE, 
+        description="Type: ferie, permesso, rol"
+    )
+    hours: Optional[float] = Field(
+        None, 
+        gt=0, 
+        le=24, 
+        description="Hours (required for ROL/permesso, automatic for ferie)"
+    )
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class VacationEntryCreate(VacationEntryBase):
+    """
+    Schema for creating vacation entry.
+    
+    REGOLE:
+    - Ferie: ore automatiche da work_hours_per_day (hours ignorato)
+    - ROL/Permesso: hours obbligatorio
+    """
+    
+    @field_validator('hours')
+    @classmethod
+    def validate_hours_for_type(cls, v, info):
+        entry_type = info.data.get('entry_type', VacationEntryType.FERIE)
+        
+        # For manual types, hours is required
+        if entry_type.value in MANUAL_HOURS_TYPES and v is None:
+            raise ValueError(f'Hours is required for {entry_type.value}')
+        
+        return v
+
+
+class VacationEntryUpdate(BaseModel):
+    """Schema for updating vacation entry (all fields optional)."""
+    entry_type: Optional[VacationEntryType] = None
+    hours: Optional[float] = Field(None, gt=0, le=24)
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class VacationEntryResponse(VacationEntryBase):
+    """Schema for vacation entry response."""
+    id: UUID
+    user_id: UUID
+    hours: float  # Always present in response
+    created_at: datetime
+    updated_at: datetime
+    day_name: Optional[str] = None
+    type_label: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class VacationEntryBulkCreate(BaseModel):
+    """Schema for creating multiple entries (e.g., a week of vacation)."""
+    start_date: date_type
+    end_date: date_type
+    entry_type: VacationEntryType = VacationEntryType.FERIE
+    hours_per_day: Optional[float] = Field(None, gt=0, le=24,
+        description="Hours per day (required for ROL/permesso, optional for ferie)")
+    skip_weekends: bool = Field(default=True)
+    skip_holidays: bool = Field(default=True)
+    notes: Optional[str] = Field(None, max_length=500)
+    
+    @field_validator('end_date')
+    @classmethod
+    def end_after_start(cls, v, info):
+        if 'start_date' in info.data and v < info.data['start_date']:
+            raise ValueError('end_date must be >= start_date')
+        return v
+
+
+# ==================== USER HOLIDAY ====================
+
+class UserHolidayBase(BaseModel):
+    """Base schema for user custom holiday."""
+    day: int = Field(..., ge=1, le=31)
+    month: int = Field(..., ge=1, le=12)
+    name: str = Field(..., min_length=1, max_length=100)
+    recurring: bool = Field(default=True)
+    year: Optional[int] = Field(None, ge=2000, le=2100)
+
+
+class UserHolidayCreate(UserHolidayBase):
+    """Schema for creating user holiday."""
+    
+    @field_validator('year')
+    @classmethod
+    def year_required_if_not_recurring(cls, v, info):
+        recurring = info.data.get('recurring', True)
+        if not recurring and v is None:
+            raise ValueError('year is required for non-recurring holidays')
+        return v
+    
+    @field_validator('day')
+    @classmethod
+    def validate_day_for_month(cls, v, info):
+        """Validate that day is valid for the given month."""
+        month = info.data.get('month')
+        if month:
+            import calendar
+            max_day = calendar.monthrange(2024, month)[1]  # Use leap year
+            if v > max_day:
+                raise ValueError(f'Day {v} is invalid for month {month}')
+        return v
+
+
+class UserHolidayResponse(UserHolidayBase):
+    """Schema for user holiday response."""
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ==================== ITALIAN HOLIDAY ====================
+
+class ItalianHolidayResponse(BaseModel):
+    """Schema for Italian holiday response."""
+    id: UUID
+    date: date_type
+    name: str
+    name_en: Optional[str] = None
+    is_fixed: bool
+    is_national: bool
+    day_name: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ==================== VACATION BALANCE (AGGIORNATO) ====================
+
+class BreakdownItem(BaseModel):
+    """Schema for balance breakdown by type WITH available hours."""
+    type: str
+    label: str
+    hours_accrued: float
+    hours_used: float
+    hours_available: float  # NEW!
+    days_accrued: float     # NEW!
+    days_used: float
+    days_available: float   # NEW!
+
+
+class VacationBalanceResponse(BaseModel):
+    """
+    Schema for complete vacation balance with AGGREGATED TOTALS.
+    
+    NEW: Shows breakdown per type AND total available across all types
+    """
+    year: int
+    month: int
+    
+    # Tracking info
+    tracking_start_date: date_type
+    months_worked: int
+    
+    # AGGREGATED TOTALS (across all types)
+    total_hours_accrued: float
+    total_hours_used: float
+    total_hours_available: float
+    total_days_available: float
+    
+    # Projected end of year
+    hours_projected_eoy: float
+    days_projected_eoy: float
+    
+    # Breakdown by type (Ferie, ROL, Permessi)
+    breakdown: List[BreakdownItem]
+    
+    # Settings reference
+    settings: Dict[str, float]
+
+
+class MonthlyProjection(BaseModel):
+    """Schema for monthly projection."""
+    month: int
+    month_name: str
+    hours_accrued_cumulative: float
+    hours_used_cumulative: float
+    hours_available: float
+    days_available: float
+
+
+class VacationProjectionResponse(BaseModel):
+    """Schema for full year projection."""
+    year: int
+    projections: List[MonthlyProjection]
+
+
+# ==================== CALENDAR ====================
+
+class CalendarDayResponse(BaseModel):
+    """Schema for a single day in calendar view."""
+    date: date_type
+    day_number: int
+    day_name: str
+    is_weekend: bool
+    is_today: bool
+    is_holiday: bool
+    holiday_name: Optional[str] = None
+    is_user_holiday: bool = False
+    user_holiday_name: Optional[str] = None
+    is_bridge_opportunity: bool = False
+    entries: List[VacationEntryResponse] = []
+    total_hours: float = 0.0
+
+
+class CalendarMonthResponse(BaseModel):
+    """Schema for monthly calendar view."""
+    year: int
+    month: int
+    month_name: str
+    days: List[CalendarDayResponse]
+    hours_accrued_this_month: float
+    hours_used_this_month: float
+    hours_available_end_of_month: float
+    days_available_end_of_month: float
+
+
+# ==================== BRIDGE OPPORTUNITIES ====================
+
+class BridgeOpportunityResponse(BaseModel):
+    """Schema for bridge day opportunity."""
+    holiday_name: str
+    holiday_date: str
+    holiday_weekday: str
+    bridge_date: Optional[str]
+    bridge_weekday: str
+    vacation_days_needed: int
+    total_days_off: int
+    efficiency: float
+    description: str
+```
+
+### 3.8.3.2 - Update Schemas __init__.py
+- [ ] 📝 Modifica `backend/app/schemas/__init__.py`
+
+```python
+# Add these imports (same as before, schemas are backward compatible):
+from app.schemas.vacation import (
+    VacationSettingsBase,
+    VacationSettingsCreate,
+    VacationSettingsUpdate,
+    VacationSettingsResponse,
+    VacationEntryBase,
+    VacationEntryCreate,
+    VacationEntryUpdate,
+    VacationEntryResponse,
+    VacationEntryBulkCreate,
+    UserHolidayBase,
+    UserHolidayCreate,
+    UserHolidayResponse,
+    ItalianHolidayResponse,
+    BreakdownItem,
+    VacationBalanceResponse,
+    VacationProjectionResponse,
+    CalendarDayResponse,
+    CalendarMonthResponse,
+    BridgeOpportunityResponse,
+)
+```
+
+### 3.8.3.3 - Commit schemas
+- [ ] Commit: `Update vacation schemas with separate accrual and aggregated totals`
+
+---
+
+## 🔧 3.8.4 - CRUD Operations (AGGIORNAMENTI)
+
+Vedi documento originale per struttura base. **MODIFICHE PRINCIPALI:**
+
+### 3.8.4.2 - Vacation Entry CRUD - AGGIUNGERE VALIDAZIONI
+
+Nel file `backend/app/crud/vacation_entry.py`, funzione `create()`:
+
+```python
+def create(db: Session, user_id: UUID, entry: VacationEntryCreate) -> VacationEntry:
+    """
+    Create a new vacation entry.
+    
+    NUOVE VALIDAZIONI:
+    - Non permette inserimento nei weekend
+    - Non permette inserimento nelle festività nazionali
+    - Non permette inserimento nelle festività custom utente
+    """
+    from app.utils.bridge_days import is_weekend
+    from app.crud import italian_holiday as italian_holiday_crud
+    from app.crud import user_holiday as user_holiday_crud
+    
+    # Check weekend
+    if is_weekend(entry.date):
+        raise ValueError("Non è possibile inserire ferie nel weekend")
+    
+    # Check Italian national holidays
+    holiday = italian_holiday_crud.get_by_date(db, entry.date)
+    if holiday:
+        raise ValueError(f"Non è possibile inserire ferie durante: {holiday.name}")
+    
+    # Check user custom holidays
+    year = entry.date.year
+    user_holidays = user_holiday_crud.get_for_year(db, user_id, year)
+    for uh in user_holidays:
+        uh_date = uh.get_date_for_year(year)
+        if uh_date == entry.date:
+            raise ValueError(f"Non è possibile inserire ferie durante: {uh.name}")
+    
+    # Determine hours (rest of logic remains the same)
+    if entry.entry_type.value in MANUAL_HOURS_TYPES:
+        hours = entry.hours
+    else:
+        settings = get_settings(db, user_id)
+        hours = settings.work_hours_per_day
+    
+    db_entry = VacationEntry(
+        user_id=user_id,
+        date=entry.date,
+        entry_type=entry.entry_type,
+        hours=hours,
+        notes=entry.notes
+    )
+    db.add(db_entry)
+    db.commit()
+    db.refresh(db_entry)
+    return db_entry
+```
+
+**NOTA:** CRUD per settings, italian_holiday, user_holiday rimangono invariati (già corretti nel documento originale)
+
+---
+
+## 🌐 3.8.5 - API Router (AGGIORNAMENTI CRITICI)
+
+Vedi documento originale per struttura base. **MODIFICHE PRINCIPALI:**
+
+### Endpoint `/entries/bulk` - FIX VALIDAZIONE
+
+```python
+@router.post("/entries/bulk", response_model=List[VacationEntryResponse], status_code=status.HTTP_201_CREATED)
+async def create_bulk_entries(
+    bulk: VacationEntryBulkCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create multiple entries for a date range (e.g., a week of vacation)."""
+    
+    # FIX: Validare hours_per_day PRIMA di qualsiasi elaborazione
+    if bulk.entry_type.value in MANUAL_HOURS_TYPES:
+        if bulk.hours_per_day is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"hours_per_day è obbligatorio per {bulk.entry_type.value}"
+            )
+        hours = bulk.hours_per_day
+    else:
+        # Ferie: usa settings o hours_per_day se specificato
+        settings = vacation_settings_crud.get_or_create(db, current_user.id)
+        hours = bulk.hours_per_day if bulk.hours_per_day else settings.work_hours_per_day
+    
+    # Build set di tutte le festività (nazionali + utente)
+    all_holiday_dates = set()
+    
+    if bulk.skip_holidays:
+        # Get year from date range
+        year = bulk.start_date.year
+        
+        # Festività nazionali
+        holidays = italian_holiday_crud.ensure_holidays_exist(db, year)
+        for h in holidays:
+            all_holiday_dates.add(h.date)
+        
+        # Festività utente
+        user_holidays = user_holiday_crud.get_for_year(db, current_user.id, year)
+        for uh in user_holidays:
+            uh_date = uh.get_date_for_year(year)
+            if uh_date:
+                all_holiday_dates.add(uh_date)
+    
+    # Create entries
+    entries_data = []
+    current_date = bulk.start_date
+    
+    while current_date <= bulk.end_date:
+        # Skip weekends
+        if bulk.skip_weekends and is_weekend(current_date):
+            current_date += timedelta(days=1)
+            continue
+        
+        # Skip holidays (nazionali + utente)
+        if current_date in all_holiday_dates:
+            current_date += timedelta(days=1)
+            continue
+        
+        # Check if entry already exists
+        existing = vacation_entry_crud.get_by_date(db, current_user.id, current_date)
+        if existing:
+            current_date += timedelta(days=1)
+            continue
+        
+        entries_data.append({
+            "date": current_date,
+            "entry_type": bulk.entry_type,
+            "hours": hours,
+            "notes": bulk.notes
+        })
+        
+        current_date += timedelta(days=1)
+    
+    if not entries_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nessuna data valida nel range (tutte saltate o già presenti)"
+        )
+    
+    # Bulk create
+    entries = vacation_entry_crud.create_bulk(db, current_user.id, entries_data)
+    
+    # Build response
+    result = []
+    for entry in entries:
+        resp = VacationEntryResponse.model_validate(entry)
+        resp.day_name = get_italian_weekday(entry.date)
+        resp.type_label = VACATION_ENTRY_TYPE_LABELS.get(entry.entry_type.value)
+        result.append(resp)
+    
+    return result
+```
+
+### Endpoint `/calendar/{year}/{month}` - OTTIMIZZAZIONE
+
+```python
+@router.get("/calendar/{year}/{month}", response_model=CalendarMonthResponse)
+async def get_calendar_month(
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get calendar view for a specific month."""
+    
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Month must be 1-12")
+    
+    # Get holidays
+    holidays = italian_holiday_crud.ensure_holidays_exist(db, year)
+    holidays_by_date = {h.date: h for h in holidays}
+    
+    # Get user custom holidays
+    user_holidays = user_holiday_crud.get_for_year(db, current_user.id, year)
+    user_holidays_by_date = {}
+    for uh in user_holidays:
+        uh_date = uh.get_date_for_year(year)
+        if uh_date:
+            user_holidays_by_date[uh_date] = uh
+    
+    # Get bridge opportunities
+    bridges = find_bridge_opportunities(holidays, year, user_holidays)
+    bridge_dates = set()
+    for b in bridges:
+        if b["bridge_date"]:
+            bridge_dates.add(date.fromisoformat(b["bridge_date"]))
+    
+    # OTTIMIZZAZIONE: Una sola query per tutto l'anno
+    all_entries = vacation_entry_crud.get_by_year(db, current_user.id, year)
+    
+    # Filtra per il mese corrente
+    month_entries = [e for e in all_entries if e.date.month == month]
+    entries_by_date = {e.date: e for e in month_entries}
+    
+    # Build calendar days
+    from calendar import monthrange
+    _, num_days = monthrange(year, month)
+    today = date.today()
+    
+    days = []
+    hours_used_this_month = 0.0
+    
+    for day in range(1, num_days + 1):
+        current_date = date(year, month, day)
+        
+        entry = entries_by_date.get(current_date)
+        total_hours = 0.0
+        entry_responses = []
+        
+        if entry:
+            total_hours = entry.hours
+            hours_used_this_month += total_hours
+            
+            resp = VacationEntryResponse.model_validate(entry)
+            resp.day_name = get_italian_weekday(entry.date)
+            resp.type_label = VACATION_ENTRY_TYPE_LABELS.get(entry.entry_type.value)
+            entry_responses.append(resp)
+        
+        holiday = holidays_by_date.get(current_date)
+        user_holiday = user_holidays_by_date.get(current_date)
+        
+        days.append(CalendarDayResponse(
+            date=current_date,
+            day_number=day,
+            day_name=get_italian_weekday(current_date),
+            is_weekend=is_weekend(current_date),
+            is_today=(current_date == today),
+            is_holiday=(holiday is not None),
+            holiday_name=holiday.name if holiday else None,
+            is_user_holiday=(user_holiday is not None),
+            user_holiday_name=user_holiday.name if user_holiday else None,
+            is_bridge_opportunity=(current_date in bridge_dates),
+            entries=entry_responses,
+            total_hours=total_hours
+        ))
+    
+    # Get settings for balance calculation (usa all_entries già caricati)
+    settings = vacation_settings_crud.get_or_create(db, current_user.id)
+    balance = calculate_balance(settings, all_entries, year, month)
+    
+    # Calculate monthly accrual
+    ferie_accrual = settings.ferie_days_per_month * settings.work_hours_per_day
+    total_accrual = ferie_accrual + settings.rol_hours_per_month + settings.permessi_hours_per_month
+    
+    return CalendarMonthResponse(
+        year=year,
+        month=month,
+        month_name=ITALIAN_MONTHS[month],
+        days=days,
+        hours_accrued_this_month=total_accrual,
+        hours_used_this_month=hours_used_this_month,
+        hours_available_end_of_month=balance["total_hours_available"],
+        days_available_end_of_month=balance["total_days_available"]
+    )
+```
+
+**NOTA:** Gli altri endpoint rimangono invariati.
+
+---
+
+## 🧪 3.8.6 - Manual Testing
+
+Stesso testing del documento originale, con aggiunta:
+
+- [ ] Test nuovo calcolo balance con breakdown separato
+- [ ] Test tracking_start_date e initial balance
+- [ ] Test validazione festività in create entry
+- [ ] Test bulk create con skip festività
+
+---
+
+## 🎯 CHECKPOINT FASE 3.8
+
+**Database:**
+- [ ] ✅ Tabella `vacation_settings` con campi separati (ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
+- [ ] ✅ Tabella `vacation_entries` (con UniqueConstraint, NO malattia)
+- [ ] ✅ Tabella `italian_holidays`
+- [ ] ✅ Tabella `user_holidays`
+
+**Models:**
+- [ ] ✅ VacationSettings con maturazione separata
+- [ ] ✅ VacationEntry senza malattia
+- [ ] ✅ UserHoliday con validazione date
+
+**Business Logic:**
+- [ ] ✅ Ferie: giorni/mese → ore (conversione automatica)
+- [ ] ✅ ROL/Permessi: ore/mese dirette
+- [ ] ✅ Balance calculator con totali aggregati
+- [ ] ✅ Validazione weekend + festività in create/bulk
+
+**API Endpoints:**
+- [ ] ✅ GET/PUT /vacation/settings (nuovi campi)
+- [ ] ✅ GET/POST /vacation/entries (con validazione festività)
+- [ ] ✅ POST /vacation/entries/bulk (con fix validazione + skip festività)
+- [ ] ✅ GET /vacation/balance (con breakdown completo + totali)
+- [ ] ✅ GET /vacation/calendar (con ottimizzazione query)
+
+**Tempo stimato:** 3-4 giorni  
+**Prossimo:** FASE 4.6 - Testing Vacation Module
+
+---
+
+## 📝 Note Implementazione
+
+### Default Settings Italia (AGGIORNATI)
+- **Ferie:** 1.83 giorni/mese = 22 giorni/anno
+- **ROL:** 2.67 ore/mese = 32 ore/anno = 4 giorni
+- **Permessi:** 8.67 ore/mese = 104 ore/anno = 13 giorni
+- **TOTALE:** 39 giorni/anno (312 ore con giornata 8h)
+- **Ore giornaliere:** 8h (configurabile dall'utente)
+
+### Tipi Entry (AGGIORNATO - NO MALATTIA)
+- **ferie**: Ore automatiche da work_hours_per_day
+- **permesso**: Ore manuali
+- **rol**: Ore manuali
+
+### Vista Riepilogo (NUOVA)
+```
+TOTALE DISPONIBILE: 196h = 24.5 giorni
+
+Dettaglio:
+- Ferie:    maturate 176h / usate 64h / disponibili 112h = 14.0gg
+- ROL:      maturate  32h / usate 12h / disponibili  20h =  2.5gg
+- Permessi: maturate 104h / usate 40h / disponibili  64h =  8.0gg
+```
+
+### Validazioni (NUOVE)
+- ❌ NO inserimento weekend
+- ❌ NO inserimento festività nazionali
+- ❌ NO inserimento festività custom utente
+- ✅ Un solo entry per giorno
+- ✅ ROL/Permessi richiedono ore manuali
+- ✅ Ferie usano ore automatiche
+
 **Prossimo:** FASE 4 - Testing & Debug
 
 ---
@@ -3399,7 +5119,537 @@ pytest tests/test_auth.py -v
 pytest tests/ -v --cov=app
 ```
 
-**Tempo stimato:** 2 giorni  
+**Tempo stimato:** 2 giorni
+
+# FASE 4.6: Testing Vacation Module (1-2 giorni)
+
+## 🎯 Obiettivo
+Implementare test automatici con Pytest per il modulo Vacation Planning con maturazione separata per tipo.
+
+**AGGIORNAMENTI:**
+- Test nuovi campi VacationSettings (ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
+- Test tracking_start_date e initial balance
+- Test validazione weekend + festività
+- Test balance con totali aggregati
+- Rimozione test malattia
+
+---
+
+## 🧪 4.6.1 - Setup Test Fixtures (AGGIORNATI)
+
+### 4.6.1.1 - Aggiungi fixtures per vacation
+- [ ] 📝 Modifica `backend/tests/conftest.py` - aggiungi:
+
+```python
+from datetime import date
+
+@pytest.fixture
+def vacation_settings_data():
+    """Test vacation settings data with separate accrual rates."""
+    return {
+        "work_hours_per_day": 8.0,
+        "ferie_days_per_month": 1.83,
+        "rol_hours_per_month": 2.67,
+        "permessi_hours_per_month": 8.67,
+        "tracking_start_date": "2025-01-01",  # Fixed date for consistent tests
+        "initial_ferie_days": 0.0,
+        "initial_rol_hours": 0.0,
+        "initial_permessi_hours": 0.0
+    }
+
+
+@pytest.fixture
+def vacation_settings_with_initial_balance():
+    """Test settings with initial balance."""
+    return {
+        "work_hours_per_day": 8.0,
+        "ferie_days_per_month": 1.83,
+        "rol_hours_per_month": 2.67,
+        "permessi_hours_per_month": 8.67,
+        "tracking_start_date": "2026-01-01",
+        "initial_balance_month": 12,
+        "initial_balance_year": 2025,
+        "initial_ferie_days": 10.0,  # 10 days
+        "initial_rol_hours": 16.0,
+        "initial_permessi_hours": 40.0
+    }
+
+
+@pytest.fixture
+def vacation_entry_ferie_data():
+    """Test vacation entry data for FERIE (no hours - automatic)."""
+    # Use fixed future date for consistent tests
+    return {
+        "date": "2027-06-15",  # Fixed Wednesday, safe date
+        "entry_type": "ferie",
+        "notes": "Test vacation day"
+    }
+
+
+@pytest.fixture
+def vacation_entry_rol_data():
+    """Test vacation entry data for ROL (manual hours required)."""
+    return {
+        "date": "2027-06-16",  # Fixed Thursday, safe date
+        "entry_type": "rol",
+        "hours": 4.0,
+        "notes": "Test ROL entry"
+    }
+
+
+@pytest.fixture
+def user_holiday_data():
+    """Test user holiday data (patron saint)."""
+    return {
+        "day": 7,
+        "month": 12,
+        "name": "Sant'Ambrogio",
+        "recurring": True
+    }
+```
+
+---
+
+## 🧪 4.6.2 - Test Vacation Settings (AGGIORNATI)
+
+- [ ] 📝 Crea `backend/tests/test_vacation_settings.py`
+
+```python
+"""Test Vacation Settings endpoints with separate accrual rates."""
+import pytest
+
+
+class TestVacationSettings:
+    
+    def test_get_settings_creates_default(self, client, auth_headers):
+        """GET creates default settings if none exist."""
+        response = client.get("/api/v1/vacation/settings", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ferie_days_per_month"] == 1.83
+        assert data["rol_hours_per_month"] == 2.67
+        assert data["permessi_hours_per_month"] == 8.67
+        assert data["work_hours_per_day"] == 8.0
+        assert "tracking_start_date" in data
+    
+    def test_update_accrual_rates(self, client, auth_headers):
+        """Test updating separate accrual rates."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        response = client.put(
+            "/api/v1/vacation/settings",
+            headers=auth_headers,
+            json={
+                "ferie_days_per_month": 2.0,  # Custom: 24 days/year
+                "rol_hours_per_month": 4.0,
+                "work_hours_per_day": 7.5
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ferie_days_per_month"] == 2.0
+        assert data["rol_hours_per_month"] == 4.0
+        assert data["work_hours_per_day"] == 7.5
+    
+    def test_initial_balance_validation(self, client, auth_headers):
+        """Initial balance date must be before tracking start."""
+        response = client.put(
+            "/api/v1/vacation/settings",
+            headers=auth_headers,
+            json={
+                "tracking_start_date": "2026-01-01",
+                "initial_balance_year": 2026,
+                "initial_balance_month": 6,  # After tracking start
+                "initial_ferie_days": 10.0
+            }
+        )
+        assert response.status_code == 422
+    
+    def test_settings_requires_auth(self, client):
+        """Settings endpoint requires authentication."""
+        response = client.get("/api/v1/vacation/settings")
+        assert response.status_code == 401
+```
+
+- [ ] Esegui: `pytest tests/test_vacation_settings.py -v`
+
+---
+
+## 🧪 4.6.3 - Test Vacation Entries (AGGIORNATI)
+
+- [ ] 📝 Crea `backend/tests/test_vacation_entries.py`
+
+```python
+"""Test Vacation Entries endpoints with weekend/holiday validation."""
+import pytest
+from datetime import date, timedelta
+
+
+class TestVacationEntries:
+    
+    def test_create_ferie_automatic_hours(self, client, auth_headers, vacation_entry_ferie_data):
+        """FERIE entry gets automatic hours from settings."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        
+        response = client.post(
+            "/api/v1/vacation/entries",
+            headers=auth_headers,
+            json=vacation_entry_ferie_data
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["entry_type"] == "ferie"
+        assert data["hours"] == 8.0  # Automatic from settings
+    
+    def test_create_rol_requires_hours(self, client, auth_headers):
+        """ROL entry requires manual hours."""
+        response = client.post(
+            "/api/v1/vacation/entries",
+            headers=auth_headers,
+            json={
+                "date": "2027-06-17",
+                "entry_type": "rol"
+                # Missing hours
+            }
+        )
+        assert response.status_code == 422
+    
+    def test_create_rol_with_hours(self, client, auth_headers, vacation_entry_rol_data):
+        """ROL entry with manual hours succeeds."""
+        response = client.post(
+            "/api/v1/vacation/entries",
+            headers=auth_headers,
+            json=vacation_entry_rol_data
+        )
+        assert response.status_code == 201
+        assert response.json()["hours"] == 4.0
+    
+    def test_weekend_validation(self, client, auth_headers):
+        """Cannot create entry on weekend."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        
+        # June 14, 2027 is Saturday
+        response = client.post(
+            "/api/v1/vacation/entries",
+            headers=auth_headers,
+            json={
+                "date": "2027-06-14",
+                "entry_type": "ferie"
+            }
+        )
+        assert response.status_code == 400
+        assert "weekend" in response.json()["detail"].lower()
+    
+    def test_holiday_validation(self, client, auth_headers):
+        """Cannot create entry on national holiday."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        
+        # January 1 is Capodanno
+        response = client.post(
+            "/api/v1/vacation/entries",
+            headers=auth_headers,
+            json={
+                "date": "2027-01-01",
+                "entry_type": "ferie"
+            }
+        )
+        assert response.status_code == 400
+        assert "festività" in response.json()["detail"].lower() or "holiday" in response.json()["detail"].lower()
+    
+    def test_duplicate_date_fails(self, client, auth_headers, vacation_entry_ferie_data):
+        """Only one entry per date allowed."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        client.post("/api/v1/vacation/entries", headers=auth_headers, json=vacation_entry_ferie_data)
+        
+        # Try same date with different type
+        duplicate_data = vacation_entry_ferie_data.copy()
+        duplicate_data["entry_type"] = "rol"
+        duplicate_data["hours"] = 4.0
+        response = client.post("/api/v1/vacation/entries", headers=auth_headers, json=duplicate_data)
+        assert response.status_code == 400
+    
+    def test_list_entries(self, client, auth_headers, vacation_entry_ferie_data):
+        """Test listing vacation entries."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        client.post("/api/v1/vacation/entries", headers=auth_headers, json=vacation_entry_ferie_data)
+        response = client.get("/api/v1/vacation/entries", headers=auth_headers)
+        assert response.status_code == 200
+        assert len(response.json()) >= 1
+    
+    def test_update_entry(self, client, auth_headers, vacation_entry_rol_data):
+        """Test updating entry hours."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        create_resp = client.post("/api/v1/vacation/entries", headers=auth_headers, json=vacation_entry_rol_data)
+        entry_id = create_resp.json()["id"]
+        
+        response = client.put(
+            f"/api/v1/vacation/entries/{entry_id}",
+            headers=auth_headers,
+            json={"hours": 6.0}
+        )
+        assert response.status_code == 200
+        assert response.json()["hours"] == 6.0
+    
+    def test_delete_entry(self, client, auth_headers, vacation_entry_ferie_data):
+        """Test deleting entry."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        create_resp = client.post("/api/v1/vacation/entries", headers=auth_headers, json=vacation_entry_ferie_data)
+        entry_id = create_resp.json()["id"]
+        
+        response = client.delete(f"/api/v1/vacation/entries/{entry_id}", headers=auth_headers)
+        assert response.status_code == 204
+```
+
+- [ ] Esegui: `pytest tests/test_vacation_entries.py -v`
+
+---
+
+## 🧪 4.6.4 - Test User Holidays (INVARIATO)
+
+Stesso codice del documento originale.
+
+---
+
+## 🧪 4.6.5 - Test Bulk Entries (AGGIORNATO)
+
+- [ ] 📝 Crea `backend/tests/test_vacation_bulk.py`
+
+```python
+"""Test Vacation Bulk Entry creation with holiday skipping."""
+import pytest
+from datetime import date, timedelta
+
+
+class TestVacationBulk:
+    
+    def test_bulk_create_week(self, client, auth_headers):
+        """Test bulk creating a week of vacation."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        
+        # Use safe fixed dates (June 2027)
+        bulk_data = {
+            "start_date": "2027-06-21",  # Monday
+            "end_date": "2027-06-25",    # Friday
+            "entry_type": "ferie",
+            "skip_weekends": True,
+            "skip_holidays": True
+        }
+        
+        response = client.post("/api/v1/vacation/entries/bulk", headers=auth_headers, json=bulk_data)
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data) == 5  # Mon-Fri
+    
+    def test_bulk_skips_weekends(self, client, auth_headers):
+        """Bulk create skips weekends."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        
+        bulk_data = {
+            "start_date": "2027-06-18",  # Friday
+            "end_date": "2027-06-21",    # Monday (includes weekend)
+            "entry_type": "ferie",
+            "skip_weekends": True,
+            "skip_holidays": False
+        }
+        
+        response = client.post("/api/v1/vacation/entries/bulk", headers=auth_headers, json=bulk_data)
+        data = response.json()
+        
+        # Should only have Friday and Monday (skip Sat/Sun)
+        assert len(data) == 2
+        for entry in data:
+            entry_date = date.fromisoformat(entry["date"])
+            assert entry_date.weekday() < 5  # No weekends
+    
+    def test_bulk_skips_holidays(self, client, auth_headers):
+        """Bulk create skips national holidays."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        
+        # Include Capodanno (Jan 1) and Epifania (Jan 6) in range
+        bulk_data = {
+            "start_date": "2027-01-01",  # Friday (Capodanno)
+            "end_date": "2027-01-08",    # Friday
+            "entry_type": "ferie",
+            "skip_weekends": True,
+            "skip_holidays": True
+        }
+        
+        response = client.post("/api/v1/vacation/entries/bulk", headers=auth_headers, json=bulk_data)
+        data = response.json()
+        
+        # Should skip: Jan 1 (holiday), Jan 2-3 (weekend), Jan 6 (holiday)
+        # Should include: Jan 4, 5, 7, 8 (4 days)
+        assert len(data) == 4
+    
+    def test_bulk_rol_requires_hours(self, client, auth_headers):
+        """Bulk ROL requires hours_per_day."""
+        bulk_data = {
+            "start_date": "2027-06-21",
+            "end_date": "2027-06-23",
+            "entry_type": "rol",
+            "skip_weekends": True
+            # Missing hours_per_day
+        }
+        
+        response = client.post("/api/v1/vacation/entries/bulk", headers=auth_headers, json=bulk_data)
+        assert response.status_code == 400
+        assert "hours_per_day" in response.json()["detail"].lower()
+```
+
+- [ ] Esegui: `pytest tests/test_vacation_bulk.py -v`
+
+---
+
+## 🧪 4.6.6 - Test Balance & Calendar (AGGIORNATO)
+
+- [ ] 📝 Crea `backend/tests/test_vacation_balance.py`
+
+```python
+"""Test Vacation Balance and Calendar endpoints with aggregated totals."""
+import pytest
+
+
+class TestVacationBalance:
+    
+    def test_get_balance_structure(self, client, auth_headers):
+        """Test balance response structure with aggregated totals."""
+        client.get("/api/v1/vacation/settings", headers=auth_headers)
+        response = client.get("/api/v1/vacation/balance", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Check aggregated totals
+        assert "total_hours_accrued" in data
+        assert "total_hours_used" in data
+        assert "total_hours_available" in data
+        assert "total_days_available" in data
+        
+        # Check tracking info
+        assert "tracking_start_date" in data
+        assert "months_worked" in data
+        
+        # Check breakdown structure
+        assert "breakdown" in data
+        breakdown_types = [b["type"] for b in data["breakdown"]]
+        assert "ferie" in breakdown_types
+        assert "rol" in breakdown_types
+        assert "permesso" in breakdown_types
+        
+        # Check breakdown items have all fields
+        for item in data["breakdown"]:
+            assert "hours_accrued" in item
+            assert "hours_used" in item
+            assert "hours_available" in item
+            assert "days_available" in item
+    
+    def test_balance_with_initial_balance(self, client, auth_headers, vacation_settings_with_initial_balance):
+        """Test balance calculation with initial balance."""
+        # Set settings with initial balance
+        client.put("/api/v1/vacation/settings", headers=auth_headers, json=vacation_settings_with_initial_balance)
+        
+        response = client.get("/api/v1/vacation/balance", headers=auth_headers)
+        data = response.json()
+        
+        # Should include initial balance
+        assert data["total_hours_available"] > 0
+        
+        # Ferie should start with 10 days = 80h
+        ferie_item = next(b for b in data["breakdown"] if b["type"] == "ferie")
+        assert ferie_item["hours_accrued"] >= 80.0  # At least initial
+
+
+class TestVacationCalendar:
+    
+    def test_get_calendar_month(self, client, auth_headers):
+        """Test monthly calendar view."""
+        response = client.get("/api/v1/vacation/calendar/2027/6", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["year"] == 2027
+        assert data["month"] == 6
+        assert len(data["days"]) == 30  # June has 30 days
+    
+    def test_calendar_shows_holidays(self, client, auth_headers):
+        """Calendar marks national holidays."""
+        response = client.get("/api/v1/vacation/calendar/2027/1", headers=auth_headers)
+        data = response.json()
+        jan1 = next(d for d in data["days"] if d["day_number"] == 1)
+        assert jan1["is_holiday"] == True
+        assert jan1["holiday_name"] == "Capodanno"
+    
+    def test_calendar_shows_user_holidays(self, client, auth_headers, user_holiday_data):
+        """Calendar marks user custom holidays."""
+        # Add patron saint
+        client.post("/api/v1/vacation/user-holidays", headers=auth_headers, json=user_holiday_data)
+        
+        response = client.get("/api/v1/vacation/calendar/2027/12", headers=auth_headers)
+        data = response.json()
+        dec7 = next(d for d in data["days"] if d["day_number"] == 7)
+        assert dec7["is_user_holiday"] == True
+        assert dec7["user_holiday_name"] == "Sant'Ambrogio"
+
+
+class TestVacationHolidays:
+    
+    def test_get_holidays(self, client, auth_headers):
+        """Test getting holidays for year."""
+        response = client.get("/api/v1/vacation/holidays/2027", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 11  # 10 fixed + Pasquetta
+
+
+class TestVacationBridges:
+    
+    def test_get_bridges(self, client, auth_headers):
+        """Test getting bridge opportunities."""
+        response = client.get("/api/v1/vacation/bridges/2027", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+```
+
+- [ ] Esegui: `pytest tests/test_vacation_balance.py -v`
+
+---
+
+## 🧪 4.6.7 - Run All Vacation Tests
+
+### 4.6.7.1 - Run complete suite
+- [ ] Esegui: `pytest tests/test_vacation*.py tests/test_user_holidays.py -v`
+- [ ] Verifica tutti i test passano
+
+### 4.6.7.2 - Coverage report
+- [ ] Esegui: `pytest tests/test_vacation*.py tests/test_user_holidays.py --cov=app.routers.vacation --cov=app.crud --cov=app.utils.vacation_balance --cov-report=term-missing`
+- [ ] Target: ≥70% coverage
+
+### 4.6.7.3 - Commit
+- [ ] Commit: `Add Pytest tests for vacation module with separate accrual (Phase 4.6)`
+
+---
+
+## 🎯 CHECKPOINT FASE 4.6
+
+- [ ] ✅ test_vacation_settings.py - nuovi campi testati
+- [ ] ✅ test_vacation_entries.py - validazione weekend/festività
+- [ ] ✅ test_user_holidays.py - tutti passano
+- [ ] ✅ test_vacation_bulk.py - skip holidays testato
+- [ ] ✅ test_vacation_balance.py - totali aggregati testati
+- [ ] ✅ Coverage ≥70%
+
+**Test principali verificati:**
+- [ ] ✅ Settings con maturazione separata (ferie/rol/permessi)
+- [ ] ✅ Tracking start date e initial balance
+- [ ] ✅ Ferie: ore automatiche da settings
+- [ ] ✅ ROL/Permessi: ore manuali obbligatorie
+- [ ] ✅ Validazione weekend bloccata
+- [ ] ✅ Validazione festività nazionali bloccata
+- [ ] ✅ Un solo entry per data (UniqueConstraint)
+- [ ] ✅ Balance con breakdown + totali aggregati
+- [ ] ✅ Calendar mostra festività nazionali e custom
+- [ ] ✅ Bulk create skip weekend + holidays
+
+**Tempo stimato:** 1-2 giorni  
+ 
 **Prossimo:** FASE 5 - Frontend Integration
 
 ---
@@ -3876,7 +6126,1766 @@ export default function App() {
 - [ ] Logout e re-login mostra stessi dati
 - [ ] Multi-user: User A non vede dati di User B
 
-**Tempo stimato:** 5-7 giorni  
+**Tempo stimato:** 5-7 giorni
+
+# FASE 5.9: Frontend Vacation Module (3-4 giorni)
+
+## 🎯 Obiettivo
+Implementare l'interfaccia React per il modulo Vacation Planning con:
+- Maturazione separata per tipo (Ferie/ROL/Permessi)
+- Vista totali aggregati in dashboard
+- Inserimento multiplo (bulk)
+- Validazione weekend + festività
+- Calendario interattivo
+
+**AGGIORNAMENTI RISPETTO ALLA VERSIONE PRECEDENTE:**
+- Settings: form con campi separati per ogni tipo + tracking start + saldo iniziale
+- Balance: mostra totali aggregati + breakdown dettagliato
+- Entry Modal: ferie no input ore, ROL/Permessi sì (invariato)
+- **NUOVO:** Bulk Entry Modal per inserimento multiplo
+- Calendar: mostra festività custom utente (invariato)
+
+---
+
+## 📋 Componenti da Creare
+
+1. **VacationDashboard** - Overview con balance aggregato e prossime festività
+2. **VacationCalendar** - Calendario mensile interattivo
+3. **VacationEntryModal** - Modal per creare/modificare entry (singolo giorno)
+4. **BulkEntryModal** - 🆕 Modal per inserimento multiplo (range date)
+5. **VacationSettings** - 🔄 Form aggiornato con maturazione separata
+6. **BridgeOpportunities** - Lista ponti disponibili
+7. **VacationBalance** - 🔄 Widget con totali aggregati + breakdown
+8. **UserHolidaysManager** - Gestione festività custom (patrono)
+
+---
+
+## 🛠️ 5.9.1 - API Service (AGGIORNATO)
+
+### 5.9.1.1 - Crea vacation service
+- [ ] 📝 Crea `frontend/src/services/vacationService.js`
+
+```javascript
+import api from './api';
+
+const vacationService = {
+  // Settings
+  getSettings: () => api.get('/vacation/settings'),
+  updateSettings: (data) => api.put('/vacation/settings', data),
+  
+  // Entries
+  getEntries: (params) => api.get('/vacation/entries', { params }),
+  createEntry: (data) => api.post('/vacation/entries', data),
+  createBulkEntries: (data) => api.post('/vacation/entries/bulk', data),  // NEW!
+  getEntry: (id) => api.get(`/vacation/entries/${id}`),
+  updateEntry: (id, data) => api.put(`/vacation/entries/${id}`, data),
+  deleteEntry: (id) => api.delete(`/vacation/entries/${id}`),
+  
+  // Balance
+  getBalance: (params) => api.get('/vacation/balance', { params }),
+  getProjection: (year) => api.get(`/vacation/projection/${year}`),
+  
+  // Calendar
+  getCalendarMonth: (year, month) => api.get(`/vacation/calendar/${year}/${month}`),
+  
+  // Holidays
+  getHolidays: (year) => api.get(`/vacation/holidays/${year}`),
+  getBridges: (year) => api.get(`/vacation/bridges/${year}`),
+  
+  // User Holidays (custom - patrono)
+  getUserHolidays: () => api.get('/vacation/user-holidays'),
+  createUserHoliday: (data) => api.post('/vacation/user-holidays', data),
+  deleteUserHoliday: (id) => api.delete(`/vacation/user-holidays/${id}`),
+  
+  // Entry types
+  getEntryTypes: () => api.get('/vacation/entry-types'),
+};
+
+export default vacationService;
+```
+
+---
+
+## 📅 5.9.2 - Vacation Calendar Component (INVARIATO)
+
+Stesso codice del documento originale - funziona già correttamente.
+
+---
+
+## 📝 5.9.3 - Entry Modal Component (INVARIATO)
+
+Stesso codice del documento originale - gestisce già correttamente Ferie (no input ore) vs ROL/Permessi (input ore).
+
+---
+
+## 🆕 5.9.4 - Bulk Entry Modal Component (NUOVO!)
+
+- [ ] 📝 Crea `frontend/src/components/vacation/BulkEntryModal.jsx`
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import vacationService from '../../services/vacationService';
+
+const BulkEntryModal = ({ onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    start_date: '',
+    end_date: '',
+    entry_type: 'ferie',
+    hours_per_day: null,  // Only for ROL/Permessi
+    skip_weekends: true,
+    skip_holidays: true,
+    notes: ''
+  });
+  const [entryTypes, setEntryTypes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [previewCount, setPreviewCount] = useState(null);
+
+  useEffect(() => {
+    loadEntryTypes();
+  }, []);
+
+  useEffect(() => {
+    // Calculate preview count when dates change
+    if (formData.start_date && formData.end_date) {
+      calculatePreview();
+    }
+  }, [formData.start_date, formData.end_date, formData.skip_weekends, formData.skip_holidays]);
+
+  const loadEntryTypes = async () => {
+    try {
+      const response = await vacationService.getEntryTypes();
+      setEntryTypes(response.data);
+    } catch (err) {
+      console.error('Error loading entry types:', err);
+    }
+  };
+
+  const calculatePreview = () => {
+    // Simple client-side preview (approximation)
+    const start = new Date(formData.start_date);
+    const end = new Date(formData.end_date);
+    let count = 0;
+    let current = new Date(start);
+
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      
+      // Skip weekends if enabled
+      if (formData.skip_weekends && (dayOfWeek === 0 || dayOfWeek === 6)) {
+        current.setDate(current.getDate() + 1);
+        continue;
+      }
+      
+      count++;
+      current.setDate(current.getDate() + 1);
+    }
+
+    setPreviewCount(count);
+  };
+
+  // Check if current type requires manual hours
+  const requiresManualHours = () => {
+    const type = entryTypes.find(t => t.value === formData.entry_type);
+    return type?.manual_hours === true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Build payload
+      const payload = {
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        entry_type: formData.entry_type,
+        skip_weekends: formData.skip_weekends,
+        skip_holidays: formData.skip_holidays,
+        notes: formData.notes || null
+      };
+      
+      // Only include hours_per_day for manual types
+      if (requiresManualHours()) {
+        if (!formData.hours_per_day) {
+          setError('Le ore per giorno sono obbligatorie per ROL e Permessi');
+          setLoading(false);
+          return;
+        }
+        payload.hours_per_day = formData.hours_per_day;
+      }
+      
+      const response = await vacationService.createBulkEntries(payload);
+      const createdCount = response.data.length;
+      
+      alert(`✅ Create ${createdCount} voci con successo!`);
+      onSave();
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Errore durante la creazione';
+      setError(detail);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content bulk-modal" onClick={e => e.stopPropagation()}>
+        <h3>📅 Inserimento Multiplo Ferie</h3>
+        <p className="modal-description">
+          Crea ferie per un periodo continuativo. Il sistema salterà automaticamente weekend e festività.
+        </p>
+        
+        {error && <div className="error-message">{error}</div>}
+        
+        <form onSubmit={handleSubmit}>
+          {/* Date Range */}
+          <div className="form-row">
+            <div className="form-group">
+              <label>Data Inizio</label>
+              <input
+                type="date"
+                value={formData.start_date}
+                onChange={e => setFormData({...formData, start_date: e.target.value})}
+                required
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Data Fine</label>
+              <input
+                type="date"
+                value={formData.end_date}
+                min={formData.start_date}
+                onChange={e => setFormData({...formData, end_date: e.target.value})}
+                required
+              />
+            </div>
+          </div>
+          
+          {/* Entry Type */}
+          <div className="form-group">
+            <label>Tipo</label>
+            <select
+              value={formData.entry_type}
+              onChange={e => setFormData({...formData, entry_type: e.target.value})}
+              required
+            >
+              {entryTypes.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            {!requiresManualHours() && (
+              <small className="help-text">
+                Le ore saranno calcolate automaticamente dalle tue impostazioni
+              </small>
+            )}
+          </div>
+          
+          {/* Hours per day - ONLY for ROL/Permessi */}
+          {requiresManualHours() && (
+            <div className="form-group">
+              <label>Ore per giorno</label>
+              <input
+                type="number"
+                min="0.5"
+                max="24"
+                step="0.5"
+                value={formData.hours_per_day || ''}
+                onChange={e => setFormData({...formData, hours_per_day: parseFloat(e.target.value)})}
+                placeholder="Es: 4"
+                required
+              />
+              <small className="help-text">
+                Quante ore vuoi inserire per ogni giorno nel range
+              </small>
+            </div>
+          )}
+          
+          {/* Options */}
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={formData.skip_weekends}
+                onChange={e => setFormData({...formData, skip_weekends: e.target.checked})}
+              />
+              <span>Salta weekend (Sabato e Domenica)</span>
+            </label>
+          </div>
+          
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={formData.skip_holidays}
+                onChange={e => setFormData({...formData, skip_holidays: e.target.checked})}
+              />
+              <span>Salta festività (nazionali e custom)</span>
+            </label>
+          </div>
+          
+          {/* Notes */}
+          <div className="form-group">
+            <label>Note (opzionale)</label>
+            <textarea
+              value={formData.notes}
+              onChange={e => setFormData({...formData, notes: e.target.value})}
+              rows="2"
+              placeholder="Es: Vacanza estiva"
+            />
+          </div>
+          
+          {/* Preview */}
+          {previewCount !== null && (
+            <div className="bulk-preview">
+              <span className="preview-icon">📊</span>
+              <span>
+                Verranno create circa <strong>{previewCount} voci</strong>
+                {formData.skip_holidays && ' (escludendo festività)'}
+              </span>
+            </div>
+          )}
+          
+          {/* Actions */}
+          <div className="modal-actions">
+            <button type="button" onClick={onClose} disabled={loading}>
+              Annulla
+            </button>
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? 'Creazione...' : `✅ Crea Periodo`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default BulkEntryModal;
+```
+
+---
+
+## 💰 5.9.5 - Balance Widget (COMPLETAMENTE AGGIORNATO)
+
+- [ ] 📝 Crea `frontend/src/components/vacation/VacationBalance.jsx`
+
+**NUOVA STRUTTURA:** Mostra totali aggregati + breakdown dettagliato per tipo
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import vacationService from '../../services/vacationService';
+
+const VacationBalance = () => {
+  const [balance, setBalance] = useState(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBalance();
+  }, [year]);
+
+  const loadBalance = async () => {
+    setLoading(true);
+    try {
+      const response = await vacationService.getBalance({ year });
+      setBalance(response.data);
+    } catch (error) {
+      console.error('Error loading balance:', error);
+    }
+    setLoading(false);
+  };
+
+  const getTypeIcon = (type) => {
+    const icons = {
+      ferie: '🏖️',
+      rol: '🕐',
+      permesso: '📋'
+    };
+    return icons[type] || '📄';
+  };
+
+  const getTypeColor = (type) => {
+    const colors = {
+      ferie: 'blue',
+      rol: 'green',
+      permesso: 'purple'
+    };
+    return colors[type] || 'gray';
+  };
+
+  if (loading) return <div className="loading">Caricamento...</div>;
+  if (!balance) return null;
+
+  return (
+    <div className="vacation-balance">
+      {/* Header with Year Selector */}
+      <div className="balance-header">
+        <h3>📊 Riepilogo Ferie {balance.year}</h3>
+        <div className="year-selector">
+          <button onClick={() => setYear(year - 1)}>◀</button>
+          <span>{year}</span>
+          <button onClick={() => setYear(year + 1)}>▶</button>
+        </div>
+      </div>
+      
+      {/* === MAIN TOTAL (AGGREGATED) === */}
+      <div className="balance-total-card">
+        <div className="total-header">
+          <h2>Totale Disponibile</h2>
+          <p className="tracking-info">
+            📅 Tracciamento dal {new Date(balance.tracking_start_date).toLocaleDateString('it-IT')}
+            ({balance.months_worked} {balance.months_worked === 1 ? 'mese' : 'mesi'})
+          </p>
+        </div>
+        
+        <div className="total-values">
+          <div className="total-days">
+            <span className="value">{balance.total_days_available.toFixed(1)}</span>
+            <span className="unit">giorni</span>
+          </div>
+          <div className="total-hours">
+            <span className="value">{balance.total_hours_available.toFixed(1)}</span>
+            <span className="unit">ore</span>
+          </div>
+        </div>
+        
+        <div className="total-breakdown-mini">
+          <div className="mini-stat">
+            <span className="label">Maturate</span>
+            <span className="value">{balance.total_hours_accrued.toFixed(1)}h</span>
+          </div>
+          <div className="mini-stat separator">-</div>
+          <div className="mini-stat">
+            <span className="label">Usate</span>
+            <span className="value">{balance.total_hours_used.toFixed(1)}h</span>
+          </div>
+          <div className="mini-stat separator">=</div>
+          <div className="mini-stat highlight">
+            <span className="label">Residue</span>
+            <span className="value">{balance.total_hours_available.toFixed(1)}h</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* === BREAKDOWN BY TYPE === */}
+      <div className="balance-breakdown">
+        <h4>Dettaglio per Tipo</h4>
+        
+        <div className="breakdown-grid">
+          {balance.breakdown.map((item) => (
+            <div key={item.type} className={`balance-type-card ${getTypeColor(item.type)}`}>
+              <div className="type-header">
+                <span className="type-icon">{getTypeIcon(item.type)}</span>
+                <h5>{item.label}</h5>
+              </div>
+              
+              <div className="type-stats">
+                <div className="stat-row">
+                  <span className="stat-label">Maturate</span>
+                  <span className="stat-value">
+                    {item.days_accrued.toFixed(1)}gg
+                    <small>({item.hours_accrued.toFixed(1)}h)</small>
+                  </span>
+                </div>
+                
+                <div className="stat-row">
+                  <span className="stat-label">Usate</span>
+                  <span className="stat-value">
+                    {item.days_used.toFixed(1)}gg
+                    <small>({item.hours_used.toFixed(1)}h)</small>
+                  </span>
+                </div>
+                
+                <div className="stat-row highlight">
+                  <span className="stat-label">Disponibili</span>
+                  <span className="stat-value">
+                    <strong>{item.days_available.toFixed(1)}gg</strong>
+                    <small>({item.hours_available.toFixed(1)}h)</small>
+                  </span>
+                </div>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="usage-bar">
+                <div 
+                  className="usage-fill" 
+                  style={{ 
+                    width: `${Math.min(100, (item.hours_used / item.hours_accrued) * 100)}%` 
+                  }}
+                ></div>
+              </div>
+              <div className="usage-label">
+                {((item.hours_used / item.hours_accrued) * 100).toFixed(0)}% utilizzato
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* === PROJECTION === */}
+      <div className="balance-projection">
+        <h4>📈 Proiezione Fine Anno</h4>
+        <div className="projection-value">
+          {balance.days_projected_eoy.toFixed(1)} giorni
+          <small>({balance.hours_projected_eoy.toFixed(1)} ore)</small>
+        </div>
+        <p className="projection-note">
+          Stima basata su maturazione senza ulteriori utilizzi
+        </p>
+      </div>
+      
+      {/* === SETTINGS REFERENCE === */}
+      <div className="balance-settings">
+        <details>
+          <summary>ℹ️ Info Configurazione</summary>
+          <div className="settings-details">
+            <p>Ore giornaliere: {balance.settings.work_hours_per_day}h</p>
+            <p>Maturazione mensile:</p>
+            <ul>
+              <li>Ferie: {balance.settings.ferie_days_per_month} giorni/mese</li>
+              <li>ROL: {balance.settings.rol_hours_per_month} ore/mese</li>
+              <li>Permessi: {balance.settings.permessi_hours_per_month} ore/mese</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+};
+
+export default VacationBalance;
+```
+
+---
+
+## ⚙️ 5.9.6 - Settings Component (COMPLETAMENTE RISCRITTO)
+
+- [ ] 📝 Crea `frontend/src/components/vacation/VacationSettings.jsx`
+
+**NUOVA STRUTTURA:** Form con maturazione separata + tracking start + saldo iniziale
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import vacationService from '../../services/vacationService';
+
+const VacationSettings = () => {
+  const [settings, setSettings] = useState(null);
+  const [formData, setFormData] = useState({
+    work_hours_per_day: 8.0,
+    ferie_days_per_month: 1.83,
+    rol_hours_per_month: 2.67,
+    permessi_hours_per_month: 8.67,
+    tracking_start_date: '',
+    initial_balance_month: null,
+    initial_balance_year: null,
+    initial_ferie_days: 0,
+    initial_rol_hours: 0,
+    initial_permessi_hours: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [showInitialBalance, setShowInitialBalance] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const response = await vacationService.getSettings();
+      setSettings(response.data);
+      
+      // Populate form
+      setFormData({
+        work_hours_per_day: response.data.work_hours_per_day,
+        ferie_days_per_month: response.data.ferie_days_per_month,
+        rol_hours_per_month: response.data.rol_hours_per_month,
+        permessi_hours_per_month: response.data.permessi_hours_per_month,
+        tracking_start_date: response.data.tracking_start_date,
+        initial_balance_month: response.data.initial_balance_month || null,
+        initial_balance_year: response.data.initial_balance_year || null,
+        initial_ferie_days: response.data.initial_ferie_days || 0,
+        initial_rol_hours: response.data.initial_rol_hours || 0,
+        initial_permessi_hours: response.data.initial_permessi_hours || 0
+      });
+      
+      // Show initial balance section if data exists
+      if (response.data.initial_balance_year) {
+        setShowInitialBalance(true);
+      }
+    } catch (err) {
+      console.error('Error loading settings:', err);
+      setError('Errore nel caricamento delle impostazioni');
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    setSuccess(false);
+    
+    try {
+      // Build payload
+      const payload = {
+        work_hours_per_day: formData.work_hours_per_day,
+        ferie_days_per_month: formData.ferie_days_per_month,
+        rol_hours_per_month: formData.rol_hours_per_month,
+        permessi_hours_per_month: formData.permessi_hours_per_month,
+        tracking_start_date: formData.tracking_start_date
+      };
+      
+      // Add initial balance if enabled
+      if (showInitialBalance) {
+        payload.initial_balance_month = formData.initial_balance_month;
+        payload.initial_balance_year = formData.initial_balance_year;
+        payload.initial_ferie_days = formData.initial_ferie_days;
+        payload.initial_rol_hours = formData.initial_rol_hours;
+        payload.initial_permessi_hours = formData.initial_permessi_hours;
+      }
+      
+      await vacationService.updateSettings(payload);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      
+      // Reload to refresh
+      loadSettings();
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Errore durante il salvataggio';
+      setError(detail);
+    }
+    setSaving(false);
+  };
+
+  const calculateAnnual = (monthly) => {
+    return (monthly * 12).toFixed(1);
+  };
+
+  if (loading) return <div className="loading">Caricamento...</div>;
+
+  return (
+    <div className="vacation-settings">
+      <h3>⚙️ Configurazione Ferie</h3>
+      
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">✅ Impostazioni salvate con successo!</div>}
+      
+      <form onSubmit={handleSubmit}>
+        {/* === WORK CONFIGURATION === */}
+        <section className="settings-section">
+          <h4>💼 Configurazione Ore Lavorative</h4>
+          
+          <div className="form-group">
+            <label>Ore lavorative al giorno</label>
+            <input
+              type="number"
+              step="0.5"
+              min="1"
+              max="24"
+              value={formData.work_hours_per_day}
+              onChange={e => setFormData({...formData, work_hours_per_day: parseFloat(e.target.value)})}
+              required
+            />
+            <small className="help-text">
+              Usate per convertire giorni in ore (es: 1 giorno = {formData.work_hours_per_day}h)
+            </small>
+          </div>
+        </section>
+        
+        {/* === ACCRUAL RATES === */}
+        <section className="settings-section">
+          <h4>📊 Maturazione Mensile</h4>
+          <p className="section-description">
+            Configura quante ferie, ROL e permessi maturi ogni mese secondo il tuo contratto.
+          </p>
+          
+          <div className="form-group">
+            <label>🏖️ Ferie (giorni al mese)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="10"
+              value={formData.ferie_days_per_month}
+              onChange={e => setFormData({...formData, ferie_days_per_month: parseFloat(e.target.value)})}
+              required
+            />
+            <small className="help-text">
+              = {calculateAnnual(formData.ferie_days_per_month)} giorni/anno
+              ({calculateAnnual(formData.ferie_days_per_month * formData.work_hours_per_day)} ore/anno)
+            </small>
+          </div>
+          
+          <div className="form-group">
+            <label>🕐 ROL (ore al mese)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="200"
+              value={formData.rol_hours_per_month}
+              onChange={e => setFormData({...formData, rol_hours_per_month: parseFloat(e.target.value)})}
+              required
+            />
+            <small className="help-text">
+              = {calculateAnnual(formData.rol_hours_per_month)} ore/anno
+              ({(calculateAnnual(formData.rol_hours_per_month) / formData.work_hours_per_day).toFixed(1)} giorni/anno)
+            </small>
+          </div>
+          
+          <div className="form-group">
+            <label>📋 Permessi (ore al mese)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="200"
+              value={formData.permessi_hours_per_month}
+              onChange={e => setFormData({...formData, permessi_hours_per_month: parseFloat(e.target.value)})}
+              required
+            />
+            <small className="help-text">
+              = {calculateAnnual(formData.permessi_hours_per_month)} ore/anno
+              ({(calculateAnnual(formData.permessi_hours_per_month) / formData.work_hours_per_day).toFixed(1)} giorni/anno)
+            </small>
+          </div>
+          
+          <div className="total-preview">
+            <strong>Totale annuo:</strong> {' '}
+            {(
+              parseFloat(calculateAnnual(formData.ferie_days_per_month)) +
+              (parseFloat(calculateAnnual(formData.rol_hours_per_month)) / formData.work_hours_per_day) +
+              (parseFloat(calculateAnnual(formData.permessi_hours_per_month)) / formData.work_hours_per_day)
+            ).toFixed(1)} giorni
+          </div>
+        </section>
+        
+        {/* === TRACKING START === */}
+        <section className="settings-section">
+          <h4>📅 Inizio Tracciamento</h4>
+          <p className="section-description">
+            Indica da quando hai iniziato a maturare ferie (es: data di assunzione o cambio contratto).
+          </p>
+          
+          <div className="form-group">
+            <label>Data inizio maturazione</label>
+            <input
+              type="date"
+              value={formData.tracking_start_date}
+              onChange={e => setFormData({...formData, tracking_start_date: e.target.value})}
+              max={new Date().toISOString().split('T')[0]}
+              required
+            />
+            <small className="help-text">
+              Il sistema calcolerà automaticamente le ore maturate da questa data
+            </small>
+          </div>
+        </section>
+        
+        {/* === INITIAL BALANCE (OPTIONAL) === */}
+        <section className="settings-section">
+          <h4>💰 Saldo Iniziale (Opzionale)</h4>
+          
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={showInitialBalance}
+                onChange={e => setShowInitialBalance(e.target.checked)}
+              />
+              <span>Ho già ore/giorni maturati prima dell'inizio tracking</span>
+            </label>
+          </div>
+          
+          {showInitialBalance && (
+            <div className="initial-balance-form">
+              <p className="section-description">
+                Inserisci il saldo che avevi a un mese specifico, prima di iniziare a usare questa app.
+              </p>
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Mese di riferimento</label>
+                  <select
+                    value={formData.initial_balance_month || ''}
+                    onChange={e => setFormData({...formData, initial_balance_month: parseInt(e.target.value)})}
+                    required={showInitialBalance}
+                  >
+                    <option value="">Seleziona mese</option>
+                    {[...Array(12)].map((_, i) => (
+                      <option key={i+1} value={i+1}>
+                        {new Date(2000, i).toLocaleString('it-IT', { month: 'long' })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Anno</label>
+                  <input
+                    type="number"
+                    min="2000"
+                    max={new Date().getFullYear()}
+                    value={formData.initial_balance_year || ''}
+                    onChange={e => setFormData({...formData, initial_balance_year: parseInt(e.target.value)})}
+                    required={showInitialBalance}
+                  />
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label>🏖️ Ferie maturate (giorni)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={formData.initial_ferie_days}
+                  onChange={e => setFormData({...formData, initial_ferie_days: parseFloat(e.target.value) || 0})}
+                />
+                <small className="help-text">
+                  Quanti giorni di ferie avevi già maturato
+                </small>
+              </div>
+              
+              <div className="form-group">
+                <label>🕐 ROL maturate (ore)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={formData.initial_rol_hours}
+                  onChange={e => setFormData({...formData, initial_rol_hours: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>📋 Permessi maturati (ore)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={formData.initial_permessi_hours}
+                  onChange={e => setFormData({...formData, initial_permessi_hours: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+            </div>
+          )}
+        </section>
+        
+        {/* === ACTIONS === */}
+        <div className="form-actions">
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? 'Salvataggio...' : '💾 Salva Impostazioni'}
+          </button>
+        </div>
+      </form>
+      
+      {/* === PRESETS === */}
+      <section className="settings-section presets">
+        <h4>⚡ Preset CCNL Comuni</h4>
+        <div className="preset-buttons">
+          <button 
+            type="button"
+            className="btn-secondary"
+            onClick={() => setFormData({
+              ...formData,
+              ferie_days_per_month: 1.83,
+              rol_hours_per_month: 2.67,
+              permessi_hours_per_month: 8.67
+            })}
+          >
+            CCNL Commercio
+          </button>
+          <button 
+            type="button"
+            className="btn-secondary"
+            onClick={() => setFormData({
+              ...formData,
+              ferie_days_per_month: 2.0,
+              rol_hours_per_month: 4.0,
+              permessi_hours_per_month: 10.0
+            })}
+          >
+            CCNL Metalmeccanico
+          </button>
+        </div>
+        <small className="help-text">
+          Clicca per applicare valori predefiniti comuni (poi personalizza se necessario)
+        </small>
+      </section>
+    </div>
+  );
+};
+
+export default VacationSettings;
+```
+
+---
+
+Continua nel prossimo file...
+
+## ⭐ 5.9.7 - User Holidays Manager (INVARIATO)
+
+Stesso codice del documento originale - funziona già correttamente.
+
+---
+
+## 🌉 5.9.8 - Bridge Opportunities (INVARIATO)
+
+Stesso codice del documento originale - funziona già correttamente.
+
+---
+
+## 📄 5.9.9 - Vacation Page (AGGIORNATO)
+
+- [ ] 📝 Crea `frontend/src/pages/VacationPage.jsx`
+
+```jsx
+import React, { useState } from 'react';
+import VacationCalendar from '../components/vacation/VacationCalendar';
+import VacationBalance from '../components/vacation/VacationBalance';
+import VacationSettings from '../components/vacation/VacationSettings';
+import BridgeOpportunities from '../components/vacation/BridgeOpportunities';
+import UserHolidaysManager from '../components/vacation/UserHolidaysManager';
+import BulkEntryModal from '../components/vacation/BulkEntryModal';  // NEW!
+import '../styles/vacation.css';
+
+const VacationPage = () => {
+  const [activeTab, setActiveTab] = useState('calendar');
+  const [showBulkModal, setShowBulkModal] = useState(false);  // NEW!
+
+  const tabs = [
+    { id: 'calendar', label: '📅 Calendario', component: VacationCalendar },
+    { id: 'balance', label: '📊 Riepilogo', component: VacationBalance },
+    { id: 'bridges', label: '🌉 Ponti', component: BridgeOpportunities },
+    { id: 'holidays', label: '⭐ Festività', component: UserHolidaysManager },
+    { id: 'settings', label: '⚙️ Impostazioni', component: VacationSettings },
+  ];
+
+  const ActiveComponent = tabs.find(t => t.id === activeTab)?.component;
+
+  const handleBulkSave = () => {
+    setShowBulkModal(false);
+    // Refresh calendar if active
+    if (activeTab === 'calendar') {
+      window.location.reload(); // Simple refresh, or use proper state management
+    }
+  };
+
+  return (
+    <div className="vacation-page">
+      <div className="page-header">
+        <h1>🏖️ Gestione Ferie</h1>
+        
+        {/* Bulk Insert Button - Show only on calendar tab */}
+        {activeTab === 'calendar' && (
+          <button 
+            className="btn-primary bulk-button"
+            onClick={() => setShowBulkModal(true)}
+          >
+            📅 Inserimento Multiplo
+          </button>
+        )}
+      </div>
+      
+      <div className="vacation-tabs">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      
+      <div className="vacation-content">
+        {ActiveComponent && <ActiveComponent />}
+      </div>
+      
+      {/* Bulk Entry Modal */}
+      {showBulkModal && (
+        <BulkEntryModal
+          onClose={() => setShowBulkModal(false)}
+          onSave={handleBulkSave}
+        />
+      )}
+    </div>
+  );
+};
+
+export default VacationPage;
+```
+
+---
+
+## 🎨 5.9.10 - CSS Styles (ESTESO)
+
+- [ ] 📝 Crea/Aggiorna `frontend/src/styles/vacation.css`
+
+```css
+/* ========================================
+   VACATION MODULE STYLES
+   ======================================== */
+
+.vacation-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.bulk-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* === TABS === */
+.vacation-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 2rem;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  color: var(--primary-color);
+  background: var(--bg-hover);
+}
+
+.tab-button.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* ========================================
+   BALANCE WIDGET
+   ======================================== */
+
+.vacation-balance {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.year-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.year-selector button {
+  background: var(--bg-secondary);
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.year-selector button:hover {
+  background: var(--bg-hover);
+}
+
+/* Total Card (Aggregated) */
+.balance-total-card {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: white;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.total-header h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.tracking-info {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
+.total-values {
+  display: flex;
+  gap: 3rem;
+  margin: 2rem 0;
+  justify-content: center;
+}
+
+.total-days, .total-hours {
+  text-align: center;
+}
+
+.total-days .value, .total-hours .value {
+  display: block;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.total-days .unit, .total-hours .unit {
+  display: block;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin-top: 0.5rem;
+}
+
+.total-breakdown-mini {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255,255,255,0.3);
+}
+
+.mini-stat {
+  text-align: center;
+}
+
+.mini-stat.separator {
+  opacity: 0.5;
+  font-size: 1.5rem;
+}
+
+.mini-stat .label {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-bottom: 0.25rem;
+}
+
+.mini-stat .value {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.mini-stat.highlight .value {
+  font-size: 1.3rem;
+}
+
+/* Breakdown Grid */
+.balance-breakdown {
+  margin-bottom: 2rem;
+}
+
+.balance-breakdown h4 {
+  margin-bottom: 1rem;
+}
+
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.balance-type-card {
+  background: white;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.balance-type-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.balance-type-card.blue { border-color: #3b82f6; }
+.balance-type-card.green { border-color: #10b981; }
+.balance-type-card.purple { border-color: #8b5cf6; }
+
+.type-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.type-icon {
+  font-size: 1.5rem;
+}
+
+.type-header h5 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.type-stats {
+  margin-bottom: 1rem;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.stat-row.highlight {
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.stat-label {
+  color: var(--text-secondary);
+}
+
+.stat-value small {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-left: 0.25rem;
+}
+
+.usage-bar {
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.usage-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-dark));
+  transition: width 0.3s;
+}
+
+.usage-label {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+/* Projection */
+.balance-projection {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.balance-projection h4 {
+  margin: 0 0 1rem 0;
+}
+
+.projection-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.projection-value small {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+.projection-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Settings Info */
+.balance-settings details {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.balance-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.balance-settings summary:hover {
+  color: var(--primary-color);
+}
+
+.settings-details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-details p {
+  margin: 0.5rem 0;
+}
+
+.settings-details ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+/* ========================================
+   SETTINGS FORM
+   ======================================== */
+
+.vacation-settings {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-section {
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section:last-of-type {
+  border-bottom: none;
+}
+
+.settings-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--primary-color);
+}
+
+.section-description {
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem 0;
+  font-size: 0.95rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.help-text {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+}
+
+.total-preview {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.initial-balance-form {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+/* Presets */
+.presets {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+}
+
+/* ========================================
+   BULK MODAL
+   ======================================== */
+
+.bulk-modal {
+  max-width: 600px;
+}
+
+.modal-description {
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem 0;
+}
+
+.bulk-preview {
+  background: var(--bg-info);
+  border-left: 4px solid var(--primary-color);
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.preview-icon {
+  font-size: 1.5rem;
+}
+
+.bulk-preview strong {
+  color: var(--primary-color);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+  .vacation-page {
+    padding: 1rem;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .vacation-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  
+  .tab-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .total-values {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .total-breakdown-mini {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .mini-stat.separator {
+    display: none;
+  }
+  
+  .breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+.error-message {
+  background: var(--error-bg);
+  color: var(--error-color);
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border-left: 4px solid var(--error-color);
+}
+
+.success-message {
+  background: var(--success-bg);
+  color: var(--success-color);
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border-left: 4px solid var(--success-color);
+}
+
+/* ========================================
+   COLOR VARIABLES (Add to main CSS)
+   ======================================== */
+
+:root {
+  --primary-color: #3b82f6;
+  --primary-dark: #2563eb;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --bg-secondary: #f9fafb;
+  --bg-hover: #f3f4f6;
+  --bg-info: #eff6ff;
+  --error-bg: #fef2f2;
+  --error-color: #dc2626;
+  --success-bg: #f0fdf4;
+  --success-color: #16a34a;
+}
+```
+
+---
+
+## 🔗 5.9.11 - Integration
+
+### 5.9.11.1 - Aggiungi route
+- [ ] 📝 Modifica `frontend/src/App.jsx`:
+
+```jsx
+import VacationPage from './pages/VacationPage';
+
+// In routes:
+<Route path="/vacation" element={<ProtectedRoute><VacationPage /></ProtectedRoute>} />
+```
+
+### 5.9.11.2 - Aggiungi link in navbar
+- [ ] 📝 Modifica componente Navbar:
+
+```jsx
+<NavLink to="/vacation">🏖️ Ferie</NavLink>
+```
+
+---
+
+## 🧪 5.9.12 - Testing Manuale
+
+### Test Checklist:
+
+**Settings:**
+- [ ] Form carica con valori default
+- [ ] Modificare maturazione separata (ferie/rol/permessi)
+- [ ] Salvare con tracking start date
+- [ ] Abilitare saldo iniziale e inserire valori
+- [ ] Verificare validazione (balance date prima di tracking start)
+- [ ] Preset CCNL funzionanti
+
+**Calendar:**
+- [ ] Festività nazionali visibili
+- [ ] Festività custom visibili (dopo averle create)
+- [ ] Weekend marcati
+- [ ] Click su giorno apre modal entry
+- [ ] Click su festività/weekend non apre modal
+- [ ] Pulsante "Inserimento Multiplo" visibile
+
+**Single Entry:**
+- [ ] Modal FERIE: no input ore
+- [ ] Modal ROL: input ore obbligatorio
+- [ ] Modal PERMESSI: input ore obbligatorio
+- [ ] Validazione: non permette weekend
+- [ ] Validazione: non permette festività
+- [ ] Entry salvata appare nel calendario
+
+**Bulk Entry:**
+- [ ] Modal si apre da pulsante
+- [ ] Range date funzionante
+- [ ] Preview count approssimativo
+- [ ] Checkbox skip weekend/holidays
+- [ ] Per FERIE: no input ore
+- [ ] Per ROL/PERMESSI: input ore obbligatorio
+- [ ] Creazione multipla funziona
+- [ ] Messaggio successo mostra count creati
+
+**Balance:**
+- [ ] Mostra totale aggregato (giorni + ore)
+- [ ] Mostra tracking info (data inizio + mesi)
+- [ ] Breakdown per tipo con tutte le info
+- [ ] Progress bar per tipo
+- [ ] Proiezione fine anno
+- [ ] Info configurazione espandibile
+
+**Bridges:**
+- [ ] Lista ponti per anno
+- [ ] Descrizioni corrette
+- [ ] Cambia anno funziona
+
+**User Holidays:**
+- [ ] Aggiungere patrono ricorrente
+- [ ] Aggiungere festività non ricorrente
+- [ ] Validazione giorno/mese
+- [ ] Eliminare festività
+- [ ] Festività appare nel calendario
+
+---
+
+## 🎯 CHECKPOINT FASE 5.9
+
+**Services:**
+- [ ] ✅ vacationService.js con tutti endpoint (incl. bulk)
+
+**Components:**
+- [ ] ✅ VacationCalendar funzionante
+- [ ] ✅ VacationEntryModal (ferie no ore, ROL/Permessi sì)
+- [ ] ✅ BulkEntryModal (NUOVO - inserimento multiplo)
+- [ ] ✅ VacationBalance (totali aggregati + breakdown)
+- [ ] ✅ VacationSettings (maturazione separata + tracking start + saldo iniziale)
+- [ ] ✅ UserHolidaysManager
+- [ ] ✅ BridgeOpportunities
+
+**Page:**
+- [ ] ✅ VacationPage con tabs
+- [ ] ✅ Pulsante bulk visibile su tab calendario
+- [ ] ✅ Route configurata
+- [ ] ✅ Navbar link funzionante
+
+**Styles:**
+- [ ] ✅ vacation.css completo
+- [ ] ✅ Responsive design
+- [ ] ✅ Color scheme coerente
+
+**Testing:**
+- [ ] ✅ Tutti i test manuali passati
+- [ ] ✅ Validazioni funzionanti
+- [ ] ✅ UX fluida
+
+---
+
+## 📊 RIEPILOGO MODIFICHE FRONTEND
+
+### Componenti Nuovi:
+1. **BulkEntryModal** - Inserimento multiplo periodo
+
+### Componenti Aggiornati:
+1. **VacationSettings** - Form completamente riscritto con:
+   - Maturazione separata (ferie/rol/permessi)
+   - Tracking start date
+   - Saldo iniziale opzionale (ferie in giorni!)
+   - Preset CCNL
+   
+2. **VacationBalance** - Widget completamente riscritto con:
+   - Totali aggregati prominenti
+   - Breakdown dettagliato per tipo
+   - Progress bar per tipo
+   - Info tracking
+   - Proiezione fine anno
+
+3. **VacationPage** - Aggiunto pulsante bulk
+
+### Componenti Invariati (già corretti):
+- VacationCalendar
+- VacationEntryModal
+- UserHolidaysManager
+- BridgeOpportunities
+
+---
+
+**Tempo stimato:** 3-4 giorni  
+**Prossimo:** FASE 6 - Deployment
+
+---
+
+## 📝 Note Finali Implementazione
+
+### UX Migliorata:
+- ✅ Form settings più chiaro e intuitivo
+- ✅ Vista totali aggregati immediata
+- ✅ Inserimento multiplo facilita pianificazione
+- ✅ Validazioni impediscono errori
+
+### Architettura Coerente:
+- ✅ Backend e Frontend allineati
+- ✅ Maturazione separata per tipo funzionante end-to-end
+- ✅ Conversioni automatiche (giorni ↔ ore)
+- ✅ Calcoli aggregati corretti
+
+### Pronti per Produzione:
+- ✅ Tutti i componenti testati
+- ✅ Validazioni lato client e server
+- ✅ Error handling completo
+- ✅ Responsive design
+
 **Prossimo:** FASE 6 - Deployment
 
 ---
@@ -4272,11 +8281,14 @@ Queste sono le funzionalità che avevi chiesto come "suggerimenti extra". Implem
 - [x] FASE 1: Database Foundation (2-3 giorni)
 - [x] FASE 2: Backend API - Autenticazione (3-4 giorni)
 - [x] FASE 3: Backend API - Core Features (4-5 giorni)
-- [x] FASE 4: Testing & Debug (2 giorni)
-- [x] FASE 5: Frontend Integration (5-7 giorni)
-- [x] FASE 6: Deployment (3-4 giorni)
 
-**Totale: 6-8 settimane** ✅
+### In Corso 🟡
+- [ ] FASE 3.8: Backend API - Vacation Planning (3-4 giorni) ← NUOVO
+- [ ] FASE 4: Testing & Debug Core (2 giorni)
+- [ ] FASE 4.6: Testing Vacation Module (1-2 giorni) ← NUOVO
+- [ ] FASE 5: Frontend Integration Core (5-7 giorni)
+- [ ] FASE 5.9: Frontend Vacation Module (3-4 giorni) ← NUOVO
+- [ ] FASE 6: Deployment (3-4 giorni)
 
 ### In Roadmap 📋
 - [ ] FASE 7: Sviluppi Futuri (ongoing)

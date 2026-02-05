@@ -9,7 +9,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**Una moderna applicazione web per la gestione del budget personale con supporto multi-utente**
+**Una moderna applicazione web per la gestione del budget personale con supporto multi-utente e pianificazione ferie**
 
 [Features](#-features) • [Tech Stack](#-tech-stack) • [Setup](#-setup-locale) • [Roadmap](#-roadmap) • [Contributing](#-contributing)
 
@@ -25,6 +25,7 @@ Budget App è una **web application SaaS** per la gestione delle finanze persona
 - Visualizzare **statistiche e grafici** in tempo reale
 - Creare **report personalizzati**
 - Pianificare budget mensili
+- **🆕 Gestire ferie e permessi** con calcolo automatico maturazione
 
 Il progetto nasce come evoluzione di un prototipo Excel, trasformato in un'applicazione web scalabile con autenticazione multi-utente e database PostgreSQL.
 
@@ -34,6 +35,8 @@ Il progetto nasce come evoluzione di un prototipo Excel, trasformato in un'appli
 
 ### 🎯 Core Features (MVP)
 
+#### 💰 Gestione Finanziaria
+
 - ✅ **Dashboard Interattiva**: Visualizzazione real-time di balance, income, expense
 - ✅ **Multi-Account Management**: Gestione conti corrente, risparmio, contanti, investimenti
 - ✅ **Categorizzazione Smart**: Categorie predefinite + custom categories
@@ -42,21 +45,54 @@ Il progetto nasce come evoluzione di un prototipo Excel, trasformato in un'appli
 - ✅ **Filtri Avanzati**: Per data, account, categoria, tipo
 - ✅ **Statistiche Mensili**: Trend income/expense, grafici a torta per categorie
 - ✅ **Custom Chart Builder**: Crea e salva grafici personalizzati
+
+#### 🏖️ Gestione Ferie (Vacation Planning)
+
+- ✅ **Maturazione Separata per Tipo**: Tracciamento indipendente Ferie, ROL, Permessi
+  - Ferie: giorni/mese (es. 1.83 giorni = 22 giorni/anno)
+  - ROL: ore/mese (es. 2.67 ore = 32 ore/anno)
+  - Permessi: ore/mese (es. 8.67 ore = 104 ore/anno)
+- ✅ **Tracking Start Date**: Data inizio maturazione invece di riporto anno precedente
+- ✅ **Saldo Iniziale Opzionale**: Per migrare da altri sistemi (ferie in giorni, ROL/Permessi in ore)
+- ✅ **Calendario Interattivo**: Visualizzazione mensile con festività evidenziate
+- ✅ **Festività Italiane**: Calendario pre-popolato con festività nazionali + calcolo automatico Pasqua/Pasquetta
+- ✅ **Festività Custom**: Aggiungi patrono locale o chiusure aziendali
+- ✅ **Inserimento Multiplo**: Crea ferie per intere settimane con auto-skip weekend/festività
+- ✅ **Validazione Intelligente**: Blocco inserimento nei weekend e festività
+- ✅ **Balance con Totali Aggregati**: Vista riepilogo prominente con breakdown dettagliato per tipo
+- ✅ **Calcolo Ponti Automatico**: Identificazione opportunità ponte (es. Martedì → Lunedì)
+- ✅ **Proiezione Fine Anno**: Stima ore residue basata su maturazione
+- ✅ **Preset CCNL**: Configurazioni rapide per contratti comuni (Commercio, Metalmeccanico)
+
+#### 🔒 Sicurezza & Multi-Utente
+
 - 🔒 **Sistema di Autenticazione**: JWT-based authentication
 - 🔒 **Multi-User Support**: Isolamento dati per utente
 - 🔒 **API REST Completa**: Backend FastAPI documentato
 
 ### 🚀 Planned Features (Post-MVP)
 
+#### Finanza
 - [ ] **Recurring Transactions**: Auto-generazione transazioni ricorrenti
 - [ ] **Budget Planning**: Impostazione budget mensile per categoria
 - [ ] **Bill Reminders**: Notifiche scadenze bollette
 - [ ] **Multi-Currency**: Supporto valute multiple con conversione
 - [ ] **Receipt Scanning**: OCR per estrarre dati da scontrini
 - [ ] **Shared Accounts**: Condivisione account tra più utenti
-- [ ] **Mobile App**: React Native app per iOS/Android
 - [ ] **Bank Sync**: Integrazione con conti bancari (Plaid/Tink)
 - [ ] **AI Insights**: Pattern detection e suggerimenti risparmio
+
+#### Ferie
+- [ ] **Export iCal**: Esporta ferie in calendario Apple/Google
+- [ ] **Smart Suggestions**: Suggerimenti periodo migliore per ferie (basato su ponti)
+- [ ] **Team View**: Vista condivisa ferie team (per piccole aziende)
+- [ ] **Approvazione Workflow**: Sistema approvazione richieste ferie
+- [ ] **Storico Multi-Anno**: Archivio ferie anni precedenti
+
+#### General
+- [ ] **Mobile App**: React Native app per iOS/Android
+- [ ] **Dark Mode**: Tema scuro per UI
+- [ ] **Multi-Language**: Supporto lingue multiple
 
 ---
 
@@ -229,8 +265,14 @@ Frontend disponibile su: **http://localhost:5173**
 cd backend
 source venv/bin/activate
 
-# Run tutti i test
+# Run tutti i test (finanza + ferie)
 pytest tests/ -v
+
+# Run solo test finanza
+pytest tests/test_auth.py tests/test_accounts.py tests/test_transactions.py -v
+
+# Run solo test ferie
+pytest tests/test_vacation*.py tests/test_user_holidays.py -v
 
 # Run con coverage
 pytest tests/ -v --cov=app --cov-report=html
@@ -279,6 +321,22 @@ La documentazione API completa è disponibile tramite **Swagger UI** quando il b
 - `GET /api/v1/analytics/summary` - Summary dashboard
 - `GET /api/v1/analytics/monthly-trend` - Trend mensile
 
+#### Vacation Planning 🆕
+- `GET /api/v1/vacation/settings` - Configurazione ferie utente
+- `PUT /api/v1/vacation/settings` - Aggiorna configurazione
+- `GET /api/v1/vacation/entries` - Lista ferie/permessi
+- `POST /api/v1/vacation/entries` - Crea singola entry
+- `POST /api/v1/vacation/entries/bulk` - Crea multiple entries (range date)
+- `PUT /api/v1/vacation/entries/{id}` - Modifica entry (solo note/ore)
+- `DELETE /api/v1/vacation/entries/{id}` - Elimina entry
+- `GET /api/v1/vacation/balance` - Balance con totali aggregati + breakdown
+- `GET /api/v1/vacation/calendar/{year}/{month}` - Calendario mensile
+- `GET /api/v1/vacation/holidays/{year}` - Festività nazionali italiane
+- `GET /api/v1/vacation/bridges/{year}` - Opportunità ponti
+- `GET /api/v1/vacation/user-holidays` - Festività custom utente
+- `POST /api/v1/vacation/user-holidays` - Aggiungi festività custom
+- `DELETE /api/v1/vacation/user-holidays/{id}` - Rimuovi festività custom
+
 Vedi [API_SPEC.md](docs/API_SPEC.md) per documentazione dettagliata.
 
 ---
@@ -291,14 +349,42 @@ budget-app-saas/
 │   ├── alembic/             # Database migrations
 │   │   └── versions/        # Migration files
 │   ├── app/                 # Application code
-│   │   ├── api/             # API routes
-│   │   │   └── endpoints/   # Endpoint modules
-│   │   ├── core/            # Core functionality
 │   │   ├── crud/            # Database CRUD operations
+│   │   │   ├── account.py
+│   │   │   ├── transaction.py
+│   │   │   ├── vacation_entry.py      # 🆕 Ferie CRUD
+│   │   │   ├── vacation_settings.py   # 🆕 Settings CRUD
+│   │   │   └── italian_holiday.py     # 🆕 Festività CRUD
 │   │   ├── models/          # SQLAlchemy models
+│   │   │   ├── account.py
+│   │   │   ├── transaction.py
+│   │   │   ├── vacation_entry.py      # 🆕 Ferie model
+│   │   │   ├── vacation_settings.py   # 🆕 Settings model
+│   │   │   ├── italian_holiday.py     # 🆕 Festività model
+│   │   │   └── user_holiday.py        # 🆕 Festività custom model
+│   │   ├── routers/         # API routes
+│   │   │   ├── auth.py
+│   │   │   ├── accounts.py
+│   │   │   ├── transactions.py
+│   │   │   └── vacation.py            # 🆕 Vacation router
 │   │   ├── schemas/         # Pydantic schemas
+│   │   │   ├── account.py
+│   │   │   ├── transaction.py
+│   │   │   └── vacation.py            # 🆕 Vacation schemas
 │   │   └── utils/           # Utility functions
+│   │       ├── security.py
+│   │       ├── easter.py              # 🆕 Calcolo Pasqua
+│   │       ├── bridge_days.py         # 🆕 Calcolo ponti
+│   │       └── vacation_balance.py    # 🆕 Balance calculator
 │   ├── tests/               # Pytest tests
+│   │   ├── test_auth.py
+│   │   ├── test_accounts.py
+│   │   ├── test_transactions.py
+│   │   ├── test_vacation_settings.py  # 🆕
+│   │   ├── test_vacation_entries.py   # 🆕
+│   │   ├── test_vacation_bulk.py      # 🆕
+│   │   ├── test_vacation_balance.py   # 🆕
+│   │   └── test_user_holidays.py      # 🆕
 │   ├── .env                 # Environment variables (not committed)
 │   ├── .env.example         # Environment template
 │   ├── main.py              # FastAPI app entry point
@@ -309,9 +395,26 @@ budget-app-saas/
 │   ├── public/              # Static files
 │   ├── src/                 # Source code
 │   │   ├── components/      # React components
+│   │   │   └── vacation/    # 🆕 Vacation components
+│   │   │       ├── VacationCalendar.jsx
+│   │   │       ├── VacationEntryModal.jsx
+│   │   │       ├── BulkEntryModal.jsx         # 🆕 Inserimento multiplo
+│   │   │       ├── VacationBalance.jsx        # 🆕 Balance widget
+│   │   │       ├── VacationSettings.jsx       # 🆕 Settings form
+│   │   │       ├── BridgeOpportunities.jsx
+│   │   │       └── UserHolidaysManager.jsx
 │   │   ├── pages/           # Page components
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Accounts.jsx
+│   │   │   ├── Transactions.jsx
+│   │   │   └── VacationPage.jsx               # 🆕 Vacation main page
 │   │   ├── services/        # API services
-│   │   ├── utils/           # Utility functions
+│   │   │   ├── api.js
+│   │   │   ├── authService.js
+│   │   │   ├── accountService.js
+│   │   │   └── vacationService.js             # 🆕 Vacation API service
+│   │   ├── styles/          # CSS files
+│   │   │   └── vacation.css                   # 🆕 Vacation styles
 │   │   ├── App.jsx          # Main App component
 │   │   └── main.jsx         # Entry point
 │   ├── .env                 # Environment variables
@@ -327,7 +430,10 @@ budget-app-saas/
 │   ├── ARCHITECTURE.md      # System architecture
 │   ├── API_SPEC.md          # API specifications
 │   ├── DEPLOYMENT.md        # Deployment guide
-│   └── TESTING.md           # Testing guide
+│   ├── TESTING.md           # Testing guide
+│   ├── fase_3_8_backend_vacation_UPDATED.md    # 🆕 Vacation backend guide
+│   ├── fase_4_6_testing_vacation_UPDATED.md    # 🆕 Vacation testing guide
+│   └── fase_5_9_frontend_vacation_UPDATED.md   # 🆕 Vacation frontend guide
 │
 ├── docker/                  # Docker configuration
 │   ├── docker-compose.yml
@@ -343,40 +449,66 @@ budget-app-saas/
 
 ## 🗺️ Roadmap
 
-### ✅ Fase 0: Setup Progetto (Completata ~60%)
+### ✅ Fase 0: Setup Progetto (Completata)
 - [x] Repository GitHub
 - [x] Struttura cartelle
 - [x] Frontend React prototipo
-- [ ] Backend Python setup
-- [ ] Database PostgreSQL
+- [x] Backend Python setup
+- [x] Database PostgreSQL
 
-### 🚧 Fase 1: Database Foundation (In corso)
-- [ ] Schema database completo
-- [ ] SQLAlchemy models
-- [ ] Alembic migrations
+### ✅ Fase 1: Database Foundation (Completata)
+- [x] Schema database completo
+- [x] SQLAlchemy models
+- [x] Alembic migrations
 
-### 📅 Fase 2: Backend API - Autenticazione
-- [ ] JWT authentication
-- [ ] User registration/login
-- [ ] Protected endpoints
+### ✅ Fase 2: Backend API - Autenticazione (Completata)
+- [x] JWT authentication
+- [x] User registration/login
+- [x] Protected endpoints
 
-### 📅 Fase 3: Backend API - Core Features
-- [ ] Accounts CRUD
-- [ ] Transactions CRUD
-- [ ] Categories CRUD
-- [ ] Transfers CRUD
-- [ ] Analytics endpoints
+### ✅ Fase 3: Backend API - Core Features (Completata)
+- [x] Accounts CRUD
+- [x] Transactions CRUD
+- [x] Categories CRUD
+- [x] Transfers CRUD
+- [x] Analytics endpoints
+
+### 🆕 Fase 3.8: Backend Vacation Planning (In corso)
+- [ ] Models con maturazione separata (Ferie/ROL/Permessi)
+- [ ] Tracking start date + initial balance
+- [ ] Calcolo automatico Pasqua/Pasquetta
+- [ ] Validazione weekend + festività
+- [ ] Balance con totali aggregati
+- [ ] Bulk entry endpoint
+- [ ] Bridge calculator
 
 ### 📅 Fase 4: Testing & Debug
-- [ ] Pytest suite completa
+- [ ] Pytest suite completa finanza
+- [ ] Pytest suite completa ferie
 - [ ] Coverage >70%
 - [ ] Bug fixing
+
+### 📅 Fase 4.6: Testing Vacation Module
+- [ ] Test settings con maturazione separata
+- [ ] Test validazione weekend/festività
+- [ ] Test balance aggregato
+- [ ] Test bulk entries
+- [ ] Test user holidays
 
 ### 📅 Fase 5: Frontend Integration
 - [ ] Connessione API backend
 - [ ] Rimozione localStorage
 - [ ] User authentication flow
 - [ ] Real-time data sync
+
+### 📅 Fase 5.9: Frontend Vacation Module
+- [ ] VacationSettings (form con preset CCNL)
+- [ ] VacationBalance (totali aggregati prominenti)
+- [ ] VacationCalendar (con festività)
+- [ ] BulkEntryModal (inserimento multiplo)
+- [ ] BridgeOpportunities
+- [ ] UserHolidaysManager
+- [ ] Responsive design
 
 ### 📅 Fase 6: Deployment
 - [ ] Backend deployment (Render.com)
@@ -389,9 +521,10 @@ budget-app-saas/
 - [ ] Budget planning
 - [ ] Multi-currency
 - [ ] Receipt scanning
+- [ ] Export iCal ferie
 - [ ] Mobile app
 
-**Timeline:** 6-8 settimane  
+**Timeline:** 8-10 settimane  
 **Vedi**: [roadmap.md](roadmap.md) per dettagli completi
 
 ---
@@ -411,6 +544,126 @@ budget-app-saas/
 
 ### Analytics
 *Grafici e statistiche personalizzate*
+
+### 🆕 Vacation Calendar
+*Calendario ferie con festività italiane e custom*
+
+### 🆕 Vacation Balance
+*Balance aggregato con breakdown dettagliato Ferie/ROL/Permessi*
+
+### 🆕 Vacation Settings
+*Configurazione maturazione separata con preset CCNL*
+
+---
+
+## 🏖️ Guida Vacation Planning
+
+### Configurazione Iniziale
+
+1. **Accedi a Impostazioni Ferie** (`/vacation` → Tab "Impostazioni")
+
+2. **Configura Ore Lavorative**
+   ```
+   Ore lavorative al giorno: 8.0 (default)
+   ```
+
+3. **Imposta Maturazione Mensile**
+   ```
+   Ferie: 1.83 giorni/mese (= 22 giorni/anno)
+   ROL: 2.67 ore/mese (= 32 ore/anno)
+   Permessi: 8.67 ore/mese (= 104 ore/anno)
+   
+   💡 Usa i preset CCNL per configurazioni rapide!
+   ```
+
+4. **Tracking Start Date**
+   ```
+   Data inizio maturazione: 01/01/2026 (esempio)
+   ```
+
+5. **Saldo Iniziale (opzionale)**
+   ```
+   Se hai già ore maturate prima del tracking:
+   - Mese riferimento: Dicembre
+   - Anno riferimento: 2025
+   - Ferie: 10 giorni (in GIORNI!)
+   - ROL: 16 ore
+   - Permessi: 40 ore
+   ```
+
+### Uso Quotidiano
+
+**Inserimento Singolo:**
+1. Vai al Calendario
+2. Click su un giorno (solo giorni lavorativi)
+3. Seleziona tipo (Ferie/ROL/Permesso)
+4. Per ROL/Permessi: inserisci ore
+5. Per Ferie: ore automatiche da settings
+6. Aggiungi note opzionali
+7. Salva
+
+**Inserimento Multiplo:**
+1. Click su "📅 Inserimento Multiplo"
+2. Seleziona range date (es. 15/07 - 19/07)
+3. Tipo: Ferie
+4. ✓ Skip weekend
+5. ✓ Skip festività
+6. Crea → Sistema genera automaticamente 5 entries (Lun-Ven)
+
+**Visualizza Balance:**
+- Tab "Riepilogo"
+- Totale disponibile prominente (giorni + ore)
+- Breakdown dettagliato per tipo:
+  - Ferie: maturate, usate, disponibili
+  - ROL: maturate, usate, disponibili
+  - Permessi: maturate, usate, disponibili
+- Proiezione fine anno
+
+**Trova Ponti:**
+- Tab "Ponti"
+- Lista automatica opportunità
+- Es: "Ponte Liberazione 25 Apr: prendi Venerdì 26 per 4 giorni off"
+
+**Festività Custom:**
+- Tab "Festività"
+- Aggiungi patrono (es. Sant'Ambrogio 7/12 Milano)
+- Aggiungi chiusure aziendali
+- Recurring: si ripete ogni anno
+
+### Regole Importanti
+
+✅ **Puoi modificare:**
+- Note (sempre)
+- Ore (solo per ROL/Permessi esistenti)
+
+❌ **NON puoi modificare:**
+- Data (elimina e ricrea)
+- Tipo (elimina e ricrea)
+
+❌ **NON puoi inserire:**
+- Weekend (validazione blocca)
+- Festività nazionali (validazione blocca)
+- Festività custom (validazione blocca)
+
+### Calcoli Automatici
+
+**Maturazione:**
+```
+Ferie: initial_ferie_days + (ferie_days_per_month × mesi_lavorati) × 8h/day
+ROL: initial_rol_hours + (rol_hours_per_month × mesi_lavorati)
+Permessi: initial_permessi_hours + (permessi_hours_per_month × mesi_lavorati)
+```
+
+**Totale Disponibile:**
+```
+Total = (Ferie disponibili) + (ROL disponibili) + (Permessi disponibili)
+Visualizzato sia in ORE che in GIORNI
+```
+
+**Proiezione Fine Anno:**
+```
+Projected = Disponibile ora + (Maturazione mesi rimanenti)
+```
 
 ---
 
@@ -512,6 +765,7 @@ Specializing in AVEVA PI System implementations
 
 - Progetto nato come evoluzione di un sistema di gestione budget Excel
 - Ispirato da moderne SaaS financial apps
+- Vacation planning module progettato per lavoratori italiani (CCNL Commercio/Metalmeccanico)
 - Built with ❤️ in Sicily
 
 ---
