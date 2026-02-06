@@ -6079,6 +6079,1344 @@ Prima di procedere, verifica:
 
 **FASE 3.9 COMPLETATA! 🎉**
 
+# FASE 3.10: Backend API - CSV Import (1 giorno)
+
+## 🎯 Obiettivo
+Implementare il backend per l'importazione massiva di transazioni da file CSV, permettendo agli utenti di caricare estratti conto bancari o export da altre app con validazione intelligente, rilevamento duplicati e preview interattiva.
+
+**Target:** Onboarding veloce utenti con storico transazioni  
+**Integrazione:** Transaction module esistente (bulk insert)
+
+---
+
+## 📋 Panoramica Funzionalità
+
+### Core Features
+- ✅ **Upload CSV con formato standard fisso**
+- ✅ **Parsing e validazione righe** (date, amount, category matching)
+- ✅ **Rilevamento duplicati automatico** (match per date + amount + description)
+- ✅ **Fuzzy matching categorie** (suggerimenti per categorie simili)
+- ✅ **Preview data** con status righe (valid/warning/error/duplicate)
+- ✅ **Bulk insert ottimizzato** (gestione transazioni multiple)
+- ✅ **Update automatico account balance**
+- ✅ **Report dettagliato** (imported/skipped/errors)
+
+### Decisioni Architetturali
+- **Formato CSV:** Standard fisso con 5 colonne obbligatorie
+- **Categoria mancante:** Assegna a categoria default "Non Categorizzato"
+- **Duplicati:** Skip automatico con report (match esatto date+amount+description)
+- **Account:** Selezione unica pre-upload (tutte le transazioni nello stesso account)
+- **Validazione:** Server-side completa prima di insert
+- **Processing:** Sincrono per MVP (file <1000 righe), asincrono post-MVP
+
+---
+
+## 🗂️ 3.10.1 - Formato CSV & Template
+
+### 3.10.1.1 - Definisci formato CSV standard
+- [ ] 📝 Documentazione formato CSV
+
+**Formato Standard BudgetApp:**
+```csv
+date,description,amount,category_name,notes
+2025-01-15,Spesa Supermercato,-45.50,Spesa,Conad Centro
+2025-01-16,Stipendio,2500.00,Stipendio,Gennaio 2025
+2025-01-17,Ristorante Pizza,-35.00,Ristorazione,Cena con amici
+```
+
+**Specifiche colonne:**
+- `date`: Formato ISO (YYYY-MM-DD), obbligatoria
+- `description`: Testo libero, obbligatoria, max 200 caratteri
+- `amount`: Numero decimale, obbligatorio
+  - Positivo = Income
+  - Negativo = Expense
+  - Separatore decimale: punto (es. -45.50)
+- `category_name`: Nome categoria, opzionale
+  - Se vuoto o non trovato → "Non Categorizzato"
+  - Case-insensitive matching
+- `notes`: Testo libero, opzionale, max 500 caratteri
+
+**Regole:**
+- Header obbligatorio (prima riga)
+- Encoding: UTF-8
+- Separatore: virgola (,)
+- Quote: Doppi apici se testo contiene virgole
+- Max righe per file: 1000 (MVP)
+
+---
+
+### 3.10.1.2 - Crea template CSV scaricabile
+- [ ] 📝 Crea file `backend/templates/template_transazioni.csv`
+
+```csv
+date,description,amount,category_name,notes
+2025-01-15,Esempio spesa supermercato,-45.50,Spesa,Note opzionali
+2025-01-16,Esempio stipendio,2500.00,Stipendio,Gennaio
+2025-01-17,Esempio ristorante,-35.00,Ristorazione,
+```
+
+- [ ] File salvato in `backend/static/templates/template_transazioni.csv`
+
+---
+
+### 3.10.1.3 - Endpoint download template
+- [ ] 📝 Aggiungi in `backend/app/main.py`:
+
+```python
+from fastapi.staticfiles import StaticFiles
+
+# Monta directory static per file scaricabili
+app.mount("/static", StaticFiles(directory="static"), name="static")
+```
+
+- [ ] Crea directory `backend/static/templates/`
+- [ ] Template accessibile via: `http://localhost:8000/static/templates/template_transazioni.csv`
+
+---
+
+### 3.10.1.4 - Commit template
+- [ ] Commit: `Add CSV import template file - Phase 3.10.1`
+- [ ] Push
+
+---
+
+## 📐 3.10.2 - Pydantic Schemas
+
+### 3.10.2.1 - Crea CSV import schemas
+- [ ] 📝 Crea `backend/app/schemas/csv_import.py`
+
+```python
+"""
+CSV Import Schemas
+Request/Response validation for CSV transaction import
+"""
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Literal
+from datetime import date
+from decimal import Decimal
+
+
+class CSVRowParsed(BaseModel):
+    """Single parsed CSV row with validation status."""
+    row_number: int = Field(..., description="Row number in CSV (1-indexed, excluding header)")
+    date: Optional[date] = Field(None, description="Parsed date")
+    description: Optional[str] = Field(None, max_length=200)
+    amount: Optional[Decimal] = None
+    category_name: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None, max_length=500)
+    
+    # Validation status
+    status: Literal["valid", "warning", "error", "duplicate"] = Field(
+        ..., 
+        description="Row status: valid=ok, warning=category not found, error=invalid data, duplicate=already exists"
+    )
+    status_message: Optional[str] = Field(None, description="Human-readable status explanation")
+    
+    # Category matching
+    suggested_category_id: Optional[str] = Field(None, description="Suggested category UUID if fuzzy match found")
+    suggested_category_name: Optional[str] = Field(None, description="Suggested category name")
+    match_confidence: Optional[float] = Field(None, ge=0, le=1, description="Fuzzy match confidence (0-1)")
+    
+    # For duplicates
+    duplicate_transaction_id: Optional[str] = Field(None, description="UUID of existing duplicate transaction")
+
+
+class CSVImportPreviewResponse(BaseModel):
+    """Preview response after parsing CSV."""
+    total_rows: int = Field(..., description="Total rows in CSV (excluding header)")
+    valid_rows: int = Field(..., description="Rows with status 'valid'")
+    warning_rows: int = Field(..., description="Rows with status 'warning'")
+    error_rows: int = Field(..., description="Rows with status 'error'")
+    duplicate_rows: int = Field(..., description="Rows with status 'duplicate'")
+    
+    rows: List[CSVRowParsed] = Field(..., description="Parsed rows with status")
+    
+    account_id: str = Field(..., description="Target account UUID for import")
+    account_name: str = Field(..., description="Target account name")
+
+
+class CSVImportConfirmRequest(BaseModel):
+    """Request to confirm import after preview."""
+    account_id: str = Field(..., description="Target account UUID")
+    rows_to_import: List[int] = Field(
+        ..., 
+        description="Row numbers to import (user can exclude errors/duplicates)"
+    )
+    
+    @field_validator('rows_to_import')
+    @classmethod
+    def rows_must_be_positive(cls, v):
+        if any(row <= 0 for row in v):
+            raise ValueError("Row numbers must be positive")
+        return v
+
+
+class CSVImportResult(BaseModel):
+    """Final import result."""
+    total_processed: int = Field(..., description="Total rows processed")
+    imported: int = Field(..., description="Successfully imported transactions")
+    skipped_duplicates: int = Field(..., description="Skipped duplicate rows")
+    skipped_errors: int = Field(..., description="Skipped error rows")
+    skipped_by_user: int = Field(..., description="Rows user chose not to import")
+    
+    errors: List[dict] = Field(default_factory=list, description="Error details if any")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total_processed": 100,
+                "imported": 85,
+                "skipped_duplicates": 10,
+                "skipped_errors": 3,
+                "skipped_by_user": 2,
+                "errors": [
+                    {"row": 5, "error": "Invalid date format"},
+                    {"row": 12, "error": "Amount missing"}
+                ]
+            }
+        }
+```
+
+---
+
+### 3.10.2.2 - Aggiungi a schemas __init__
+- [ ] 📝 Apri `backend/app/schemas/__init__.py`
+- [ ] Aggiungi:
+
+```python
+from app.schemas.csv_import import (
+    CSVRowParsed,
+    CSVImportPreviewResponse,
+    CSVImportConfirmRequest,
+    CSVImportResult
+)
+```
+
+---
+
+### 3.10.2.3 - Commit schemas
+- [ ] Commit: `Add CSV import Pydantic schemas - Phase 3.10.2`
+- [ ] Push
+
+---
+
+## 🔧 3.10.3 - CSV Parser & Validator
+
+### 3.10.3.1 - Crea CSV parser utility
+- [ ] 📝 Crea `backend/app/utils/csv_parser.py`
+
+```python
+"""
+CSV Parser & Validator
+Utilities for parsing and validating CSV import files
+"""
+import csv
+from io import StringIO
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime, date
+from decimal import Decimal, InvalidOperation
+from difflib import SequenceMatcher
+
+from app.schemas.csv_import import CSVRowParsed
+
+
+class CSVParseError(Exception):
+    """Custom exception for CSV parsing errors."""
+    pass
+
+
+def similarity(a: str, b: str) -> float:
+    """Calculate string similarity (0-1) using SequenceMatcher."""
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def parse_csv_file(file_content: str, max_rows: int = 1000) -> List[Dict[str, str]]:
+    """
+    Parse CSV file content into list of dictionaries.
+    
+    Args:
+        file_content: CSV file content as string
+        max_rows: Maximum rows to parse (safety limit)
+    
+    Returns:
+        List of dicts with column_name: value
+    
+    Raises:
+        CSVParseError: If CSV is malformed or exceeds limits
+    """
+    try:
+        # Parse CSV
+        csv_reader = csv.DictReader(StringIO(file_content))
+        
+        # Check required columns
+        required_columns = {'date', 'description', 'amount'}
+        if not required_columns.issubset(set(csv_reader.fieldnames or [])):
+            missing = required_columns - set(csv_reader.fieldnames or [])
+            raise CSVParseError(f"Missing required columns: {missing}")
+        
+        # Parse rows
+        rows = []
+        for i, row in enumerate(csv_reader, start=1):
+            if i > max_rows:
+                raise CSVParseError(f"CSV exceeds maximum {max_rows} rows")
+            rows.append(row)
+        
+        if not rows:
+            raise CSVParseError("CSV file is empty (no data rows)")
+        
+        return rows
+    
+    except csv.Error as e:
+        raise CSVParseError(f"CSV format error: {str(e)}")
+
+
+def parse_date(date_str: str) -> Optional[date]:
+    """
+    Parse date string in multiple formats.
+    
+    Supported formats:
+    - YYYY-MM-DD (ISO, preferred)
+    - DD/MM/YYYY (Italian)
+    - DD-MM-YYYY
+    
+    Returns:
+        date object or None if parsing fails
+    """
+    if not date_str or not date_str.strip():
+        return None
+    
+    date_str = date_str.strip()
+    
+    # Try ISO format first (YYYY-MM-DD)
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        pass
+    
+    # Try Italian format (DD/MM/YYYY)
+    try:
+        return datetime.strptime(date_str, "%d/%m/%Y").date()
+    except ValueError:
+        pass
+    
+    # Try DD-MM-YYYY
+    try:
+        return datetime.strptime(date_str, "%d-%m-%Y").date()
+    except ValueError:
+        pass
+    
+    return None
+
+
+def parse_amount(amount_str: str) -> Optional[Decimal]:
+    """
+    Parse amount string to Decimal.
+    
+    Handles:
+    - Decimal point and comma (converts comma to point)
+    - Spaces (removes them)
+    - Currency symbols (removes them)
+    
+    Returns:
+        Decimal or None if parsing fails
+    """
+    if not amount_str or not amount_str.strip():
+        return None
+    
+    # Clean string
+    amount_str = amount_str.strip()
+    
+    # Remove common currency symbols
+    amount_str = amount_str.replace('€', '').replace('$', '').replace('£', '')
+    
+    # Remove spaces
+    amount_str = amount_str.replace(' ', '')
+    
+    # Replace comma with point (Italian format: 1.234,56 → 1234.56)
+    # Handle both: 1,234.56 (US) and 1.234,56 (IT)
+    if ',' in amount_str and '.' in amount_str:
+        # Both present: determine which is decimal separator
+        comma_pos = amount_str.rfind(',')
+        point_pos = amount_str.rfind('.')
+        if comma_pos > point_pos:
+            # Italian: 1.234,56
+            amount_str = amount_str.replace('.', '').replace(',', '.')
+        else:
+            # US: 1,234.56
+            amount_str = amount_str.replace(',', '')
+    elif ',' in amount_str:
+        # Only comma: assume decimal separator
+        amount_str = amount_str.replace(',', '.')
+    
+    # Parse to Decimal
+    try:
+        return Decimal(amount_str)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def validate_row(
+    row_data: Dict[str, str],
+    row_number: int
+) -> Tuple[CSVRowParsed, bool]:
+    """
+    Validate single CSV row.
+    
+    Args:
+        row_data: Raw row dict from CSV
+        row_number: Row number (1-indexed)
+    
+    Returns:
+        Tuple of (CSVRowParsed, is_valid)
+    """
+    # Parse date
+    parsed_date = parse_date(row_data.get('date', ''))
+    
+    # Parse amount
+    parsed_amount = parse_amount(row_data.get('amount', ''))
+    
+    # Get other fields
+    description = row_data.get('description', '').strip()
+    category_name = row_data.get('category_name', '').strip() or None
+    notes = row_data.get('notes', '').strip() or None
+    
+    # Determine status
+    errors = []
+    
+    if parsed_date is None:
+        errors.append("Invalid date format")
+    
+    if parsed_amount is None:
+        errors.append("Invalid amount")
+    
+    if not description:
+        errors.append("Description is required")
+    
+    # Determine status
+    if errors:
+        status = "error"
+        status_message = "; ".join(errors)
+        is_valid = False
+    elif category_name is None or category_name == "":
+        status = "warning"
+        status_message = "Category not specified (will use 'Non Categorizzato')"
+        is_valid = True
+    else:
+        status = "valid"
+        status_message = "OK"
+        is_valid = True
+    
+    return CSVRowParsed(
+        row_number=row_number,
+        date=parsed_date,
+        description=description[:200] if description else None,
+        amount=parsed_amount,
+        category_name=category_name[:100] if category_name else None,
+        notes=notes[:500] if notes else None,
+        status=status,
+        status_message=status_message
+    ), is_valid
+
+
+def find_similar_category(
+    category_name: str,
+    available_categories: List[Dict[str, str]],
+    threshold: float = 0.7
+) -> Optional[Tuple[str, str, float]]:
+    """
+    Find similar category using fuzzy matching.
+    
+    Args:
+        category_name: Category name to match
+        available_categories: List of dicts with 'id' and 'name'
+        threshold: Minimum similarity score (0-1)
+    
+    Returns:
+        Tuple of (category_id, category_name, confidence) or None
+    """
+    best_match = None
+    best_score = 0.0
+    
+    for cat in available_categories:
+        score = similarity(category_name, cat['name'])
+        if score > best_score and score >= threshold:
+            best_score = score
+            best_match = (cat['id'], cat['name'], score)
+    
+    return best_match
+```
+
+---
+
+### 3.10.3.2 - Commit parser utility
+- [ ] Commit: `Add CSV parser and validator utilities - Phase 3.10.3`
+- [ ] Push
+
+---
+
+## 🗄️ 3.10.4 - Import Logic (CRUD Extension)
+
+### 3.10.4.1 - Estendi transaction CRUD
+- [ ] 📝 Apri `backend/app/crud/transaction.py`
+- [ ] Aggiungi funzioni import:
+
+```python
+from typing import List, Tuple
+from app.schemas.csv_import import CSVRowParsed
+
+
+def check_duplicate_transaction(
+    db: Session,
+    user_id: Union[str, UUID],
+    date: date,
+    amount: Decimal,
+    description: str,
+    account_id: Union[str, UUID]
+) -> Optional[UUID]:
+    """
+    Check if transaction is duplicate.
+    
+    Match criteria: same date + amount + description + account
+    
+    Returns:
+        UUID of existing transaction if duplicate, None otherwise
+    """
+    user_id = _to_uuid(user_id)
+    account_id = _to_uuid(account_id)
+    
+    existing = db.query(Transaction).filter(
+        Transaction.user_id == user_id,
+        Transaction.account_id == account_id,
+        Transaction.date == date,
+        Transaction.amount == amount,
+        Transaction.description == description
+    ).first()
+    
+    return existing.id if existing else None
+
+
+def bulk_create_transactions(
+    db: Session,
+    transactions: List[TransactionCreate],
+    user_id: Union[str, UUID]
+) -> Tuple[int, List[str]]:
+    """
+    Bulk create multiple transactions.
+    
+    Args:
+        db: Database session
+        transactions: List of TransactionCreate objects
+        user_id: User ID
+    
+    Returns:
+        Tuple of (count_created, list_of_created_ids)
+    """
+    user_id = _to_uuid(user_id)
+    created_ids = []
+    
+    for txn_data in transactions:
+        # Use existing create_transaction (handles balance update)
+        try:
+            txn = create_transaction(db, txn_data, user_id)
+            created_ids.append(str(txn.id))
+        except Exception as e:
+            # Log error but continue with other transactions
+            print(f"Error creating transaction: {e}")
+            continue
+    
+    return len(created_ids), created_ids
+```
+
+---
+
+### 3.10.4.2 - Commit CRUD extension
+- [ ] Commit: `Add bulk import functions to transaction CRUD - Phase 3.10.4`
+- [ ] Push
+
+---
+
+## 🛣️ 3.10.5 - API Router
+
+### 3.10.5.1 - Crea CSV import router
+- [ ] 📝 Crea `backend/app/routers/csv_import.py`
+
+```python
+"""
+CSV Import Router
+Endpoints for importing transactions via CSV
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from sqlalchemy.orm import Session
+from typing import List
+
+from app.database import get_db
+from app.schemas.csv_import import (
+    CSVImportPreviewResponse,
+    CSVImportConfirmRequest,
+    CSVImportResult,
+    CSVRowParsed
+)
+from app.schemas.transaction import TransactionCreate
+from app.crud import transaction as transaction_crud
+from app.crud import account as account_crud
+from app.crud import category as category_crud
+from app.dependencies import get_current_user
+from app.models.user import User
+from app.utils.csv_parser import (
+    parse_csv_file,
+    validate_row,
+    find_similar_category,
+    CSVParseError
+)
+
+router = APIRouter(prefix="/csv-import", tags=["CSV Import"])
+
+
+@router.post("/preview", response_model=CSVImportPreviewResponse)
+async def preview_csv_import(
+    file: UploadFile = File(..., description="CSV file to import"),
+    account_id: str = Query(..., description="Target account UUID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Preview CSV import with validation.
+    
+    **Flow:**
+    1. Upload CSV file
+    2. Server parses and validates all rows
+    3. Returns preview with status for each row:
+       - `valid`: Ready to import
+       - `warning`: Category not found (will use 'Non Categorizzato')
+       - `error`: Invalid data (date/amount missing)
+       - `duplicate`: Transaction already exists
+    
+    **CSV Format (required columns):**
+    ```
+    date,description,amount,category_name,notes
+    2025-01-15,Spesa,-45.50,Spesa,Note opzionali
+    ```
+    
+    User can then review preview and confirm import.
+    """
+    # Verify account exists and belongs to user
+    account = account_crud.get_account(db, account_id, str(current_user.id))
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found or does not belong to user"
+        )
+    
+    # Read file
+    try:
+        content = await file.read()
+        file_content = content.decode('utf-8')
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be UTF-8 encoded"
+        )
+    
+    # Parse CSV
+    try:
+        raw_rows = parse_csv_file(file_content, max_rows=1000)
+    except CSVParseError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    
+    # Get user categories for matching
+    user_categories = category_crud.get_categories(db, str(current_user.id))
+    categories_dict = [{'id': str(cat.id), 'name': cat.name} for cat in user_categories]
+    
+    # Get or create "Non Categorizzato" category
+    non_categorizzato = next(
+        (cat for cat in user_categories if cat.name == "Non Categorizzato"),
+        None
+    )
+    if not non_categorizzato:
+        # Create it
+        from app.schemas.category import CategoryCreate
+        non_categorizzato = category_crud.create_category(
+            db,
+            CategoryCreate(
+                name="Non Categorizzato",
+                type="expense_necessity",
+                color="#9CA3AF"
+            ),
+            str(current_user.id)
+        )
+    
+    # Validate each row
+    parsed_rows: List[CSVRowParsed] = []
+    counts = {'valid': 0, 'warning': 0, 'error': 0, 'duplicate': 0}
+    
+    for idx, raw_row in enumerate(raw_rows, start=1):
+        # Basic validation
+        parsed_row, is_valid = validate_row(raw_row, idx)
+        
+        if not is_valid:
+            counts['error'] += 1
+            parsed_rows.append(parsed_row)
+            continue
+        
+        # Check duplicate
+        if parsed_row.date and parsed_row.amount and parsed_row.description:
+            duplicate_id = transaction_crud.check_duplicate_transaction(
+                db,
+                user_id=str(current_user.id),
+                date=parsed_row.date,
+                amount=parsed_row.amount,
+                description=parsed_row.description,
+                account_id=account_id
+            )
+            
+            if duplicate_id:
+                parsed_row.status = "duplicate"
+                parsed_row.status_message = "Transaction already exists"
+                parsed_row.duplicate_transaction_id = str(duplicate_id)
+                counts['duplicate'] += 1
+                parsed_rows.append(parsed_row)
+                continue
+        
+        # Category matching
+        if parsed_row.category_name:
+            # Try exact match (case-insensitive)
+            exact_match = next(
+                (cat for cat in user_categories 
+                 if cat.name.lower() == parsed_row.category_name.lower()),
+                None
+            )
+            
+            if exact_match:
+                # Exact match found
+                parsed_row.suggested_category_id = str(exact_match.id)
+                parsed_row.suggested_category_name = exact_match.name
+                parsed_row.match_confidence = 1.0
+                counts['valid'] += 1
+            else:
+                # Try fuzzy match
+                similar = find_similar_category(
+                    parsed_row.category_name,
+                    categories_dict,
+                    threshold=0.7
+                )
+                
+                if similar:
+                    cat_id, cat_name, confidence = similar
+                    parsed_row.status = "warning"
+                    parsed_row.status_message = f"Category '{parsed_row.category_name}' not found. Did you mean '{cat_name}'?"
+                    parsed_row.suggested_category_id = cat_id
+                    parsed_row.suggested_category_name = cat_name
+                    parsed_row.match_confidence = confidence
+                    counts['warning'] += 1
+                else:
+                    # No match: will use "Non Categorizzato"
+                    parsed_row.status = "warning"
+                    parsed_row.status_message = f"Category '{parsed_row.category_name}' not found. Will use 'Non Categorizzato'"
+                    parsed_row.suggested_category_id = str(non_categorizzato.id)
+                    parsed_row.suggested_category_name = "Non Categorizzato"
+                    parsed_row.match_confidence = 0.0
+                    counts['warning'] += 1
+        else:
+            # No category specified
+            parsed_row.suggested_category_id = str(non_categorizzato.id)
+            parsed_row.suggested_category_name = "Non Categorizzato"
+            parsed_row.match_confidence = 0.0
+            counts['warning'] += 1
+        
+        parsed_rows.append(parsed_row)
+    
+    return CSVImportPreviewResponse(
+        total_rows=len(parsed_rows),
+        valid_rows=counts['valid'],
+        warning_rows=counts['warning'],
+        error_rows=counts['error'],
+        duplicate_rows=counts['duplicate'],
+        rows=parsed_rows,
+        account_id=account_id,
+        account_name=account.name
+    )
+
+
+@router.post("/confirm", response_model=CSVImportResult)
+async def confirm_csv_import(
+    import_request: CSVImportConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Confirm and execute CSV import after preview.
+    
+    **Flow:**
+    1. User reviews preview from `/preview` endpoint
+    2. User selects which rows to import (excludes errors/duplicates)
+    3. POST to this endpoint with row numbers to import
+    4. Server creates transactions and updates account balance
+    5. Returns import result summary
+    
+    **Note:** This endpoint expects preview data to be stored temporarily.
+    For MVP, we'll require the frontend to re-send the validated data.
+    Post-MVP: use session/cache to store preview data.
+    """
+    # TODO: For MVP, this requires frontend to send full transaction data
+    # For now, return placeholder
+    # In Phase 5.11 (frontend), we'll implement the full flow
+    
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Confirm import will be implemented with frontend integration in Phase 5.11"
+    )
+
+
+@router.get("/template")
+async def download_template():
+    """
+    Download CSV template file.
+    
+    Returns pre-filled CSV template with example data.
+    Frontend should provide download link to this endpoint.
+    
+    **Alternative:** Serve static file via `/static/templates/template_transazioni.csv`
+    """
+    from fastapi.responses import FileResponse
+    import os
+    
+    template_path = os.path.join("static", "templates", "template_transazioni.csv")
+    
+    if not os.path.exists(template_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Template file not found"
+        )
+    
+    return FileResponse(
+        template_path,
+        media_type='text/csv',
+        filename='BudgetApp_Template_Transazioni.csv'
+    )
+```
+
+---
+
+### 3.10.5.2 - Registra router in main
+- [ ] 📝 Apri `backend/app/main.py`
+- [ ] Aggiungi:
+
+```python
+from app.routers import csv_import
+
+app.include_router(csv_import.router, prefix="/api/v1")
+```
+
+---
+
+### 3.10.5.3 - Commit router
+- [ ] Commit: `Add CSV import API router with preview endpoint - Phase 3.10.5`
+- [ ] Push
+
+---
+
+## 🧪 3.10.6 - Testing Manuale
+
+### 3.10.6.1 - Prepara file CSV test
+- [ ] Crea `backend/test_data/test_import.csv`:
+
+```csv
+date,description,amount,category_name,notes
+2025-01-15,Spesa Conad,-45.50,Spesa,Settimanale
+2025-01-16,Stipendio,2500.00,Stipendio,Gennaio
+2025-01-17,Pizza Napoli,-35.00,Ristorazione,Cena
+2025-01-18,Benzina,-60.00,Trasporti,
+2025-99-99,Invalid date,-100.00,Test,Should error
+2025-01-15,Spesa Conad,-45.50,Spesa,Duplicate of row 1
+2025-01-20,Missing amount,,Spesa,Should error
+2025-01-21,Unknown Category,-25.00,CategoryNotExists,Should warn
+```
+
+---
+
+### 3.10.6.2 - Test workflow completo
+- [ ] Avvia server: `python run.py`
+- [ ] Apri Swagger: http://localhost:8000/docs
+
+**Test 1: Download template**
+- [ ] GET `/api/v1/csv-import/template`
+- [ ] Verifica download file CSV
+- [ ] Apri file: deve avere 3 righe esempio
+
+**Test 2: Preview import (success case)**
+- [ ] POST `/auth/login` → ottieni token
+- [ ] Authorize in Swagger
+- [ ] POST `/accounts` → crea account "Test Import" → salva `account_id`
+- [ ] POST `/api/v1/csv-import/preview`
+  - file: `test_import.csv`
+  - account_id: UUID account creato
+- [ ] Verifica response:
+  ```json
+  {
+    "total_rows": 8,
+    "valid_rows": 3,
+    "warning_rows": 1,
+    "error_rows": 2,
+    "duplicate_rows": 1,
+    "rows": [
+      {
+        "row_number": 1,
+        "status": "valid",
+        "status_message": "OK"
+      },
+      {
+        "row_number": 5,
+        "status": "error",
+        "status_message": "Invalid date format"
+      },
+      {
+        "row_number": 6,
+        "status": "duplicate",
+        "duplicate_transaction_id": "uuid..."
+      },
+      {
+        "row_number": 8,
+        "status": "warning",
+        "status_message": "Category 'CategoryNotExists' not found..."
+      }
+    ]
+  }
+  ```
+
+**Test 3: Preview con file malformato**
+- [ ] Crea `bad_file.csv` senza header
+- [ ] POST `/api/v1/csv-import/preview`
+- [ ] Aspettato: 400 Bad Request "Missing required columns"
+
+**Test 4: Preview con file troppo grande**
+- [ ] Crea CSV con 1001 righe
+- [ ] POST `/api/v1/csv-import/preview`
+- [ ] Aspettato: 400 Bad Request "exceeds maximum 1000 rows"
+
+**Test 5: Fuzzy matching categoria**
+- [ ] Crea categoria "Ristorazione"
+- [ ] CSV ha riga con "Ristorante" (simile)
+- [ ] Preview deve suggerire "Ristorazione" con confidence ~0.8
+
+---
+
+### 3.10.6.3 - Verifica in database
+- [ ] Dopo test 2, verifica:
+  - [ ] Categoria "Non Categorizzato" creata automaticamente
+  - [ ] Nessuna transazione creata (solo preview, no confirm)
+
+---
+
+### 3.10.6.4 - Commit testing docs
+- [ ] 📝 Crea `backend/docs/CSV_IMPORT_TESTING.md` con workflow test
+- [ ] Commit: `Add CSV import testing documentation - Phase 3.10.6`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 3.10
+
+Prima di procedere, verifica:
+
+### Template & Formato
+- [ ] ✅ Template CSV creato e scaricabile
+- [ ] ✅ Formato standard documentato
+- [ ] ✅ File accessibile via `/static/templates/`
+
+### Schemas
+- [ ] ✅ CSVRowParsed con tutti i campi
+- [ ] ✅ CSVImportPreviewResponse completo
+- [ ] ✅ Status types: valid/warning/error/duplicate
+
+### Parser & Validator
+- [ ] ✅ parse_csv_file gestisce file malformati
+- [ ] ✅ parse_date supporta 3 formati
+- [ ] ✅ parse_amount gestisce decimali IT/US
+- [ ] ✅ validate_row identifica errori
+- [ ] ✅ find_similar_category fuzzy matching funziona
+
+### CRUD Extension
+- [ ] ✅ check_duplicate_transaction implementato
+- [ ] ✅ bulk_create_transactions funziona
+- [ ] ✅ Categoria "Non Categorizzato" auto-creata
+
+### API Endpoints
+- [ ] ✅ POST /csv-import/preview funzionante
+- [ ] ✅ GET /csv-import/template download OK
+- [ ] ✅ POST /csv-import/confirm (placeholder per fase 5.11)
+
+### Testing
+- [ ] ✅ Preview con file valido → response corretta
+- [ ] ✅ Preview con errori → errors identificati
+- [ ] ✅ Preview con duplicati → duplicates marcati
+- [ ] ✅ Fuzzy matching categorie → suggestions corrette
+- [ ] ✅ File malformato → 400 Bad Request
+- [ ] ✅ File troppo grande → 400 Bad Request
+
+### Documentation
+- [ ] ✅ CSV_IMPORT_TESTING.md creato
+- [ ] ✅ Formato CSV documentato in codice
+- [ ] ✅ Tutti i commit pushati
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 1 giorno (6-8 ore)
+
+**Funzionalità implementate:**
+- ✅ Upload e parsing CSV
+- ✅ Validazione completa righe
+- ✅ Rilevamento duplicati automatico
+- ✅ Fuzzy matching categorie
+- ✅ Preview dettagliata con status
+- ✅ Template scaricabile
+
+**Pronto per:**
+- Fase 4.8 - Testing automatico CSV import
+- Fase 5.11 - Frontend UI per import
+
+**Note implementazione:**
+- Endpoint `/confirm` è placeholder (completo in fase 5.11)
+- Max 1000 righe per file (limite MVP)
+- Processing sincrono (per file grandi, post-MVP fare asincrono)
+- Categoria "Non Categorizzato" auto-creata se mancante
+
+**Post-MVP enhancements:**
+- [ ] Import asincrono con job queue (file >1000 righe)
+- [ ] Cache preview data (evita re-upload per confirm)
+- [ ] Supporto più formati date
+- [ ] Mapping colonne flessibile
+- [ ] Import da URL (Google Sheets, Dropbox)
+- [ ] Scheduled import automatico (ricorrente)
+
+---
+
+**FASE 3.10 COMPLETATA! 🎉**
+
+# FASE 3.11: Backend Excel Export (0.5 giorni)
+
+## 🎯 Obiettivo
+Implementare endpoint backend helper per l'export Excel, fornendo dati aggregati ottimizzati per la generazione client-side del file Excel multi-sheet.
+
+**Target:** API helper che restituisce dati completi in un colpo solo  
+**Strategia:** Client-side export (frontend genera Excel con `xlsx.js`)  
+**Backend role:** Fornire endpoint aggregato con pre-calcoli
+
+---
+
+## 📋 Panoramica Strategia
+
+### Decisione Architetturale: Client-Side Generation
+
+**Perché client-side:**
+- ✅ Zero carico server (scalabilità)
+- ✅ Download istantaneo (no latency)
+- ✅ Nessun file temporaneo da gestire
+- ✅ Libreria `xlsx.js` potente e matura
+
+**Ruolo Backend:**
+- Fornire endpoint `/export/data` che aggrega tutti i dati in single call
+- Pre-calcolare aggregazioni (summary, category totals, account totals)
+- Evitare 5-6 API calls separate dal frontend
+
+**Ruolo Frontend (Fase 5.12):**
+- Generare Excel con `xlsx.js`
+- Creare 5-6 sheets con formattazione
+- Triggerare download
+
+---
+
+## 🗂️ 3.11.1 - Export Data Schemas
+
+### 3.11.1.1 - Crea export schemas
+- [ ] 📝 Crea `backend/app/schemas/export.py`
+
+```python
+"""
+Export Schemas
+Data structures for export endpoints
+"""
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import date
+from decimal import Decimal
+
+
+class TransactionExport(BaseModel):
+    """Transaction for export."""
+    date: date
+    account_name: str
+    category_name: str
+    type: str
+    description: str
+    amount: Decimal
+    notes: Optional[str] = None
+
+
+class CategoryTotal(BaseModel):
+    """Category aggregation."""
+    macro_category: str  # 'Entrate', 'Spese Necessarie', 'Spese Extra'
+    category_name: str
+    total_amount: Decimal
+    transaction_count: int
+    percentage: float
+
+
+class AccountTotal(BaseModel):
+    """Account aggregation."""
+    account_name: str
+    initial_balance: Decimal
+    total_income: Decimal
+    total_expense: Decimal
+    final_balance: Decimal
+    variation: Decimal
+
+
+class TransferExport(BaseModel):
+    """Transfer for export."""
+    date: date
+    from_account: str
+    to_account: str
+    amount: Decimal
+    transfer_type: str
+    notes: Optional[str] = None
+
+
+class ExportDataResponse(BaseModel):
+    """Complete export data (single endpoint response)."""
+    # Period
+    start_date: date
+    end_date: date
+    generated_at: str
+    
+    # Summary
+    total_income: Decimal
+    total_expense_necessity: Decimal
+    total_expense_extra: Decimal
+    total_expense: Decimal
+    net_balance: Decimal
+    total_net_worth: Decimal
+    
+    # Data
+    transactions: List[TransactionExport]
+    categories_breakdown: List[CategoryTotal]
+    accounts_breakdown: List[AccountTotal]
+    transfers: List[TransferExport]
+    
+    # Metadata
+    user_email: str
+    total_transactions: int
+    total_accounts: int
+```
+
+---
+
+### 3.11.1.2 - Commit schemas
+- [ ] Aggiungi a `backend/app/schemas/__init__.py`
+- [ ] Commit: `Add export schemas - Phase 3.11.1`
+- [ ] Push
+
+---
+
+## 🔧 3.11.2 - Export CRUD Logic
+
+### 3.11.2.1 - Crea export CRUD
+- [ ] 📝 Crea `backend/app/crud/export.py` con:
+  - [ ] `get_export_data(db, user_id, start_date, end_date, account_id)`
+  - [ ] `_calculate_categories_breakdown()` (aggregazione per categoria + percentuali)
+  - [ ] `_calculate_accounts_breakdown()` (initial/final balance per account)
+  - [ ] Logica aggregazione completa
+
+**Funzionalità chiave:**
+- Query transactions con JOIN (account, category)
+- Calcolo summary (income, expenses by type, net balance)
+- Aggregazione categorie con percentuali
+- Calcolo initial balance account (current - delta period)
+- Total net worth (sum tutti account balances)
+
+---
+
+### 3.11.2.2 - Commit CRUD
+- [ ] Aggiungi a `backend/app/crud/__init__.py`
+- [ ] Commit: `Add export CRUD logic - Phase 3.11.2`
+- [ ] Push
+
+---
+
+## 🛣️ 3.11.3 - Export API Router
+
+### 3.11.3.1 - Crea export router
+- [ ] 📝 Crea `backend/app/routers/export.py`
+
+```python
+@router.get("/data", response_model=ExportDataResponse)
+async def get_export_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    account_id: Optional[str] = Query(None)
+):
+    """
+    Get complete export data for Excel generation.
+    
+    Single endpoint returns everything:
+    - Summary stats
+    - All transactions
+    - Category breakdown
+    - Account breakdown
+    - Transfers
+    
+    Default period: current month
+    """
+    return export_crud.get_export_data(...)
+
+@router.get("/info")
+async def get_export_info(current_user: User = Depends(get_current_user)):
+    """Export capabilities info."""
+    return {
+        "available_formats": ["excel"],
+        "generation_method": "client-side",
+        "supported_sheets": [
+            "Riepilogo",
+            "Transazioni",
+            "Per Categoria",
+            "Per Account",
+            "Trasferimenti"
+        ]
+    }
+```
+
+---
+
+### 3.11.3.2 - Registra router
+- [ ] Apri `backend/app/main.py`
+- [ ] Aggiungi: `app.include_router(export.router, prefix="/api/v1")`
+
+---
+
+### 3.11.3.3 - Commit router
+- [ ] Commit: `Add export API router - Phase 3.11.3`
+- [ ] Push
+
+---
+
+## 🧪 3.11.4 - Testing Manuale
+
+### 3.11.4.1 - Prepara dati test
+- [ ] Login come test user
+- [ ] Crea 3 account (Checking, Savings, Cash)
+- [ ] Crea 5 categorie (Stipendio, Spesa, Ristorazione, etc.)
+- [ ] Crea 10-15 transazioni varie
+- [ ] Crea 2 transfers
+
+---
+
+### 3.11.4.2 - Test export endpoint
+- [ ] Avvia server: `python run.py`
+- [ ] Swagger: http://localhost:8000/docs
+
+**Test 1: Export default period (current month)**
+- [ ] GET `/api/v1/export/data` (no params)
+- [ ] Verifica response completo:
+  ```json
+  {
+    "start_date": "2025-02-01",
+    "end_date": "2025-02-06",
+    "total_income": 2500.00,
+    "transactions": [...],
+    "categories_breakdown": [...],
+    "accounts_breakdown": [...]
+  }
+  ```
+
+**Test 2: Custom period**
+- [ ] GET `/export/data?start_date=2025-01-01&end_date=2025-01-31`
+- [ ] Verifica periodo corretto
+
+**Test 3: Single account filter**
+- [ ] GET `/export/data?account_id={uuid}`
+- [ ] Verifica solo transactions di quell'account
+
+**Test 4: Export info**
+- [ ] GET `/export/info`
+- [ ] Verifica metadata
+
+---
+
+### 3.11.4.3 - Verifica aggregazioni
+- [ ] Categories breakdown:
+  - [ ] Totali corretti
+  - [ ] Percentuali sommano ~100%
+  - [ ] Ordinamento per amount desc
+- [ ] Accounts breakdown:
+  - [ ] Initial balance = final - delta
+  - [ ] Variation corretto
+- [ ] Summary:
+  - [ ] total_income = sum positive
+  - [ ] total_expense = sum absolute negative
+  - [ ] net_worth = sum all accounts
+
+---
+
+### 3.11.4.4 - Commit testing docs
+- [ ] 📝 Crea `backend/docs/EXPORT_TESTING.md`
+- [ ] Commit: `Add export testing docs - Phase 3.11.4`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 3.11
+
+### Schemas
+- [ ] ✅ export.py con 5 schemas
+- [ ] ✅ ExportDataResponse completo
+- [ ] ✅ Transaction/Category/Account/Transfer export
+
+### CRUD
+- [ ] ✅ export.py creato
+- [ ] ✅ get_export_data() implementato
+- [ ] ✅ Aggregazioni categorie/account
+
+### API
+- [ ] ✅ GET /export/data funzionante
+- [ ] ✅ GET /export/info implementato
+- [ ] ✅ Query params (start_date, end_date, account_id)
+
+### Testing
+- [ ] ✅ Export default period → OK
+- [ ] ✅ Custom period → OK
+- [ ] ✅ Account filter → OK
+- [ ] ✅ Aggregazioni verificate
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 0.5 giorni (4 ore)
+
+**Implementato:**
+- ✅ Endpoint GET /export/data (singolo, completo)
+- ✅ Aggregazioni pre-calcolate
+- ✅ Summary + transactions + breakdowns
+- ✅ Date filtering + account filtering
+
+**Architettura:**
+- Backend = API helper (1 call, tutti i dati)
+- Frontend = Excel generator (xlsx.js)
+- Zero file temporanei server
+- Scalabile infinitamente
+
+---
+
+**FASE 3.11 COMPLETATA! 🎉**
+
+Prossimo step: **FASE 4.9 - Testing Export Backend**
+
 **Prossimo:** FASE 4 - Testing & Debug
 
 ---
@@ -7964,7 +9302,1306 @@ Prima di procedere, verifica:
 - [ ] ✅ Bulk create skip weekend + holidays
 
 **Tempo stimato:** 1-2 giorni  
- 
+
+# FASE 4.8: Testing CSV Import Module (0.5 giorni)
+
+## 🎯 Obiettivo
+Implementare test automatici con Pytest per il modulo CSV Import, garantendo copertura completa delle funzionalità di parsing, validazione, duplicate detection e fuzzy matching categorie.
+
+**Target:** Coverage >80% per modulo CSV Import  
+**Focus:** Parser, validator, duplicate detection, API endpoints
+
+---
+
+## 📋 Panoramica Testing
+
+### Aree da Testare
+- ✅ **CSV Parser**: Parsing file, gestione errori, formati multipli
+- ✅ **Date Parser**: 3 formati supportati (ISO, IT, DD-MM-YYYY)
+- ✅ **Amount Parser**: Decimali IT/US, currency symbols, edge cases
+- ✅ **Row Validator**: Validazione completa, error detection
+- ✅ **Fuzzy Matching**: Similarity scoring, threshold matching
+- ✅ **Duplicate Detection**: Match logic, edge cases
+- ✅ **API Preview Endpoint**: Upload, parsing, response structure
+- ✅ **Template Download**: File availability, format correctness
+
+### Decisioni Testing
+- **Database**: Test database separato (`budget_app_test`)
+- **Fixtures**: CSV content strings, user, account, categories, transactions
+- **Isolation**: Ogni test indipendente con rollback
+- **Coverage**: pytest-cov per verificare coverage
+- **Mock**: Nessun mock necessario (test reali su DB test)
+
+---
+
+## 🧪 4.8.1 - Setup Test Fixtures
+
+### 4.8.1.1 - Verifica pytest setup
+- [ ] Verifica `backend/pytest.ini` configurato
+- [ ] Verifica `backend/tests/conftest.py` con fixtures base (user, db, account, category)
+
+---
+
+### 4.8.1.2 - Aggiungi CSV fixtures a conftest
+- [ ] 📝 Apri `backend/tests/conftest.py`
+- [ ] Aggiungi fixtures CSV:
+
+```python
+import pytest
+from decimal import Decimal
+from datetime import date
+
+
+@pytest.fixture
+def valid_csv_content():
+    """Valid CSV content for testing."""
+    return """date,description,amount,category_name,notes
+2025-01-15,Spesa Supermercato,-45.50,Spesa,Conad
+2025-01-16,Stipendio,2500.00,Stipendio,Gennaio 2025
+2025-01-17,Ristorante Pizza,-35.00,Ristorazione,Cena amici"""
+
+
+@pytest.fixture
+def csv_with_errors():
+    """CSV with various errors for testing validation."""
+    return """date,description,amount,category_name,notes
+2025-01-15,Valid Transaction,-45.50,Spesa,OK
+2025-99-99,Invalid Date,-100.00,Spesa,Bad date
+2025-01-17,Missing Amount,,Spesa,No amount
+,Empty Date,-50.00,Spesa,No date
+2025-01-18,,25.00,Spesa,No description"""
+
+
+@pytest.fixture
+def csv_with_duplicates():
+    """CSV with duplicate transactions."""
+    return """date,description,amount,category_name,notes
+2025-01-15,Spesa Supermercato,-45.50,Spesa,First
+2025-01-15,Spesa Supermercato,-45.50,Spesa,Duplicate
+2025-01-16,Unique Transaction,-100.00,Spesa,Not duplicate"""
+
+
+@pytest.fixture
+def csv_malformed():
+    """Malformed CSV for error testing."""
+    return """This is not a CSV file
+Just random text
+No proper structure"""
+
+
+@pytest.fixture
+def csv_missing_columns():
+    """CSV missing required columns."""
+    return """date,description
+2025-01-15,Missing amount column"""
+
+
+@pytest.fixture
+def csv_large_file():
+    """CSV exceeding max rows limit."""
+    header = "date,description,amount,category_name,notes\n"
+    rows = "\n".join([
+        f"2025-01-15,Transaction {i},-{i}.00,Spesa,"
+        for i in range(1, 1002)  # 1001 rows (exceeds limit)
+    ])
+    return header + rows
+
+
+@pytest.fixture
+def test_categories_for_fuzzy(db, test_user):
+    """Create categories for fuzzy matching tests."""
+    from app.crud import category as category_crud
+    from app.schemas.category import CategoryCreate
+    
+    categories = [
+        CategoryCreate(name="Ristorazione", type="expense_extra", color="#FF0000"),
+        CategoryCreate(name="Trasporti", type="expense_necessity", color="#00FF00"),
+        CategoryCreate(name="Shopping", type="expense_extra", color="#0000FF"),
+    ]
+    
+    created = []
+    for cat_data in categories:
+        cat = category_crud.create_category(db, cat_data, str(test_user.id))
+        created.append(cat)
+    
+    return created
+
+
+@pytest.fixture
+def test_transaction_for_duplicate(db, test_user, test_account, test_category):
+    """Create a transaction for duplicate detection testing."""
+    from app.crud import transaction as transaction_crud
+    from app.schemas.transaction import TransactionCreate
+    
+    txn = transaction_crud.create_transaction(
+        db,
+        TransactionCreate(
+            account_id=test_account.id,
+            category_id=test_category.id,
+            amount=Decimal('-45.50'),
+            date=date(2025, 1, 15),
+            description="Spesa Supermercato"
+        ),
+        str(test_user.id)
+    )
+    
+    return txn
+```
+
+---
+
+### 4.8.1.3 - Commit fixtures
+- [ ] Commit: `Add CSV import test fixtures - Phase 4.8.1`
+- [ ] Push
+
+---
+
+## 🧪 4.8.2 - Test CSV Parser Functions
+
+### 4.8.2.1 - Crea parser test file
+- [ ] 📝 Crea `backend/tests/test_csv_parser.py` (vedi codice test completo nella roadmap originale)
+
+**Test inclusi (~40 test):**
+- parse_csv_file: valid, missing columns, malformed, exceeds limit, empty
+- parse_date: ISO format, Italian format, dash format, invalid, whitespace
+- parse_amount: simple, currency symbols, Italian format, US format, spaces, invalid, edge cases
+- validate_row: valid, missing date/amount/description, no category, multiple errors
+- similarity: exact match, case-insensitive, high/low scores, empty strings
+- find_similar_category: exact match, fuzzy match, no match, best match, empty list
+
+---
+
+### 4.8.2.2 - Run parser tests
+- [ ] Terminal:
+
+```bash
+cd backend
+source venv/bin/activate
+pytest tests/test_csv_parser.py -v
+```
+
+- [ ] Verifica tutti i test passano (~40 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.8.2.3 - Commit parser tests
+- [ ] Commit: `Add CSV parser utility tests - Phase 4.8.2`
+- [ ] Push
+
+---
+
+## 🧪 4.8.3 - Test Duplicate Detection & CRUD
+
+### 4.8.3.1 - Crea CRUD test file
+- [ ] 📝 Crea `backend/tests/test_csv_import_crud.py` (vedi codice test completo nella roadmap originale)
+
+**Test inclusi (~7 test):**
+- check_duplicate_transaction: exists, not exists, different amount/date
+- bulk_create_transactions: multiple transactions, balance update
+
+---
+
+### 4.8.3.2 - Run CRUD tests
+- [ ] Terminal:
+
+```bash
+pytest tests/test_csv_import_crud.py -v
+```
+
+- [ ] Verifica tutti i test passano (~7 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.8.3.3 - Commit CRUD tests
+- [ ] Commit: `Add CSV import CRUD tests - Phase 4.8.3`
+- [ ] Push
+
+---
+
+## 🧪 4.8.4 - Test API Endpoints
+
+### 4.8.4.1 - Crea API test file
+- [ ] 📝 Crea `backend/tests/test_csv_import_api.py` (vedi codice test completo nella roadmap originale)
+
+**Test inclusi (~15 test):**
+- preview: valid CSV, errors, duplicates, fuzzy matching
+- error handling: invalid account, malformed file, missing columns, too large, not UTF-8
+- auto-create "Non Categorizzato" category
+- template download
+- authentication required
+
+---
+
+### 4.8.4.2 - Run API tests
+- [ ] Terminal:
+
+```bash
+pytest tests/test_csv_import_api.py -v
+```
+
+- [ ] Verifica tutti i test passano (~15 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.8.4.3 - Commit API tests
+- [ ] Commit: `Add CSV import API tests - Phase 4.8.4`
+- [ ] Push
+
+---
+
+## 🧪 4.8.5 - Test Coverage & Final Verification
+
+### 4.8.5.1 - Run all CSV import tests with coverage
+- [ ] Terminal:
+
+```bash
+pytest tests/test_csv*.py -v --cov=app/utils/csv_parser --cov=app/crud/transaction --cov=app/routers/csv_import --cov-report=html
+```
+
+- [ ] Verifica coverage totale:
+  - [ ] `app/utils/csv_parser.py`: >85%
+  - [ ] `app/crud/transaction.py` (CSV functions): >80%
+  - [ ] `app/routers/csv_import.py`: >75%
+
+---
+
+### 4.8.5.2 - Open coverage report
+- [ ] Terminal:
+
+```bash
+open htmlcov/index.html  # macOS
+# or
+xdg-open htmlcov/index.html  # Linux
+```
+
+- [ ] Verifica aree non coperte
+- [ ] Aggiungi test per coverage mancante se <80%
+
+---
+
+### 4.8.5.3 - Run full test suite
+- [ ] Terminal:
+
+```bash
+pytest -v
+```
+
+- [ ] Verifica tutti i test passano (inclusi CSV import tests)
+- [ ] Totale test CSV import: ~62 test
+  - [ ] test_csv_parser.py: ~40 test
+  - [ ] test_csv_import_crud.py: ~7 test
+  - [ ] test_csv_import_api.py: ~15 test
+
+---
+
+### 4.8.5.4 - Documenta coverage
+- [ ] 📝 Crea `backend/docs/CSV_IMPORT_TEST_COVERAGE.md` con:
+  - Coverage percentages per file
+  - Test summary (total tests, passing)
+  - Test scenarios covered
+  - Next steps
+
+---
+
+### 4.8.5.5 - Commit coverage report
+- [ ] Commit: `Add CSV import test coverage report - Phase 4.8.5`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 4.8
+
+Prima di procedere, verifica:
+
+### Test Files
+- [ ] ✅ test_csv_parser.py creato (~40 test)
+- [ ] ✅ test_csv_import_crud.py creato (~7 test)
+- [ ] ✅ test_csv_import_api.py creato (~15 test)
+- [ ] ✅ Totale: ~62 test CSV import
+
+### Fixtures
+- [ ] ✅ valid_csv_content
+- [ ] ✅ csv_with_errors
+- [ ] ✅ csv_with_duplicates
+- [ ] ✅ csv_malformed
+- [ ] ✅ csv_missing_columns
+- [ ] ✅ csv_large_file
+- [ ] ✅ test_categories_for_fuzzy
+- [ ] ✅ test_transaction_for_duplicate
+
+### Coverage
+- [ ] ✅ csv_parser.py: >85% coverage
+- [ ] ✅ transaction.py (CSV functions): >80%
+- [ ] ✅ csv_import.py router: >75%
+- [ ] ✅ Coverage report generato
+
+### Test Results
+- [ ] ✅ Tutti i test CSV passano
+- [ ] ✅ Full test suite passa
+- [ ] ✅ Nessun warning critico
+
+### Documentation
+- [ ] ✅ CSV_IMPORT_TEST_COVERAGE.md creato
+- [ ] ✅ Coverage percentages documentate
+- [ ] ✅ Test scenarios listed
+
+### Quality Checks
+- [ ] ✅ Parser functions completamente testati
+- [ ] ✅ Date parsing: 3 formati + edge cases
+- [ ] ✅ Amount parsing: IT/US + symbols + edge cases
+- [ ] ✅ Validation: error/warning scenarios
+- [ ] ✅ Fuzzy matching: similarity + threshold
+- [ ] ✅ Duplicate detection: match logic + edge cases
+- [ ] ✅ API preview: success + error scenarios
+- [ ] ✅ Template download funzionante
+- [ ] ✅ Authentication verificata
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 0.5 giorni (4 ore)
+
+**Test implementati:**
+- ✅ ~40 Parser tests
+- ✅ ~7 CRUD tests
+- ✅ ~15 API tests
+- ✅ Coverage >80% per tutto il modulo
+
+**Pronto per:**
+- Fase 5.11 - Frontend CSV Import UI
+- API confirm endpoint sarà testato con frontend integration
+
+**Quality Assurance:**
+- ✅ Parsing robusto (3 date formats, IT/US amounts, UTF-8)
+- ✅ Validation completa (errors/warnings correttamente identificati)
+- ✅ Duplicate detection accurato
+- ✅ Fuzzy matching funzionante (threshold 0.7)
+- ✅ Error handling completo
+- ✅ Auto-creation "Non Categorizzato" testata
+
+---
+
+**FASE 4.8 COMPLETATA! 🎉**
+
+# FASE 4.9: Testing Excel Export Backend (0.25 giorni)
+
+## 🎯 Obiettivo
+Implementare test automatici con Pytest per il modulo Excel Export backend, verificando aggregazioni dati, calcoli, e response structure dell'endpoint `/export/data`.
+
+**Target:** Coverage >80% per export module  
+**Focus:** CRUD aggregations, endpoint response, data accuracy
+
+---
+
+## 📋 Panoramica Testing
+
+### Aree da Testare
+- ✅ **Export CRUD:** Aggregazioni categorie, account, summary stats
+- ✅ **API Endpoint:** Response structure, filters, authentication
+- ✅ **Calculations:** Percentages, balances, totals accuracy
+- ✅ **Date Filtering:** Period ranges, default values
+- ✅ **Account Filtering:** Single account vs all accounts
+
+### Decisioni Testing
+- **Database:** Test database separato (`budget_app_test`)
+- **Fixtures:** Users, accounts, categories, transactions, transfers
+- **Focus:** Data aggregation correctness (not file generation)
+- **Coverage:** Export CRUD + API endpoint
+
+---
+
+## 🧪 4.9.1 - Setup Test Fixtures
+
+### 4.9.1.1 - Verifica pytest setup
+- [ ] Verifica `backend/pytest.ini` configurato
+- [ ] Verifica `backend/tests/conftest.py` con fixtures base
+
+---
+
+### 4.9.1.2 - Aggiungi export fixtures
+- [ ] 📝 Apri `backend/tests/conftest.py`
+- [ ] Aggiungi fixtures export:
+
+```python
+import pytest
+from datetime import date, timedelta
+from decimal import Decimal
+
+
+@pytest.fixture
+def export_test_data(db, test_user, test_account, test_category):
+    """
+    Create comprehensive test data for export testing.
+    
+    Creates:
+    - 3 accounts (Checking, Savings, Cash)
+    - 5 categories (Stipendio, Spesa, Ristorazione, Trasporti, Abbonamenti)
+    - 15 transactions (mixed income/expenses, different dates)
+    - 2 transfers
+    """
+    from app.models.account import Account
+    from app.models.category import Category
+    from app.models.transaction import Transaction
+    from app.models.transfer import Transfer
+    from app.crud import transaction as transaction_crud
+    from app.schemas.transaction import TransactionCreate
+    
+    # Additional accounts
+    savings = Account(
+        user_id=test_user.id,
+        name="Savings",
+        type="savings",
+        balance=Decimal('5000.00')
+    )
+    cash = Account(
+        user_id=test_user.id,
+        name="Cash",
+        type="cash",
+        balance=Decimal('200.00')
+    )
+    db.add(savings)
+    db.add(cash)
+    db.commit()
+    
+    # Additional categories
+    categories_data = [
+        ("Stipendio", "income", "#10B981"),
+        ("Spesa", "expense_necessity", "#EF4444"),
+        ("Ristorazione", "expense_extra", "#8B5CF6"),
+        ("Trasporti", "expense_necessity", "#F59E0B"),
+        ("Abbonamenti", "expense_extra", "#3B82F6"),
+    ]
+    
+    categories = {}
+    for name, type_, color in categories_data:
+        cat = Category(
+            user_id=test_user.id,
+            name=name,
+            type=type_,
+            color=color,
+            is_active=True
+        )
+        db.add(cat)
+        categories[name] = cat
+    
+    db.commit()
+    for cat in categories.values():
+        db.refresh(cat)
+    
+    # Transactions (mixed dates in current month)
+    today = date.today()
+    first_day = date(today.year, today.month, 1)
+    
+    transactions_data = [
+        # Income
+        (first_day + timedelta(days=1), test_account.id, categories["Stipendio"].id, Decimal('2500.00'), "Stipendio Gennaio", "income"),
+        (first_day + timedelta(days=15), savings.id, categories["Stipendio"].id, Decimal('500.00'), "Bonus", "income"),
+        
+        # Expenses necessity
+        (first_day + timedelta(days=2), test_account.id, categories["Spesa"].id, Decimal('-45.50'), "Spesa Conad", "expense_necessity"),
+        (first_day + timedelta(days=5), test_account.id, categories["Spesa"].id, Decimal('-67.80'), "Spesa Esselunga", "expense_necessity"),
+        (first_day + timedelta(days=10), test_account.id, categories["Trasporti"].id, Decimal('-50.00'), "Benzina", "expense_necessity"),
+        (first_day + timedelta(days=12), cash.id, categories["Trasporti"].id, Decimal('-30.00'), "Parcheggio", "expense_necessity"),
+        
+        # Expenses extra
+        (first_day + timedelta(days=3), test_account.id, categories["Ristorazione"].id, Decimal('-35.00'), "Pizza", "expense_extra"),
+        (first_day + timedelta(days=7), test_account.id, categories["Ristorazione"].id, Decimal('-42.50'), "Ristorante", "expense_extra"),
+        (first_day + timedelta(days=8), cash.id, categories["Ristorazione"].id, Decimal('-25.00'), "Bar", "expense_extra"),
+        (first_day + timedelta(days=4), test_account.id, categories["Abbonamenti"].id, Decimal('-9.99'), "Netflix", "expense_extra"),
+        (first_day + timedelta(days=11), test_account.id, categories["Abbonamenti"].id, Decimal('-14.99'), "Spotify", "expense_extra"),
+    ]
+    
+    created_transactions = []
+    for txn_date, account_id, category_id, amount, description, txn_type in transactions_data:
+        txn = transaction_crud.create_transaction(
+            db,
+            TransactionCreate(
+                account_id=account_id,
+                category_id=category_id,
+                amount=amount,
+                date=txn_date,
+                description=description,
+                type=txn_type
+            ),
+            str(test_user.id)
+        )
+        created_transactions.append(txn)
+    
+    # Transfers
+    transfer1 = Transfer(
+        user_id=test_user.id,
+        from_account_id=test_account.id,
+        to_account_id=savings.id,
+        amount=Decimal('1000.00'),
+        date=first_day + timedelta(days=6),
+        type='savings',
+        notes="Risparmio mensile"
+    )
+    transfer2 = Transfer(
+        user_id=test_user.id,
+        from_account_id=savings.id,
+        to_account_id=cash.id,
+        amount=Decimal('100.00'),
+        date=first_day + timedelta(days=9),
+        type='withdrawal',
+        notes="Contanti"
+    )
+    db.add(transfer1)
+    db.add(transfer2)
+    db.commit()
+    
+    # Refresh all
+    db.refresh(savings)
+    db.refresh(cash)
+    db.refresh(test_account)
+    
+    return {
+        'user': test_user,
+        'accounts': {
+            'checking': test_account,
+            'savings': savings,
+            'cash': cash
+        },
+        'categories': categories,
+        'transactions': created_transactions,
+        'transfers': [transfer1, transfer2],
+        'period_start': first_day,
+        'period_end': today
+    }
+
+
+@pytest.fixture
+def previous_month_data(db, test_user, test_account, test_category):
+    """
+    Create transactions in previous month for date filtering tests.
+    """
+    from app.crud import transaction as transaction_crud
+    from app.schemas.transaction import TransactionCreate
+    
+    today = date.today()
+    # Previous month
+    if today.month == 1:
+        prev_month = date(today.year - 1, 12, 15)
+    else:
+        prev_month = date(today.year, today.month - 1, 15)
+    
+    txn = transaction_crud.create_transaction(
+        db,
+        TransactionCreate(
+            account_id=test_account.id,
+            category_id=test_category.id,
+            amount=Decimal('-99.99'),
+            date=prev_month,
+            description="Previous month transaction"
+        ),
+        str(test_user.id)
+    )
+    
+    return {
+        'transaction': txn,
+        'date': prev_month
+    }
+```
+
+---
+
+### 4.9.1.3 - Commit fixtures
+- [ ] Commit: `Add export test fixtures - Phase 4.9.1`
+- [ ] Push
+
+---
+
+## 🧪 4.9.2 - Test Export CRUD Functions
+
+### 4.9.2.1 - Crea CRUD test file
+- [ ] 📝 Crea `backend/tests/test_export_crud.py`
+
+```python
+"""
+Tests for Export CRUD operations
+"""
+import pytest
+from datetime import date
+from decimal import Decimal
+
+from app.crud import export as export_crud
+
+
+def test_get_export_data_basic(db, export_test_data):
+    """Test get_export_data with basic scenario."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Check structure
+    assert result.start_date == data['period_start']
+    assert result.end_date == data['period_end']
+    assert result.user_email == data['user'].email
+    
+    # Check transactions
+    assert len(result.transactions) == 11  # All transactions in period
+    assert result.total_transactions == 11
+    
+    # Check accounts
+    assert result.total_accounts == 3  # Checking, Savings, Cash
+    assert len(result.accounts_breakdown) == 3
+
+
+def test_get_export_data_summary_calculations(db, export_test_data):
+    """Test summary statistics calculations."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Income: 2500 + 500 = 3000
+    assert result.total_income == Decimal('3000.00')
+    
+    # Expense necessity: 45.50 + 67.80 + 50 + 30 = 193.30
+    assert result.total_expense_necessity == Decimal('193.30')
+    
+    # Expense extra: 35 + 42.50 + 25 + 9.99 + 14.99 = 127.48
+    assert result.total_expense_extra == Decimal('127.48')
+    
+    # Total expense
+    assert result.total_expense == Decimal('320.78')
+    
+    # Net balance
+    assert result.net_balance == Decimal('2679.22')
+
+
+def test_get_export_data_categories_breakdown(db, export_test_data):
+    """Test categories breakdown aggregation."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Should have 5 categories
+    assert len(result.categories_breakdown) == 5
+    
+    # Find Spesa category
+    spesa = next((c for c in result.categories_breakdown if c.category_name == "Spesa"), None)
+    assert spesa is not None
+    assert spesa.total_amount == Decimal('113.30')  # 45.50 + 67.80
+    assert spesa.transaction_count == 2
+    assert spesa.macro_category == "Spese Necessarie"
+    
+    # Percentages should be calculated
+    assert spesa.percentage > 0
+
+
+def test_get_export_data_accounts_breakdown(db, export_test_data):
+    """Test accounts breakdown calculations."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Find Checking account
+    checking = next(
+        (a for a in result.accounts_breakdown if a.account_name == data['accounts']['checking'].name),
+        None
+    )
+    assert checking is not None
+    
+    # Verify calculations
+    assert checking.final_balance == data['accounts']['checking'].balance
+    assert checking.total_income > 0
+    assert checking.total_expense > 0
+    assert checking.variation == checking.final_balance - checking.initial_balance
+
+
+def test_get_export_data_with_account_filter(db, export_test_data):
+    """Test filtering by single account."""
+    data = export_test_data
+    checking_id = data['accounts']['checking'].id
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end'],
+        account_id=checking_id
+    )
+    
+    # Should only include transactions from Checking account
+    for txn in result.transactions:
+        assert txn.account_name == data['accounts']['checking'].name
+    
+    # But accounts_breakdown should still have all 3 accounts
+    assert len(result.accounts_breakdown) == 3
+
+
+def test_get_export_data_with_date_filter(db, export_test_data, previous_month_data):
+    """Test date range filtering."""
+    data = export_test_data
+    
+    # Get only current month
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Should not include previous month transaction
+    descriptions = [t.description for t in result.transactions]
+    assert "Previous month transaction" not in descriptions
+
+
+def test_get_export_data_transfers(db, export_test_data):
+    """Test transfers are included."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Should have 2 transfers
+    assert len(result.transfers) == 2
+    
+    # Check transfer structure
+    transfer = result.transfers[0]
+    assert transfer.from_account is not None
+    assert transfer.to_account is not None
+    assert transfer.amount > 0
+
+
+def test_get_export_data_default_dates(db, export_test_data):
+    """Test default date range (current month)."""
+    data = export_test_data
+    
+    # Call without dates (should default to current month)
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id
+    )
+    
+    # Should use current month
+    today = date.today()
+    first_day = date(today.year, today.month, 1)
+    
+    assert result.start_date == first_day
+    assert result.end_date == today
+
+
+def test_calculate_categories_breakdown_percentages(db, export_test_data):
+    """Test category percentages sum to ~100% per type."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Group by macro category
+    necessity_cats = [c for c in result.categories_breakdown if c.macro_category == "Spese Necessarie"]
+    extra_cats = [c for c in result.categories_breakdown if c.macro_category == "Spese Extra"]
+    
+    # Percentages should sum to ~100 for each type
+    if necessity_cats:
+        necessity_total = sum(c.percentage for c in necessity_cats)
+        assert 99 <= necessity_total <= 101  # Allow small rounding differences
+    
+    if extra_cats:
+        extra_total = sum(c.percentage for c in extra_cats)
+        assert 99 <= extra_total <= 101
+
+
+def test_calculate_accounts_breakdown_balance_logic(db, export_test_data):
+    """Test account balance calculation logic."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    for account_breakdown in result.accounts_breakdown:
+        # Variation should equal final - initial
+        expected_variation = account_breakdown.final_balance - account_breakdown.initial_balance
+        assert account_breakdown.variation == expected_variation
+        
+        # Variation should also equal income - expense
+        delta = account_breakdown.total_income - account_breakdown.total_expense
+        assert abs(account_breakdown.variation - delta) < Decimal('0.01')  # Allow rounding
+
+
+def test_export_data_net_worth_calculation(db, export_test_data):
+    """Test total net worth calculation."""
+    data = export_test_data
+    
+    result = export_crud.get_export_data(
+        db=db,
+        user_id=data['user'].id,
+        start_date=data['period_start'],
+        end_date=data['period_end']
+    )
+    
+    # Net worth should equal sum of all account final balances
+    expected_net_worth = sum(
+        a.final_balance for a in result.accounts_breakdown
+    )
+    
+    assert result.total_net_worth == expected_net_worth
+```
+
+---
+
+### 4.9.2.2 - Run CRUD tests
+- [ ] Terminal:
+
+```bash
+cd backend
+source venv/bin/activate
+pytest tests/test_export_crud.py -v
+```
+
+- [ ] Verifica tutti i test passano (~12 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.9.2.3 - Commit CRUD tests
+- [ ] Commit: `Add export CRUD tests - Phase 4.9.2`
+- [ ] Push
+
+---
+
+## 🧪 4.9.3 - Test Export API Endpoint
+
+### 4.9.3.1 - Crea API test file
+- [ ] 📝 Crea `backend/tests/test_export_api.py`
+
+```python
+"""
+Tests for Export API endpoints
+"""
+import pytest
+from datetime import date
+
+
+def test_get_export_data_endpoint(client, auth_headers, export_test_data):
+    """Test GET /export/data endpoint."""
+    data = export_test_data
+    
+    response = client.get(
+        f"/api/v1/export/data?start_date={data['period_start']}&end_date={data['period_end']}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    # Check structure
+    assert 'start_date' in result
+    assert 'end_date' in result
+    assert 'total_income' in result
+    assert 'transactions' in result
+    assert 'categories_breakdown' in result
+    assert 'accounts_breakdown' in result
+
+
+def test_get_export_data_default_period(client, auth_headers, export_test_data):
+    """Test export with default period (no dates provided)."""
+    response = client.get(
+        "/api/v1/export/data",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    # Should use current month
+    today = date.today()
+    first_day = date(today.year, today.month, 1)
+    
+    assert result['start_date'] == str(first_day)
+    assert result['end_date'] == str(today)
+
+
+def test_get_export_data_with_account_filter(client, auth_headers, export_test_data):
+    """Test export filtered by account."""
+    data = export_test_data
+    account_id = data['accounts']['checking'].id
+    
+    response = client.get(
+        f"/api/v1/export/data?account_id={account_id}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    # All transactions should be from that account
+    for txn in result['transactions']:
+        assert txn['account_name'] == data['accounts']['checking'].name
+
+
+def test_get_export_data_custom_date_range(client, auth_headers, export_test_data):
+    """Test export with custom date range."""
+    data = export_test_data
+    
+    response = client.get(
+        f"/api/v1/export/data?start_date=2025-01-01&end_date=2025-01-31",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    assert result['start_date'] == '2025-01-01'
+    assert result['end_date'] == '2025-01-31'
+
+
+def test_get_export_data_requires_auth(client, export_test_data):
+    """Test export endpoint requires authentication."""
+    response = client.get("/api/v1/export/data")
+    
+    assert response.status_code == 401
+
+
+def test_get_export_info_endpoint(client, auth_headers):
+    """Test GET /export/info endpoint."""
+    response = client.get(
+        "/api/v1/export/info",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    # Check metadata structure
+    assert 'available_formats' in result
+    assert 'generation_method' in result
+    assert 'supported_sheets' in result
+    
+    # Check values
+    assert 'excel' in result['available_formats']
+    assert result['generation_method'] == 'client-side'
+    assert isinstance(result['supported_sheets'], list)
+
+
+def test_export_data_response_structure(client, auth_headers, export_test_data):
+    """Test complete response structure."""
+    data = export_test_data
+    
+    response = client.get(
+        f"/api/v1/export/data?start_date={data['period_start']}&end_date={data['period_end']}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    # Period fields
+    assert 'start_date' in result
+    assert 'end_date' in result
+    assert 'generated_at' in result
+    
+    # Summary fields
+    assert 'total_income' in result
+    assert 'total_expense_necessity' in result
+    assert 'total_expense_extra' in result
+    assert 'total_expense' in result
+    assert 'net_balance' in result
+    assert 'total_net_worth' in result
+    
+    # Data arrays
+    assert 'transactions' in result
+    assert isinstance(result['transactions'], list)
+    assert 'categories_breakdown' in result
+    assert isinstance(result['categories_breakdown'], list)
+    assert 'accounts_breakdown' in result
+    assert isinstance(result['accounts_breakdown'], list)
+    assert 'transfers' in result
+    assert isinstance(result['transfers'], list)
+    
+    # Metadata
+    assert 'user_email' in result
+    assert 'total_transactions' in result
+    assert 'total_accounts' in result
+
+
+def test_export_transaction_structure(client, auth_headers, export_test_data):
+    """Test transaction object structure in export."""
+    response = client.get(
+        "/api/v1/export/data",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    if result['transactions']:
+        txn = result['transactions'][0]
+        
+        # Required fields
+        assert 'date' in txn
+        assert 'account_name' in txn
+        assert 'category_name' in txn
+        assert 'type' in txn
+        assert 'description' in txn
+        assert 'amount' in txn
+
+
+def test_export_category_breakdown_structure(client, auth_headers, export_test_data):
+    """Test category breakdown object structure."""
+    response = client.get(
+        "/api/v1/export/data",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    if result['categories_breakdown']:
+        cat = result['categories_breakdown'][0]
+        
+        # Required fields
+        assert 'macro_category' in cat
+        assert 'category_name' in cat
+        assert 'total_amount' in cat
+        assert 'transaction_count' in cat
+        assert 'percentage' in cat
+
+
+def test_export_account_breakdown_structure(client, auth_headers, export_test_data):
+    """Test account breakdown object structure."""
+    response = client.get(
+        "/api/v1/export/data",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    if result['accounts_breakdown']:
+        acc = result['accounts_breakdown'][0]
+        
+        # Required fields
+        assert 'account_name' in acc
+        assert 'initial_balance' in acc
+        assert 'total_income' in acc
+        assert 'total_expense' in acc
+        assert 'final_balance' in acc
+        assert 'variation' in acc
+```
+
+---
+
+### 4.9.3.2 - Run API tests
+- [ ] Terminal:
+
+```bash
+pytest tests/test_export_api.py -v
+```
+
+- [ ] Verifica tutti i test passano (~11 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.9.3.3 - Commit API tests
+- [ ] Commit: `Add export API tests - Phase 4.9.3`
+- [ ] Push
+
+---
+
+## 🧪 4.9.4 - Coverage & Final Verification
+
+### 4.9.4.1 - Run all export tests with coverage
+- [ ] Terminal:
+
+```bash
+pytest tests/test_export*.py -v --cov=app/crud/export --cov=app/routers/export --cov-report=html
+```
+
+- [ ] Verifica coverage:
+  - [ ] `app/crud/export.py`: >85%
+  - [ ] `app/routers/export.py`: >80%
+
+---
+
+### 4.9.4.2 - Open coverage report
+- [ ] Terminal: `open htmlcov/index.html` (macOS) o `xdg-open htmlcov/index.html` (Linux)
+- [ ] Identifica aree non coperte
+- [ ] Aggiungi test se coverage <80%
+
+---
+
+### 4.9.4.3 - Run full test suite
+- [ ] Terminal: `pytest -v`
+- [ ] Verifica tutti i test passano (inclusi export tests)
+- [ ] Totale test export: ~23 test
+  - [ ] test_export_crud.py: ~12 test
+  - [ ] test_export_api.py: ~11 test
+
+---
+
+### 4.9.4.4 - Documenta coverage
+- [ ] 📝 Crea `backend/docs/EXPORT_TEST_COVERAGE.md`:
+
+```markdown
+# Export Module Test Coverage
+
+**Data:** [DATA]
+**Coverage Totale:** [XX]%
+
+## Coverage per File
+
+### app/crud/export.py
+- **Coverage:** XX%
+- **Functions Tested:** get_export_data, _calculate_categories_breakdown, _calculate_accounts_breakdown
+
+### app/routers/export.py
+- **Coverage:** XX%
+- **Endpoints Tested:** GET /export/data, GET /export/info
+
+## Test Summary
+
+**Total Tests:** ~23
+- CRUD Tests: ~12 ✅
+- API Tests: ~11 ✅
+
+**All Tests Passing:** ✅
+
+## Test Scenarios Covered
+
+### CRUD Functions
+- ✅ get_export_data: basic, summary calculations, categories breakdown, accounts breakdown
+- ✅ Date filtering: default dates, custom range
+- ✅ Account filtering: single account vs all accounts
+- ✅ Aggregations: categories percentages, account balances, net worth
+- ✅ Transfers: included in export
+- ✅ Calculations: variation = final - initial, percentages sum to 100%
+
+### API Endpoints
+- ✅ GET /export/data: default period, custom dates, account filter
+- ✅ Authentication required
+- ✅ GET /export/info: metadata structure
+- ✅ Response structure: all required fields present
+- ✅ Object structures: transaction, category, account format
+
+## Next Steps
+
+- [x] Export CRUD: 100% tested
+- [x] Export API: 100% tested
+- [ ] Frontend Excel generation: Will be implemented in Phase 5.12
+```
+
+---
+
+### 4.9.4.5 - Commit coverage report
+- [ ] Commit: `Add export test coverage report - Phase 4.9.4`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 4.9
+
+Prima di procedere, verifica:
+
+### Test Files
+- [ ] ✅ test_export_crud.py creato (~12 test)
+- [ ] ✅ test_export_api.py creato (~11 test)
+- [ ] ✅ Totale: ~23 test export module
+
+### Fixtures
+- [ ] ✅ export_test_data (comprehensive dataset)
+- [ ] ✅ previous_month_data (date filtering)
+- [ ] ✅ 3 accounts, 5 categories, 11 transactions, 2 transfers
+
+### Coverage
+- [ ] ✅ export.py CRUD: >85%
+- [ ] ✅ export.py router: >80%
+- [ ] ✅ Coverage report generato
+
+### Test Results
+- [ ] ✅ Tutti i test export passano
+- [ ] ✅ Full test suite passa
+- [ ] ✅ Nessun warning critico
+
+### Test Scenarios CRUD
+- [ ] ✅ Basic export data retrieval
+- [ ] ✅ Summary calculations verified
+- [ ] ✅ Categories breakdown aggregation
+- [ ] ✅ Accounts breakdown calculations
+- [ ] ✅ Date filtering (default + custom)
+- [ ] ✅ Account filtering
+- [ ] ✅ Transfers included
+- [ ] ✅ Percentages sum to 100%
+- [ ] ✅ Balance logic verified
+- [ ] ✅ Net worth calculation
+
+### Test Scenarios API
+- [ ] ✅ GET /export/data works
+- [ ] ✅ Default period (current month)
+- [ ] ✅ Custom date range
+- [ ] ✅ Account filter
+- [ ] ✅ Authentication required
+- [ ] ✅ GET /export/info metadata
+- [ ] ✅ Response structure complete
+- [ ] ✅ Transaction structure
+- [ ] ✅ Category structure
+- [ ] ✅ Account structure
+
+### Documentation
+- [ ] ✅ EXPORT_TEST_COVERAGE.md creato
+- [ ] ✅ Coverage stats documented
+- [ ] ✅ Test scenarios listed
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 0.25 giorni (2 ore)
+
+**Test implementati:**
+- ✅ ~12 CRUD tests (aggregations, calculations, filters)
+- ✅ ~11 API tests (endpoints, auth, structure)
+- ✅ Coverage >80% export module
+
+**Test Quality:**
+- ✅ Aggregazioni verificate (categories, accounts)
+- ✅ Calcoli accurati (summary, balances, percentages)
+- ✅ Filtri funzionanti (date range, account)
+- ✅ Response structure completa
+- ✅ Edge cases coperti
+
+---
+
+**FASE 4.9 COMPLETATA! 🎉**
+
 **Prossimo:** FASE 5 - Frontend Integration
 
 ---
@@ -11339,6 +13976,2046 @@ Prima di procedere, verifica:
 ---
 
 **FASE 5.10 COMPLETATA! 🎉**
+
+# FASE 5.11: Frontend CSV Import UI (1 giorno)
+
+## 🎯 Obiettivo
+Implementare l'interfaccia utente React per l'importazione CSV di transazioni, con preview interattiva, validazione visuale, correzione inline degli errori e conferma import.
+
+**Target:** UI completa per import CSV con UX fluida  
+**Focus:** Modal upload, preview table, fix inline, conferma import
+
+---
+
+## 📋 Panoramica Funzionalità
+
+### User Flow Completo
+1. **Upload:** User seleziona account + carica CSV
+2. **Preview:** Sistema mostra tutte le righe con status colorati
+3. **Fix:** User può correggere errori inline o escludere righe
+4. **Confirm:** User conferma import → transazioni create
+5. **Success:** Redirect a lista transazioni con filtro "oggi"
+
+### Decisioni UI/UX
+- **Preview Table:** Status visivi (🟢🟡🔴🟣⚠️) per ogni riga
+- **Fix Inline:** Click su cella → edit mode (solo per errori)
+- **Bulk Actions:** Checkbox per selezionare/deselezionare righe
+- **Smart Defaults:** Righe valide/warning pre-selezionate, errori/duplicati deselezionati
+- **Template Download:** Link prominente nel modal
+- **Error Feedback:** Toast notifications per errori API
+
+---
+
+## 🎨 5.11.1 - CSV Import Service
+
+### 5.11.1.1 - Crea service file
+- [ ] 📝 Crea `frontend/src/services/csvImportService.js`
+
+```javascript
+/**
+ * CSV Import Service
+ * API calls for CSV transaction import
+ */
+import api from './api';
+
+/**
+ * Preview CSV import - parse and validate file
+ * @param {File} file - CSV file
+ * @param {string} accountId - Target account UUID
+ * @returns {Promise<Object>} Preview data with rows status
+ */
+export const previewCSVImport = async (file, accountId) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.post(
+    `/csv-import/preview?account_id=${accountId}`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+
+  return response.data;
+};
+
+/**
+ * Confirm CSV import - create transactions
+ * @param {string} accountId - Target account UUID
+ * @param {Array<number>} rowNumbers - Row numbers to import
+ * @param {Array<Object>} rows - Full row data (for re-validation)
+ * @returns {Promise<Object>} Import result summary
+ */
+export const confirmCSVImport = async (accountId, rowNumbers, rows) => {
+  // Filter selected rows
+  const selectedRows = rows.filter(row => rowNumbers.includes(row.row_number));
+
+  // Transform to transaction format
+  const transactions = selectedRows.map(row => ({
+    account_id: accountId,
+    category_id: row.suggested_category_id || null,
+    amount: parseFloat(row.amount),
+    date: row.date,
+    description: row.description,
+    notes: row.notes || '',
+  }));
+
+  // For MVP: call bulk create directly
+  // Post-MVP: use dedicated /csv-import/confirm endpoint
+  const response = await api.post('/transactions/bulk', {
+    transactions,
+  });
+
+  return response.data;
+};
+
+/**
+ * Download CSV template
+ * @returns {void} Triggers browser download
+ */
+export const downloadCSVTemplate = () => {
+  const link = document.createElement('a');
+  link.href = `${api.defaults.baseURL}/csv-import/template`;
+  link.download = 'BudgetApp_Template_Transazioni.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+/**
+ * Get status display info
+ * @param {string} status - Row status
+ * @returns {Object} Display info (color, icon, label)
+ */
+export const getStatusDisplay = (status) => {
+  const displays = {
+    valid: {
+      color: 'text-green-600 bg-green-50',
+      icon: '🟢',
+      label: 'Valida',
+      borderColor: 'border-green-200',
+    },
+    warning: {
+      color: 'text-yellow-600 bg-yellow-50',
+      icon: '🟡',
+      label: 'Attenzione',
+      borderColor: 'border-yellow-200',
+    },
+    error: {
+      color: 'text-red-600 bg-red-50',
+      icon: '🔴',
+      label: 'Errore',
+      borderColor: 'border-red-200',
+    },
+    duplicate: {
+      color: 'text-purple-600 bg-purple-50',
+      icon: '🟣',
+      label: 'Duplicato',
+      borderColor: 'border-purple-200',
+    },
+    orphan: {
+      color: 'text-gray-600 bg-gray-50',
+      icon: '⚠️',
+      label: 'Orfano',
+      borderColor: 'border-gray-200',
+    },
+  };
+
+  return displays[status] || displays.error;
+};
+
+/**
+ * Format currency for display
+ * @param {number} amount
+ * @returns {string}
+ */
+export const formatAmount = (amount) => {
+  if (!amount) return '€ 0,00';
+  
+  const formatted = Math.abs(amount).toFixed(2).replace('.', ',');
+  const sign = amount < 0 ? '-' : '+';
+  
+  return `${sign} € ${formatted}`;
+};
+
+/**
+ * Format date for display
+ * @param {string} dateStr - ISO date string
+ * @returns {string} DD/MM/YYYY format
+ */
+export const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  
+  return `${day}/${month}/${year}`;
+};
+
+export default {
+  previewCSVImport,
+  confirmCSVImport,
+  downloadCSVTemplate,
+  getStatusDisplay,
+  formatAmount,
+  formatDateDisplay,
+};
+```
+
+---
+
+### 5.11.1.2 - Crea bulk transaction endpoint (se mancante)
+- [ ] 📝 Verifica se esiste `POST /transactions/bulk` nel backend
+- [ ] Se mancante, aggiungi in `backend/app/routers/transactions.py`:
+
+```python
+@router.post("/bulk", response_model=dict)
+async def create_bulk_transactions(
+    transactions: List[TransactionCreate],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk create multiple transactions.
+    Used by CSV import confirm step.
+    """
+    count, ids = transaction_crud.bulk_create_transactions(
+        db, transactions, str(current_user.id)
+    )
+    
+    return {
+        "created": count,
+        "transaction_ids": ids
+    }
+```
+
+---
+
+### 5.11.1.3 - Commit service
+- [ ] Commit: `Add CSV import service - Phase 5.11.1`
+- [ ] Push
+
+---
+
+## 🎨 5.11.2 - CSV Import Modal Component
+
+### 5.11.2.1 - Crea modal component
+- [ ] 📝 Crea `frontend/src/components/transactions/CSVImportModal.jsx`
+
+```javascript
+/**
+ * CSV Import Modal
+ * Main component for CSV import workflow
+ */
+import React, { useState } from 'react';
+import {
+  previewCSVImport,
+  confirmCSVImport,
+  downloadCSVTemplate,
+} from '../../services/csvImportService';
+import CSVPreviewTable from './CSVPreviewTable';
+
+const CSVImportModal = ({ isOpen, onClose, accounts, onSuccess }) => {
+  const [step, setStep] = useState('upload'); // 'upload' | 'preview' | 'importing'
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [file, setFile] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Reset state when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setStep('upload');
+      setSelectedAccountId('');
+      setFile(null);
+      setPreviewData(null);
+      setSelectedRows([]);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      // Validate file type
+      if (!selectedFile.name.endsWith('.csv')) {
+        setError('Per favore seleziona un file CSV');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setError('Il file è troppo grande (max 5MB)');
+        return;
+      }
+      
+      setFile(selectedFile);
+      setError(null);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!file || !selectedAccountId) {
+      setError('Seleziona un account e carica un file CSV');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await previewCSVImport(file, selectedAccountId);
+      setPreviewData(data);
+      
+      // Auto-select valid and warning rows (exclude errors and duplicates)
+      const autoSelected = data.rows
+        .filter(row => row.status === 'valid' || row.status === 'warning')
+        .map(row => row.row_number);
+      
+      setSelectedRows(autoSelected);
+      setStep('preview');
+    } catch (err) {
+      console.error('Preview error:', err);
+      setError(
+        err.response?.data?.detail || 
+        'Errore durante l\'analisi del file. Verifica il formato CSV.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (selectedRows.length === 0) {
+      setError('Seleziona almeno una riga da importare');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setStep('importing');
+
+    try {
+      const result = await confirmCSVImport(
+        selectedAccountId,
+        selectedRows,
+        previewData.rows
+      );
+      
+      // Success!
+      onSuccess(result);
+      onClose();
+    } catch (err) {
+      console.error('Import error:', err);
+      setError(
+        err.response?.data?.detail || 
+        'Errore durante l\'importazione. Riprova.'
+      );
+      setStep('preview'); // Go back to preview
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    setStep('upload');
+    setPreviewData(null);
+    setSelectedRows([]);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-2xl font-bold text-gray-900">
+            📥 Importa Transazioni da CSV
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            disabled={loading}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {step === 'upload' && (
+            <div className="space-y-6">
+              {/* Instructions */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 mb-2">
+                  📋 Come importare:
+                </h3>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                  <li>Scarica il template CSV e compilalo con i tuoi dati</li>
+                  <li>Seleziona l'account di destinazione</li>
+                  <li>Carica il file CSV</li>
+                  <li>Verifica l'anteprima e conferma l'importazione</li>
+                </ol>
+              </div>
+
+              {/* Download Template */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <p className="font-medium text-gray-900">
+                    Non hai un file CSV?
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Scarica il template e compilalo con i tuoi dati
+                  </p>
+                </div>
+                <button
+                  onClick={downloadCSVTemplate}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                >
+                  📥 Scarica Template
+                </button>
+              </div>
+
+              {/* Account Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Account di destinazione *
+                </label>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                >
+                  <option value="">Seleziona un account...</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} (€ {account.balance.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-sm text-gray-500">
+                  Tutte le transazioni importate saranno assegnate a questo account
+                </p>
+              </div>
+
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  File CSV *
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    disabled={loading}
+                  />
+                </div>
+                {file && (
+                  <p className="mt-2 text-sm text-green-600">
+                    ✓ File selezionato: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+              </div>
+
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 'preview' && previewData && (
+            <CSVPreviewTable
+              previewData={previewData}
+              selectedRows={selectedRows}
+              onSelectedRowsChange={setSelectedRows}
+            />
+          )}
+
+          {step === 'importing' && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-lg font-medium text-gray-900">
+                Importazione in corso...
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                Creazione di {selectedRows.length} transazioni
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          <div className="text-sm text-gray-600">
+            {step === 'preview' && previewData && (
+              <span>
+                {selectedRows.length} / {previewData.total_rows} righe selezionate
+              </span>
+            )}
+          </div>
+          
+          <div className="flex gap-3">
+            {step === 'upload' && (
+              <>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  disabled={loading}
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handlePreview}
+                  disabled={!file || !selectedAccountId || loading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Analisi...' : 'Analizza File'}
+                </button>
+              </>
+            )}
+            
+            {step === 'preview' && (
+              <>
+                <button
+                  onClick={handleBack}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  disabled={loading}
+                >
+                  ← Indietro
+                </button>
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={selectedRows.length === 0 || loading}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Importa {selectedRows.length} Transazioni
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CSVImportModal;
+```
+
+---
+
+### 5.11.2.2 - Commit modal component
+- [ ] Commit: `Add CSV import modal component - Phase 5.11.2`
+- [ ] Push
+
+---
+
+## 🎨 5.11.3 - CSV Preview Table Component
+
+### 5.11.3.1 - Crea preview table
+- [ ] 📝 Crea `frontend/src/components/transactions/CSVPreviewTable.jsx`
+
+```javascript
+/**
+ * CSV Preview Table
+ * Displays parsed CSV rows with status and allows selection
+ */
+import React from 'react';
+import {
+  getStatusDisplay,
+  formatAmount,
+  formatDateDisplay,
+} from '../../services/csvImportService';
+
+const CSVPreviewTable = ({ previewData, selectedRows, onSelectedRowsChange }) => {
+  const { rows, total_rows, valid_rows, warning_rows, error_rows, duplicate_rows } = previewData;
+
+  const handleToggleRow = (rowNumber) => {
+    if (selectedRows.includes(rowNumber)) {
+      onSelectedRowsChange(selectedRows.filter(r => r !== rowNumber));
+    } else {
+      onSelectedRowsChange([...selectedRows, rowNumber]);
+    }
+  };
+
+  const handleToggleAll = () => {
+    if (selectedRows.length === rows.length) {
+      // Deselect all
+      onSelectedRowsChange([]);
+    } else {
+      // Select all valid and warning (exclude errors and duplicates)
+      const validAndWarning = rows
+        .filter(row => row.status === 'valid' || row.status === 'warning')
+        .map(row => row.row_number);
+      onSelectedRowsChange(validAndWarning);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <p className="text-sm text-gray-600">Totale Righe</p>
+          <p className="text-2xl font-bold text-gray-900">{total_rows}</p>
+        </div>
+        
+        <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+          <p className="text-sm text-green-700">🟢 Valide</p>
+          <p className="text-2xl font-bold text-green-900">{valid_rows}</p>
+        </div>
+        
+        <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+          <p className="text-sm text-yellow-700">🟡 Attenzione</p>
+          <p className="text-2xl font-bold text-yellow-900">{warning_rows}</p>
+        </div>
+        
+        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+          <p className="text-sm text-red-700">🔴 Errori</p>
+          <p className="text-2xl font-bold text-red-900">{error_rows}</p>
+        </div>
+        
+        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+          <p className="text-sm text-purple-700">🟣 Duplicati</p>
+          <p className="text-2xl font-bold text-purple-900">{duplicate_rows}</p>
+        </div>
+      </div>
+
+      {/* Info Banners */}
+      {error_rows > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">
+            ⚠️ {error_rows} righe contengono errori e non possono essere importate. 
+            Controlla il file e riprova.
+          </p>
+        </div>
+      )}
+      
+      {duplicate_rows > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <p className="text-sm text-purple-800">
+            🟣 {duplicate_rows} righe sono duplicate (transazioni già esistenti). 
+            Sono state deselezionate automaticamente.
+          </p>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.length === rows.length && rows.length > 0}
+                    onChange={handleToggleAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Riga
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Data
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Descrizione
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Importo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Categoria
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Note
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {rows.map((row) => {
+                const display = getStatusDisplay(row.status);
+                const isSelected = selectedRows.includes(row.row_number);
+                
+                return (
+                  <tr
+                    key={row.row_number}
+                    className={`hover:bg-gray-50 ${
+                      row.status === 'error' || row.status === 'duplicate'
+                        ? 'opacity-60'
+                        : ''
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleRow(row.row_number)}
+                        disabled={row.status === 'error'}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      #{row.row_number}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${display.color}`}
+                        title={row.status_message}
+                      >
+                        {display.icon} {display.label}
+                      </span>
+                      {row.status_message && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {row.status_message}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {formatDateDisplay(row.date) || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {row.description || '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-sm font-medium ${
+                          row.amount < 0 ? 'text-red-600' : 'text-green-600'
+                        }`}
+                      >
+                        {row.amount ? formatAmount(row.amount) : '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {row.suggested_category_name ? (
+                        <div>
+                          <span className="text-gray-900">
+                            {row.suggested_category_name}
+                          </span>
+                          {row.match_confidence && row.match_confidence < 1 && (
+                            <span className="text-xs text-yellow-600 ml-1">
+                              ({Math.round(row.match_confidence * 100)}%)
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-xs">
+                      {row.notes || '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <p className="text-sm font-medium text-gray-700 mb-2">Legenda Status:</p>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span>🟢</span>
+            <span className="text-gray-600">Valida - pronta per import</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>🟡</span>
+            <span className="text-gray-600">Attenzione - categoria non trovata</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>🔴</span>
+            <span className="text-gray-600">Errore - dati non validi</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>🟣</span>
+            <span className="text-gray-600">Duplicato - già esistente</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span className="text-gray-600">Orfano - categoria eliminata</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CSVPreviewTable;
+```
+
+---
+
+### 5.11.3.2 - Commit preview table
+- [ ] Commit: `Add CSV preview table component - Phase 5.11.3`
+- [ ] Push
+
+---
+
+## 🔗 5.11.4 - Integration with Transactions Page
+
+### 5.11.4.1 - Add import button to TransactionList
+- [ ] 📝 Apri `frontend/src/components/transactions/TransactionList.jsx` (o pagina transazioni)
+- [ ] Aggiungi state per modal:
+
+```javascript
+const [showImportModal, setShowImportModal] = useState(false);
+```
+
+- [ ] Aggiungi bottone "Importa CSV" nella toolbar:
+
+```javascript
+<button
+  onClick={() => setShowImportModal(true)}
+  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+>
+  📥 Importa CSV
+</button>
+```
+
+- [ ] Aggiungi modal al render:
+
+```javascript
+<CSVImportModal
+  isOpen={showImportModal}
+  onClose={() => setShowImportModal(false)}
+  accounts={accounts}
+  onSuccess={handleImportSuccess}
+/>
+```
+
+- [ ] Implementa `handleImportSuccess`:
+
+```javascript
+const handleImportSuccess = (result) => {
+  // Show success toast
+  toast.success(`✓ ${result.created} transazioni importate con successo!`);
+  
+  // Refresh transaction list
+  fetchTransactions();
+  
+  // Optional: filter to show today's imports
+  // setFilters({ ...filters, date: new Date().toISOString().split('T')[0] });
+};
+```
+
+---
+
+### 5.11.4.2 - Commit integration
+- [ ] Commit: `Integrate CSV import modal with transactions page - Phase 5.11.4`
+- [ ] Push
+
+---
+
+## 🧪 5.11.5 - Testing & Refinement
+
+### 5.11.5.1 - Manual testing workflow
+- [ ] **Test 1: Happy Path**
+  - [ ] Click "Importa CSV"
+  - [ ] Download template
+  - [ ] Compila template con 5 righe valide
+  - [ ] Seleziona account
+  - [ ] Upload file
+  - [ ] Click "Analizza File"
+  - [ ] Preview mostra 5 righe verdi
+  - [ ] Tutte le 5 righe selezionate
+  - [ ] Click "Importa 5 Transazioni"
+  - [ ] Success toast appare
+  - [ ] Transazioni visibili nella lista
+
+- [ ] **Test 2: Validation Errors**
+  - [ ] CSV con date invalide, amount mancante
+  - [ ] Preview mostra righe rosse
+  - [ ] Righe rosse NON selezionabili
+  - [ ] Status message chiaro
+
+- [ ] **Test 3: Warnings (Fuzzy Categories)**
+  - [ ] CSV con categoria "Ristorante" (simile a "Ristorazione")
+  - [ ] Preview mostra riga gialla
+  - [ ] Suggestion: "Forse intendevi Ristorazione?"
+  - [ ] Match confidence mostrato (es. 85%)
+  - [ ] Riga selezionabile
+  - [ ] Import assegna categoria suggerita
+
+- [ ] **Test 4: Duplicates**
+  - [ ] Crea transazione esistente in DB
+  - [ ] CSV con stessa transazione
+  - [ ] Preview mostra riga viola
+  - [ ] Riga viola NON selezionata di default
+  - [ ] User può forzare import selezionando checkbox
+
+- [ ] **Test 5: Mixed Statuses**
+  - [ ] CSV con: 3 valid, 2 warning, 1 error, 1 duplicate
+  - [ ] Stats summary corrette (3+2+1+1=7)
+  - [ ] Auto-selected: 3 valid + 2 warning = 5
+  - [ ] Error + duplicate deselezionati
+
+- [ ] **Test 6: Edge Cases**
+  - [ ] File non CSV → error "Seleziona un file CSV"
+  - [ ] File >5MB → error "File troppo grande"
+  - [ ] File UTF-8 con caratteri italiani → OK
+  - [ ] File senza account selezionato → error
+  - [ ] Nessuna riga selezionata → bottone disabled
+
+- [ ] **Test 7: UX Flow**
+  - [ ] Modal apre correttamente
+  - [ ] Download template funziona
+  - [ ] File input funziona
+  - [ ] Bottone "Indietro" torna a upload
+  - [ ] Bottone "Annulla" chiude modal
+  - [ ] Loading states visibili
+  - [ ] Success redirect funziona
+
+---
+
+### 5.11.5.2 - Browser compatibility
+- [ ] Test su Chrome
+- [ ] Test su Firefox
+- [ ] Test su Safari
+- [ ] Test su mobile (responsive)
+
+---
+
+### 5.11.5.3 - Fix bugs & polish UX
+- [ ] Fix eventuali bug trovati
+- [ ] Polish animations/transitions
+- [ ] Verifica loading states
+- [ ] Verifica error messages chiari
+
+---
+
+### 5.11.5.4 - Commit testing results
+- [ ] 📝 Aggiorna `frontend/docs/CSV_IMPORT_TESTING.md` con risultati
+- [ ] Commit: `CSV import UI testing complete - Phase 5.11.5`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 5.11
+
+Prima di procedere, verifica:
+
+### Service
+- [ ] ✅ csvImportService.js creato
+- [ ] ✅ previewCSVImport funzionante
+- [ ] ✅ confirmCSVImport funzionante
+- [ ] ✅ downloadCSVTemplate funzionante
+- [ ] ✅ Helper functions (formatAmount, getStatusDisplay, etc.)
+- [ ] ✅ Bulk endpoint backend (POST /transactions/bulk)
+
+### Components
+- [ ] ✅ CSVImportModal.jsx completo
+- [ ] ✅ CSVPreviewTable.jsx completo
+- [ ] ✅ 3 steps: upload → preview → importing
+- [ ] ✅ State management corretto
+
+### UI/UX
+- [ ] ✅ Download template prominente
+- [ ] ✅ Account selection chiara
+- [ ] ✅ File upload con validazione
+- [ ] ✅ Preview table responsive
+- [ ] ✅ Status colors (🟢🟡🔴🟣⚠️)
+- [ ] ✅ Summary stats visibili
+- [ ] ✅ Checkbox select/deselect
+- [ ] ✅ Auto-select smart (valid+warning)
+- [ ] ✅ Error messages chiari
+- [ ] ✅ Loading states
+
+### Integration
+- [ ] ✅ Modal integrato in TransactionList
+- [ ] ✅ Import button visibile
+- [ ] ✅ Success callback refresh lista
+- [ ] ✅ Toast notifications
+
+### Testing
+- [ ] ✅ Happy path funziona
+- [ ] ✅ Validation errors gestiti
+- [ ] ✅ Warnings (fuzzy) funzionano
+- [ ] ✅ Duplicates identificati
+- [ ] ✅ Mixed statuses gestiti
+- [ ] ✅ Edge cases coperti
+- [ ] ✅ Browser compatibility OK
+- [ ] ✅ Mobile responsive
+
+### Documentation
+- [ ] ✅ Testing results documentati
+- [ ] ✅ Known issues (se presenti)
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 1 giorno (6-8 ore)
+
+**Componenti creati:**
+- ✅ csvImportService.js (API service)
+- ✅ CSVImportModal.jsx (main component)
+- ✅ CSVPreviewTable.jsx (preview table)
+- ✅ Integration con TransactionList
+
+**Features implementate:**
+- ✅ 3-step workflow (upload → preview → confirm)
+- ✅ Template download
+- ✅ Preview interattiva con status
+- ✅ Smart auto-selection
+- ✅ Checkbox select/deselect
+- ✅ Error handling completo
+- ✅ Success feedback
+
+**Pronto per:**
+- Produzione MVP
+- User testing
+- Feedback collection
+
+**Post-MVP Enhancements:**
+- [ ] Edit inline per correggere errori
+- [ ] Drag & drop file upload
+- [ ] Progress bar per file grandi
+- [ ] History import precedenti
+- [ ] Scheduled import automatici
+- [ ] Mapping colonne flessibile
+
+---
+
+**FASE 5.11 COMPLETATA! 🎉**
+
+# FASE 5.12: Frontend Excel Generation (1 giorno)
+
+## 🎯 Obiettivo
+Implementare l'interfaccia utente React per l'export Excel con generazione client-side del file multi-sheet, formattazione completa e download istantaneo.
+
+**Target:** UI completa per export Excel con generazione client-side  
+**Focus:** Modal parametri, generazione Excel (xlsx.js), 5-6 sheet formattati, download
+
+---
+
+## 📋 Panoramica Funzionalità
+
+### User Flow Completo
+1. **Setup:** User clicca "Esporta Excel"
+2. **Parametri:** Modal con periodo, account, opzioni sheet
+3. **Loading:** Chiamata API `/export/data` + generazione Excel
+4. **Download:** Browser scarica file Excel automaticamente
+5. **Success:** Toast conferma + possibilità riaprire
+
+### Decisioni UI/UX
+- **Client-Side Generation:** Libreria `xlsx` (SheetJS) genera file nel browser
+- **Multi-Sheet:** 5-6 sheet (Riepilogo, Transazioni, Per Categoria, Per Account, Trasferimenti, Budget)
+- **Formattazione:** Headers colorati, freeze panes, auto-filter, conditional formatting
+- **Period Presets:** Quick buttons (questo mese, ultimi 3 mesi, quest'anno)
+- **Download Immediato:** Nessun file server-side, zero latency
+
+---
+
+## 📦 5.12.1 - Install XLSX Library
+
+### 5.12.1.1 - Install SheetJS library
+- [ ] Terminal:
+
+```bash
+cd frontend
+npm install xlsx
+# or
+yarn add xlsx
+```
+
+- [ ] Verifica installazione in `package.json`
+
+---
+
+### 5.12.1.2 - Create xlsx utility helper
+- [ ] 📝 Crea `frontend/src/utils/xlsxHelper.js`
+
+```javascript
+/**
+ * XLSX Helper Utilities
+ * Common functions for Excel generation
+ */
+
+/**
+ * Auto-fit column widths based on content
+ * @param {Array} data - Sheet data
+ * @returns {Array} Column widths
+ */
+export const calculateColumnWidths = (data) => {
+  if (!data || data.length === 0) return [];
+  
+  const colWidths = [];
+  const maxWidth = 50; // Max column width
+  const minWidth = 10; // Min column width
+  
+  // Get max length for each column
+  data.forEach((row) => {
+    Object.keys(row).forEach((key, idx) => {
+      const value = String(row[key] || '');
+      const length = value.length;
+      
+      if (!colWidths[idx] || colWidths[idx] < length) {
+        colWidths[idx] = Math.min(Math.max(length, minWidth), maxWidth);
+      }
+    });
+  });
+  
+  return colWidths.map(w => ({ wch: w }));
+};
+
+/**
+ * Format currency for Excel
+ * @param {number} amount
+ * @returns {string}
+ */
+export const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined) return '€ 0,00';
+  const formatted = Math.abs(amount).toFixed(2).replace('.', ',');
+  return `€ ${formatted}`;
+};
+
+/**
+ * Format date for Excel
+ * @param {string} dateStr - ISO date
+ * @returns {string} DD/MM/YYYY
+ */
+export const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+/**
+ * Create header row with styling
+ * @param {Object} worksheet
+ * @param {Array} headers
+ * @param {string} color - Header color (hex)
+ */
+export const styleHeaderRow = (worksheet, headers, color = '4472C4') => {
+  const range = worksheet['!ref'];
+  if (!range) return;
+  
+  const headerRange = `A1:${String.fromCharCode(64 + headers.length)}1`;
+  
+  headers.forEach((header, idx) => {
+    const cellAddress = String.fromCharCode(65 + idx) + '1';
+    const cell = worksheet[cellAddress];
+    
+    if (cell) {
+      cell.s = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: color } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      };
+    }
+  });
+};
+
+/**
+ * Apply number format to currency columns
+ * @param {Object} worksheet
+ * @param {Array} columns - Column letters (e.g., ['C', 'D'])
+ * @param {number} startRow
+ * @param {number} endRow
+ */
+export const formatCurrencyColumns = (worksheet, columns, startRow, endRow) => {
+  columns.forEach(col => {
+    for (let row = startRow; row <= endRow; row++) {
+      const cellAddress = `${col}${row}`;
+      const cell = worksheet[cellAddress];
+      
+      if (cell && typeof cell.v === 'number') {
+        cell.z = '€ #,##0.00';
+      }
+    }
+  });
+};
+
+export default {
+  calculateColumnWidths,
+  formatCurrency,
+  formatDate,
+  styleHeaderRow,
+  formatCurrencyColumns
+};
+```
+
+---
+
+### 5.12.1.3 - Commit utilities
+- [ ] Commit: `Add XLSX helper utilities - Phase 5.12.1`
+- [ ] Push
+
+---
+
+## 🎨 5.12.2 - Excel Generation Service
+
+### 5.12.2.1 - Create Excel service
+- [ ] 📝 Crea `frontend/src/services/excelService.js`
+
+```javascript
+/**
+ * Excel Generation Service
+ * Client-side Excel file generation using xlsx library
+ */
+import * as XLSX from 'xlsx';
+import api from './api';
+import {
+  formatCurrency,
+  formatDate,
+  calculateColumnWidths
+} from '../utils/xlsxHelper';
+
+/**
+ * Fetch export data from backend
+ * @param {string} startDate - YYYY-MM-DD
+ * @param {string} endDate - YYYY-MM-DD
+ * @param {string} accountId - Optional account UUID
+ * @returns {Promise<Object>} Export data
+ */
+export const fetchExportData = async (startDate, endDate, accountId = null) => {
+  let url = `/export/data?start_date=${startDate}&end_date=${endDate}`;
+  if (accountId) {
+    url += `&account_id=${accountId}`;
+  }
+  
+  const response = await api.get(url);
+  return response.data;
+};
+
+/**
+ * Generate Excel file from export data
+ * @param {Object} exportData - Data from backend
+ * @param {Object} options - Generation options
+ * @returns {Blob} Excel file blob
+ */
+export const generateExcelFile = (exportData, options = {}) => {
+  const {
+    includeRiepilogo = true,
+    includeTransazioni = true,
+    includeCategorie = true,
+    includeAccount = true,
+    includeTrasferimenti = true,
+    includeBudget = false
+  } = options;
+  
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+  
+  // Sheet 1: Riepilogo
+  if (includeRiepilogo) {
+    const riepilogoSheet = createRiepilogoSheet(exportData);
+    XLSX.utils.book_append_sheet(workbook, riepilogoSheet, 'Riepilogo');
+  }
+  
+  // Sheet 2: Transazioni
+  if (includeTransazioni) {
+    const transazioniSheet = createTransazioniSheet(exportData);
+    XLSX.utils.book_append_sheet(workbook, transazioniSheet, 'Transazioni');
+  }
+  
+  // Sheet 3: Per Categoria
+  if (includeCategorie) {
+    const categorieSheet = createCategorieSheet(exportData);
+    XLSX.utils.book_append_sheet(workbook, categorieSheet, 'Per Categoria');
+  }
+  
+  // Sheet 4: Per Account
+  if (includeAccount) {
+    const accountSheet = createAccountSheet(exportData);
+    XLSX.utils.book_append_sheet(workbook, accountSheet, 'Per Account');
+  }
+  
+  // Sheet 5: Trasferimenti (if exist)
+  if (includeTrasferimenti && exportData.transfers?.length > 0) {
+    const transfersSheet = createTrasferimentiSheet(exportData);
+    XLSX.utils.book_append_sheet(workbook, transfersSheet, 'Trasferimenti');
+  }
+  
+  // Sheet 6: Budget vs Actual (if exist and requested)
+  if (includeBudget && exportData.budgets?.length > 0) {
+    const budgetSheet = createBudgetSheet(exportData);
+    XLSX.utils.book_append_sheet(workbook, budgetSheet, 'Budget vs Actual');
+  }
+  
+  // Generate Excel file
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetmlsheet' });
+};
+
+/**
+ * Create Riepilogo (Summary) sheet
+ */
+const createRiepilogoSheet = (data) => {
+  const summaryData = [
+    ['RIEPILOGO FINANZIARIO', ''],
+    ['', ''],
+    ['Periodo', `${formatDate(data.start_date)} - ${formatDate(data.end_date)}`],
+    ['Generato il', new Date(data.generated_at).toLocaleString('it-IT')],
+    ['', ''],
+    ['ENTRATE E USCITE', ''],
+    ['Totale Entrate', formatCurrency(data.total_income)],
+    ['Totale Spese Necessarie', formatCurrency(data.total_expense_necessity)],
+    ['Totale Spese Extra', formatCurrency(data.total_expense_extra)],
+    ['Totale Spese', formatCurrency(data.total_expense)],
+    ['', ''],
+    ['SALDO', ''],
+    ['Saldo Netto Periodo', formatCurrency(data.net_balance)],
+    ['Patrimonio Totale', formatCurrency(data.total_net_worth)],
+    ['', ''],
+    ['STATISTICHE', ''],
+    ['Numero Transazioni', data.total_transactions],
+    ['Numero Account', data.total_accounts],
+  ];
+  
+  const worksheet = XLSX.utils.aoa_to_sheet(summaryData);
+  
+  // Set column widths
+  worksheet['!cols'] = [{ wch: 30 }, { wch: 20 }];
+  
+  return worksheet;
+};
+
+/**
+ * Create Transazioni sheet
+ */
+const createTransazioniSheet = (data) => {
+  const transactions = data.transactions.map(txn => ({
+    Data: formatDate(txn.date),
+    Account: txn.account_name,
+    Categoria: txn.category_name,
+    Tipo: mapTypeToItalian(txn.type),
+    Descrizione: txn.description,
+    Importo: txn.amount,
+    Note: txn.notes || ''
+  }));
+  
+  const worksheet = XLSX.utils.json_to_sheet(transactions);
+  
+  // Auto-filter on all columns
+  worksheet['!autofilter'] = { ref: worksheet['!ref'] };
+  
+  // Freeze first row
+  worksheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+  
+  // Set column widths
+  worksheet['!cols'] = [
+    { wch: 12 }, // Data
+    { wch: 15 }, // Account
+    { wch: 20 }, // Categoria
+    { wch: 18 }, // Tipo
+    { wch: 30 }, // Descrizione
+    { wch: 12 }, // Importo
+    { wch: 25 }  // Note
+  ];
+  
+  return worksheet;
+};
+
+/**
+ * Create Per Categoria sheet
+ */
+const createCategorieSheet = (data) => {
+  const categories = data.categories_breakdown.map(cat => ({
+    'Macro-Categoria': cat.macro_category,
+    'Sotto-Categoria': cat.category_name,
+    'Totale Speso': cat.total_amount,
+    'N° Transazioni': cat.transaction_count,
+    '% sul Totale': `${cat.percentage.toFixed(2)}%`
+  }));
+  
+  const worksheet = XLSX.utils.json_to_sheet(categories);
+  
+  // Set column widths
+  worksheet['!cols'] = [
+    { wch: 20 }, // Macro-Categoria
+    { wch: 25 }, // Sotto-Categoria
+    { wch: 15 }, // Totale Speso
+    { wch: 15 }, // N° Transazioni
+    { wch: 12 }  // % sul Totale
+  ];
+  
+  return worksheet;
+};
+
+/**
+ * Create Per Account sheet
+ */
+const createAccountSheet = (data) => {
+  const accounts = data.accounts_breakdown.map(acc => ({
+    Account: acc.account_name,
+    'Saldo Iniziale': acc.initial_balance,
+    Entrate: acc.total_income,
+    Uscite: acc.total_expense,
+    'Saldo Finale': acc.final_balance,
+    Variazione: acc.variation
+  }));
+  
+  const worksheet = XLSX.utils.json_to_sheet(accounts);
+  
+  // Set column widths
+  worksheet['!cols'] = [
+    { wch: 20 }, // Account
+    { wch: 15 }, // Saldo Iniziale
+    { wch: 12 }, // Entrate
+    { wch: 12 }, // Uscite
+    { wch: 15 }, // Saldo Finale
+    { wch: 12 }  // Variazione
+  ];
+  
+  return worksheet;
+};
+
+/**
+ * Create Trasferimenti sheet
+ */
+const createTrasferimentiSheet = (data) => {
+  const transfers = data.transfers.map(tr => ({
+    Data: formatDate(tr.date),
+    'Da Account': tr.from_account,
+    'A Account': tr.to_account,
+    Importo: tr.amount,
+    Tipo: mapTransferType(tr.transfer_type),
+    Note: tr.notes || ''
+  }));
+  
+  const worksheet = XLSX.utils.json_to_sheet(transfers);
+  
+  // Set column widths
+  worksheet['!cols'] = [
+    { wch: 12 }, // Data
+    { wch: 20 }, // Da Account
+    { wch: 20 }, // A Account
+    { wch: 12 }, // Importo
+    { wch: 15 }, // Tipo
+    { wch: 25 }  // Note
+  ];
+  
+  return worksheet;
+};
+
+/**
+ * Create Budget vs Actual sheet
+ */
+const createBudgetSheet = (data) => {
+  // TODO: Implement when budgets are ready
+  const budgets = data.budgets?.map(b => ({
+    Categoria: b.category_name,
+    'Budget Mensile': b.budget_amount,
+    Speso: b.spent_amount,
+    Rimanente: b.remaining,
+    '% Utilizzato': `${b.percentage_used.toFixed(2)}%`,
+    Status: b.status
+  })) || [];
+  
+  const worksheet = XLSX.utils.json_to_sheet(budgets);
+  return worksheet;
+};
+
+/**
+ * Download Excel file
+ * @param {Blob} blob - Excel file blob
+ * @param {string} filename - File name
+ */
+export const downloadExcel = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Helper: Map transaction type to Italian
+ */
+const mapTypeToItalian = (type) => {
+  const map = {
+    'income': 'Entrata',
+    'expense_necessity': 'Spesa Necessaria',
+    'expense_extra': 'Spesa Extra'
+  };
+  return map[type] || type;
+};
+
+/**
+ * Helper: Map transfer type to Italian
+ */
+const mapTransferType = (type) => {
+  const map = {
+    'internal': 'Interno',
+    'savings': 'Risparmio',
+    'withdrawal': 'Prelievo',
+    'deposit': 'Deposito'
+  };
+  return map[type] || type;
+};
+
+export default {
+  fetchExportData,
+  generateExcelFile,
+  downloadExcel
+};
+```
+
+---
+
+### 5.12.2.2 - Commit service
+- [ ] Commit: `Add Excel generation service - Phase 5.12.2`
+- [ ] Push
+
+---
+
+## 🎨 5.12.3 - Excel Export Modal Component
+
+### 5.12.3.1 - Create modal component
+- [ ] 📝 Crea `frontend/src/components/reports/ExcelExportModal.jsx`
+
+```javascript
+/**
+ * Excel Export Modal
+ * UI for configuring and triggering Excel export
+ */
+import React, { useState, useEffect } from 'react';
+import {
+  fetchExportData,
+  generateExcelFile,
+  downloadExcel
+} from '../../services/excelService';
+
+const ExcelExportModal = ({ isOpen, onClose, accounts }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Period selection
+  const [periodType, setPeriodType] = useState('this_month'); // 'this_month', 'custom', etc.
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  // Account filter
+  const [selectedAccountId, setSelectedAccountId] = useState(''); // '' = all accounts
+  
+  // Sheet options
+  const [includeRiepilogo, setIncludeRiepilogo] = useState(true);
+  const [includeTransazioni, setIncludeTransazioni] = useState(true);
+  const [includeCategorie, setIncludeCategorie] = useState(true);
+  const [includeAccount, setIncludeAccount] = useState(true);
+  const [includeTrasferimenti, setIncludeTrasferimenti] = useState(true);
+  const [includeBudget, setIncludeBudget] = useState(false);
+  
+  // Initialize dates based on period type
+  useEffect(() => {
+    if (isOpen) {
+      updateDatesForPeriod(periodType);
+    }
+  }, [isOpen, periodType]);
+  
+  const updateDatesForPeriod = (type) => {
+    const today = new Date();
+    let start, end;
+    
+    switch (type) {
+      case 'this_month':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = today;
+        break;
+      case 'last_month':
+        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        end = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case 'last_3_months':
+        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+        end = today;
+        break;
+      case 'last_6_months':
+        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        end = today;
+        break;
+      case 'this_year':
+        start = new Date(today.getFullYear(), 0, 1);
+        end = today;
+        break;
+      case 'last_year':
+        start = new Date(today.getFullYear() - 1, 0, 1);
+        end = new Date(today.getFullYear() - 1, 11, 31);
+        break;
+      case 'custom':
+        // Keep current dates
+        return;
+      default:
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = today;
+    }
+    
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
+  
+  const handleExport = async () => {
+    if (!startDate || !endDate) {
+      setError('Seleziona un periodo valido');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch data from backend
+      const exportData = await fetchExportData(
+        startDate,
+        endDate,
+        selectedAccountId || null
+      );
+      
+      // Generate Excel file
+      const excelBlob = generateExcelFile(exportData, {
+        includeRiepilogo,
+        includeTransazioni,
+        includeCategorie,
+        includeAccount,
+        includeTrasferimenti,
+        includeBudget
+      });
+      
+      // Generate filename
+      const filename = `BudgetApp_Export_${startDate}_${endDate}.xlsx`;
+      
+      // Download
+      downloadExcel(excelBlob, filename);
+      
+      // Success
+      onClose();
+      // Optional: show success toast
+    } catch (err) {
+      console.error('Export error:', err);
+      setError(
+        err.response?.data?.detail ||
+        'Errore durante l\'esportazione. Riprova.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-2xl font-bold text-gray-900">
+            📊 Esporta Excel
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl"
+            disabled={loading}
+          >
+            ×
+          </button>
+        </div>
+        
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Period Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Periodo
+            </label>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[
+                { value: 'this_month', label: 'Questo mese' },
+                { value: 'last_month', label: 'Mese scorso' },
+                { value: 'last_3_months', label: 'Ultimi 3 mesi' },
+                { value: 'last_6_months', label: 'Ultimi 6 mesi' },
+                { value: 'this_year', label: 'Quest\'anno' },
+                { value: 'last_year', label: 'Anno scorso' }
+              ].map(period => (
+                <button
+                  key={period.value}
+                  onClick={() => setPeriodType(period.value)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    periodType === period.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => setPeriodType('custom')}
+              className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                periodType === 'custom'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              📅 Personalizzato
+            </button>
+            
+            {periodType === 'custom' && (
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Da</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">A</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Account Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Account
+            </label>
+            <select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg"
+            >
+              <option value="">Tutti gli account</option>
+              {accounts.map(account => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Sheet Options */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fogli da includere
+            </label>
+            <div className="space-y-2">
+              {[
+                { key: 'includeRiepilogo', label: 'Riepilogo', state: includeRiepilogo, setState: setIncludeRiepilogo },
+                { key: 'includeTransazioni', label: 'Transazioni', state: includeTransazioni, setState: setIncludeTransazioni },
+                { key: 'includeCategorie', label: 'Per Categoria', state: includeCategorie, setState: setIncludeCategorie },
+                { key: 'includeAccount', label: 'Per Account', state: includeAccount, setState: setIncludeAccount },
+                { key: 'includeTrasferimenti', label: 'Trasferimenti', state: includeTrasferimenti, setState: setIncludeTrasferimenti },
+                { key: 'includeBudget', label: 'Budget vs Actual', state: includeBudget, setState: setIncludeBudget, disabled: true }
+              ].map(option => (
+                <label key={option.key} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={option.state}
+                    onChange={(e) => option.setState(e.target.checked)}
+                    disabled={option.disabled}
+                    className="rounded border-gray-300 text-blue-600 mr-2"
+                  />
+                  <span className={option.disabled ? 'text-gray-400' : 'text-gray-700'}>
+                    {option.label}
+                    {option.disabled && ' (prossimamente)'}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          <p className="text-sm text-gray-600">
+            Formato: Excel (.xlsx)
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={loading || !startDate || !endDate}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300"
+            >
+              {loading ? 'Generazione...' : '📥 Esporta Excel'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ExcelExportModal;
+```
+
+---
+
+### 5.12.3.2 - Commit modal
+- [ ] Commit: `Add Excel export modal component - Phase 5.12.3`
+- [ ] Push
+
+---
+
+## 🔗 5.12.4 - Integration with App
+
+### 5.12.4.1 - Add export button
+- [ ] 📝 Apri pagina/dashboard dove aggiungere bottone export (es. `Dashboard.jsx` o `Reports.jsx`)
+- [ ] Aggiungi state:
+
+```javascript
+const [showExportModal, setShowExportModal] = useState(false);
+```
+
+- [ ] Aggiungi bottone:
+
+```javascript
+<button
+  onClick={() => setShowExportModal(true)}
+  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+>
+  📊 Esporta Excel
+</button>
+```
+
+- [ ] Aggiungi modal:
+
+```javascript
+<ExcelExportModal
+  isOpen={showExportModal}
+  onClose={() => setShowExportModal(false)}
+  accounts={accounts}
+/>
+```
+
+---
+
+### 5.12.4.2 - Commit integration
+- [ ] Commit: `Integrate Excel export modal - Phase 5.12.4`
+- [ ] Push
+
+---
+
+## 🧪 5.12.5 - Testing & Refinement
+
+### 5.12.5.1 - Manual testing
+- [ ] **Test 1: Basic Export (This Month)**
+  - [ ] Click "Esporta Excel"
+  - [ ] Select "Questo mese"
+  - [ ] Keep all sheets checked
+  - [ ] Click "Esporta Excel"
+  - [ ] File downloads: `BudgetApp_Export_2025-02-01_2025-02-06.xlsx`
+  - [ ] Open Excel: 5 sheets present
+  - [ ] Riepilogo sheet: summary correct
+  - [ ] Transazioni sheet: all transactions, auto-filter works
+  - [ ] Per Categoria sheet: aggregations correct
+  - [ ] Per Account sheet: balances correct
+  - [ ] Trasferimenti sheet: transfers listed
+
+- [ ] **Test 2: Custom Period**
+  - [ ] Select "Personalizzato"
+  - [ ] Set dates: 2025-01-01 to 2025-01-31
+  - [ ] Export
+  - [ ] Verify filename has correct dates
+  - [ ] Verify only January transactions
+
+- [ ] **Test 3: Single Account Filter**
+  - [ ] Select specific account
+  - [ ] Export
+  - [ ] Verify only transactions from that account
+
+- [ ] **Test 4: Selective Sheets**
+  - [ ] Uncheck "Trasferimenti"
+  - [ ] Export
+  - [ ] Verify file has only 4 sheets (no Trasferimenti)
+
+- [ ] **Test 5: Large Dataset**
+  - [ ] Create 100+ transactions
+  - [ ] Export "Quest'anno"
+  - [ ] Verify generation time <5 seconds
+  - [ ] Verify all data present
+
+- [ ] **Test 6: Edge Cases**
+  - [ ] No account selected → exports all
+  - [ ] No transactions in period → empty sheets OK
+  - [ ] Missing end date → button disabled
+
+---
+
+### 5.12.5.2 - Excel file quality check
+- [ ] Open generated file in Excel/LibreOffice
+- [ ] Check formatting:
+  - [ ] Headers bold and colored
+  - [ ] Currency format correct (€ XX,XX)
+  - [ ] Date format correct (DD/MM/YYYY)
+  - [ ] Column widths readable
+  - [ ] Auto-filter enabled on Transazioni
+  - [ ] Freeze panes work
+- [ ] Check data accuracy:
+  - [ ] Summary totals match dashboard
+  - [ ] Transaction count correct
+  - [ ] Categories breakdown adds up
+  - [ ] Account balances match app
+
+---
+
+### 5.12.5.3 - Browser compatibility
+- [ ] Test on Chrome
+- [ ] Test on Firefox
+- [ ] Test on Safari
+- [ ] Test on mobile (download works)
+
+---
+
+### 5.12.5.4 - Fix bugs & polish
+- [ ] Fix eventuali bug
+- [ ] Polish loading states
+- [ ] Improve error messages
+- [ ] Add success toast notification
+
+---
+
+### 5.12.5.5 - Commit testing
+- [ ] 📝 Crea `frontend/docs/EXCEL_EXPORT_TESTING.md`
+- [ ] Commit: `Excel export testing complete - Phase 5.12.5`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 5.12
+
+### Library & Utilities
+- [ ] ✅ xlsx library installed
+- [ ] ✅ xlsxHelper.js utilities created
+- [ ] ✅ Helper functions working
+
+### Service
+- [ ] ✅ excelService.js created
+- [ ] ✅ fetchExportData() works
+- [ ] ✅ generateExcelFile() creates workbook
+- [ ] ✅ 5 sheet creation functions
+- [ ] ✅ downloadExcel() triggers download
+
+### Components
+- [ ] ✅ ExcelExportModal complete
+- [ ] ✅ Period selection (6 presets + custom)
+- [ ] ✅ Account filter
+- [ ] ✅ Sheet options checkboxes
+- [ ] ✅ Loading states
+- [ ] ✅ Error handling
+
+### Integration
+- [ ] ✅ Export button added to app
+- [ ] ✅ Modal opens/closes
+- [ ] ✅ Accounts passed as prop
+
+### Excel File Quality
+- [ ] ✅ 5 sheets generated correctly
+- [ ] ✅ Riepilogo: summary stats
+- [ ] ✅ Transazioni: all data, auto-filter
+- [ ] ✅ Per Categoria: aggregations
+- [ ] ✅ Per Account: balances
+- [ ] ✅ Trasferimenti: transfers list
+- [ ] ✅ Formatting: headers, colors, widths
+- [ ] ✅ Data accuracy verified
+
+### Testing
+- [ ] ✅ Basic export works
+- [ ] ✅ Custom period works
+- [ ] ✅ Account filter works
+- [ ] ✅ Selective sheets works
+- [ ] ✅ Large dataset (<5 sec)
+- [ ] ✅ Edge cases handled
+- [ ] ✅ Browser compatibility OK
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 1 giorno (6-8 ore)
+
+**Implementato:**
+- ✅ Client-side Excel generation (xlsx library)
+- ✅ 5 sheets multi-format
+- ✅ Period presets + custom range
+- ✅ Account filtering
+- ✅ Sheet selection
+- ✅ Instant download
+
+**Pronto per:**
+- MVP Production
+- User testing
+- Feedback collection
+
+**Architettura:**
+- Client-side = zero server load
+- Single API call = fast data fetch
+- Immediate download = great UX
+- Scalable infinitely
+
+**Post-MVP Enhancements:**
+- [ ] PDF export option
+- [ ] Email delivery
+- [ ] Scheduled exports
+- [ ] Custom templates
+- [ ] Charts in Excel
+- [ ] Pivot tables
+
+---
+
+**FASE 5.12 COMPLETATA! 🎉**
+
+**EXCEL EXPORT MODULE COMPLETE!** 📊✅
+
+**MVP CSV Import completo!**
 
 **Prossimo:** FASE 6 - Deployment
 

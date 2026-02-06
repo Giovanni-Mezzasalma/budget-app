@@ -191,6 +191,75 @@ Se elimini una categoria che ha budget attivi, questi diventano "budget orfani".
 
 Questo approccio "permissivo" ti dà massima flessibilità nella gestione delle tue categorie senza perdere dati o controllo sui tuoi budget.
 
+## 📥 CSV Import & 📊 Data Export
+
+### CSV Import
+
+Importa massivamente transazioni da file CSV con preview interattiva e validazione intelligente.
+
+**Caratteristiche:**
+- ✅ **Template CSV** scaricabile con formato standard
+- ✅ **Preview Interattiva** con status per ogni riga (🟢 valid, 🟡 warning, 🔴 error, 🟣 duplicate)
+- ✅ **Fuzzy Matching** categorie (es. "Ristorante" → "Ristorazione")
+- ✅ **Rilevamento Duplicati** automatico
+- ✅ **Import Selettivo** (escludi righe con errori)
+
+**Formato CSV:**
+```csv
+date,description,amount,category_name,notes
+2025-01-15,Spesa Supermercato,-45.50,Spesa,Settimanale
+2025-01-16,Stipendio,2500.00,Stipendio,Gennaio 2025
+```
+
+**User Flow:** Upload → Preview con validazione → Correggi errori → Conferma import
+
+**Limiti:** Max 1000 righe per file, UTF-8 encoding
+
+---
+
+### Data Export (Excel)
+
+Esporta report finanziari completi in Excel multi-sheet con generazione client-side.
+
+**Caratteristiche:**
+- ✅ **5-6 Fogli Excel**: Riepilogo, Transazioni, Per Categoria, Per Account, Trasferimenti, Budget
+- ✅ **Generazione Client-Side** (zero carico server, download istantaneo)
+- ✅ **Period Presets**: Questo mese, ultimi 3/6 mesi, quest'anno, anno scorso, custom
+- ✅ **Filtri**: Esporta tutti gli account o singolo account
+- ✅ **Formattazione Professionale**: Auto-filter, freeze panes, headers colorati
+
+**Fogli Generati:**
+1. **Riepilogo**: Statistiche periodo (entrate, uscite, saldo, patrimonio)
+2. **Transazioni**: Lista completa con auto-filter
+3. **Per Categoria**: Aggregazione spese con percentuali
+4. **Per Account**: Breakdown movimenti per account
+5. **Trasferimenti**: Lista trasferimenti tra account
+6. **Budget vs Actual**: Confronto budget pianificato vs speso *(futuro)*
+
+**User Flow:** Configura periodo → Seleziona fogli → Download Excel
+
+**File generato:** `BudgetApp_Export_2025-01-01_2025-01-31.xlsx`
+
+---
+
+### Implementazione Tecnica
+
+**Backend:**
+- `app/utils/csv_parser.py`: Parsing e validazione CSV
+- `app/crud/export.py`: Aggregazione dati export
+- `app/routers/csv_import.py`: Endpoint import (preview, template)
+- `app/routers/export.py`: Endpoint export (data aggregation)
+
+**Frontend:**
+- Libreria `xlsx` (SheetJS) per generazione Excel client-side
+- `components/transactions/CSVImportModal.jsx`: Modal import
+- `components/reports/ExcelExportModal.jsx`: Modal export
+- `services/csvImportService.js` & `excelService.js`: API integration
+
+**Testing:**
+- Backend: 85+ test con >80% coverage
+- Fixtures: CSV test files, export data mocks
+
 #### 🏖️ Gestione Ferie (Vacation Planning)
 
 - ✅ **Maturazione Separata per Tipo**: Tracciamento indipendente Ferie, ROL, Permessi
