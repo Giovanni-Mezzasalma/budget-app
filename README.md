@@ -46,6 +46,151 @@ Il progetto nasce come evoluzione di un prototipo Excel, trasformato in un'appli
 - ✅ **Statistiche Mensili**: Trend income/expense, grafici a torta per categorie
 - ✅ **Custom Chart Builder**: Crea e salva grafici personalizzati
 
+#### 📊 Sistema di Categorizzazione Gerarchico
+
+La piattaforma utilizza un **sistema di categorizzazione a due livelli** progettato per garantire flessibilità e controllo granulare delle finanze:
+
+**Macro-Categorie (Fisse):**
+
+La piattaforma organizza tutte le transazioni in **3 macro-categorie principali**:
+
+1. **Entrate** (`income`) - Per tutte le fonti di reddito
+2. **Spese di Necessità** (`expense_necessity`) - Spese essenziali e ricorrenti
+3. **Spese Extra** (`expense_extra`) - Spese discrezionali e non essenziali
+
+Queste macro-categorie sono **fisse e non modificabili** dall'utente, garantendo una struttura organizzativa coerente e facilitando l'analisi del budget secondo il metodo 50/30/20 (necessità/desideri/risparmi).
+
+**Sotto-Categorie (Completamente Customizzabili):**
+
+All'interno di ogni macro-categoria, gli utenti possono:
+
+- ✅ **Utilizzare categorie predefinite**: Al momento della registrazione, il sistema crea automaticamente un set di sotto-categorie comuni (es. Stipendio, Affitto, Spesa, Trasporti, Svago, ecc.)
+- ✅ **Creare nuove sotto-categorie**: Personalizzare completamente le proprie categorie in base alle esigenze specifiche
+- ✅ **Modificare categorie esistenti**: Cambiare nome, colore, icona delle categorie
+- ✅ **Eliminare/disattivare categorie**: Rimuovere categorie non più necessarie (preservando lo storico delle transazioni associate)
+
+**Struttura Gerarchica:**
+
+```
+📁 Entrate
+  ├── 💰 Reddito
+  │   ├── Reddito Principale
+  │   └── Reddito Secondario
+  ├── 🏠 Affitto (da locazione)
+  ├── 🏷️ Vendita
+  └── 🔄 Rimborsi
+
+📁 Spese di Necessità
+  ├── 🏠 Casa
+  │   ├── Mutuo/Affitto
+  │   ├── Elettricità
+  │   ├── Gas
+  │   └── Acqua
+  ├── 🚗 Trasporti
+  │   ├── Benzina
+  │   ├── Assicurazione Auto
+  │   └── Manutenzione
+  └── 🏥 Salute
+      ├── Medicinali
+      └── Visite mediche
+
+📁 Spese Extra
+  ├── 🎭 Svago
+  │   ├── Ristoranti
+  │   ├── Cinema/Eventi
+  │   └── Shopping
+  └── 🐾 Animali
+      ├── Cibo
+      └── Veterinario
+```
+
+**Vantaggi del Sistema:**
+
+- 🎯 **Organizzazione chiara**: Le 3 macro-categorie forniscono una struttura mentale semplice per gestire le finanze
+- 🔧 **Massima flessibilità**: Ogni utente può personalizzare completamente le sotto-categorie secondo le proprie esigenze
+- 📊 **Analytics potenti**: Possibilità di analizzare le spese sia per macro-categoria (visione d'insieme) che per sotto-categoria (dettaglio granulare)
+- 🎨 **Personalizzazione visiva**: Ogni categoria può avere colore ed emoji personalizzati per una UI intuitiva
+- 🔄 **Evoluzione nel tempo**: Aggiungi nuove categorie man mano che le tue esigenze cambiano
+
+**Profondità Massima:**
+
+Il sistema supporta una profondità massima di **2 livelli** (macro-categoria → sotto-categoria) per mantenere la struttura semplice e gestibile. Non è possibile creare sotto-categorie di sotto-categorie.
+
+#### 💡 Gestione Budget (Budget Planning)
+
+La piattaforma include un **sistema di budgeting proattivo** che ti permette di pianificare e monitorare le tue spese per categoria, aiutandoti a mantenere il controllo delle finanze.
+
+**Funzionalità Budget:**
+
+- ✅ **Budget per Sotto-Categoria**: Crea budget mensili per ogni sotto-categoria personalizzata (es. "Ristoranti": €200/mese, "Spesa": €400/mese)
+- ✅ **Tracking Real-Time**: Confronto automatico tra budget pianificato e spesa effettiva
+- ✅ **Indicatori Visivi**: Sistema a semaforo (verde/giallo/rosso) per monitorare l'utilizzo del budget
+- ✅ **Percentuale di Utilizzo**: Visualizzazione chiara di quanto budget hai già utilizzato (es. "€150/€200 - 75%")
+- ✅ **Storico Budget**: Mantieni lo storico dei budget anche quando le categorie vengono modificate o eliminate
+- ✅ **Flessibilità**: Modifica, disattiva o elimina budget in qualsiasi momento
+
+**Come Funziona:**
+
+1. **Crea un Budget**
+   - Seleziona una sotto-categoria (es. "Ristoranti")
+   - Imposta l'importo mensile (es. €200)
+   - Attiva il budget
+
+2. **Monitora l'Utilizzo**
+   - Ogni transazione nella categoria viene automaticamente conteggiata
+   - La dashboard mostra in tempo reale: "€150/€200 (75%)"
+   - Indicatore visivo:
+     - 🟢 Verde: < 70% utilizzato
+     - 🟡 Giallo: 70-90% utilizzato
+     - 🔴 Rosso: > 90% utilizzato
+
+3. **Gestione Intelligente delle Categorie**
+   - Se rinomini una categoria, il budget si aggiorna automaticamente
+   - Se elimini una categoria con budget attivo, ricevi un avviso:
+     ```
+     ⚠️ Questa categoria ha budget attivi
+     Vuoi: [Riassegnare] [Eliminare budget] [Annulla]
+     ```
+
+**Esempio Pratico:**
+
+```
+📊 I Tuoi Budget (Gennaio 2025)
+
+🍽️ Ristoranti
+€150 / €200 (75%) 🟡
+Ancora disponibili: €50
+
+🛒 Spesa
+€380 / €400 (95%) 🔴
+Quasi esaurito! Ancora €20
+
+🚗 Benzina
+€45 / €100 (45%) 🟢
+Ben sotto budget!
+
+⚠️ Budget Orfani: 1
+[Gestisci Budget Orfani]
+```
+
+**Vantaggi:**
+
+- 🎯 **Controllo Proattivo**: Non solo tracking passivo, ma pianificazione attiva delle spese
+- 📊 **Visibilità Immediata**: Vedi subito dove stai spendendo troppo
+- 🔔 **Nessuna Sorpresa**: Gli indicatori visivi ti avvisano prima di sforare
+- 🔧 **Flessibile**: Budget adattabili alla tua situazione che cambia nel tempo
+- 📈 **Analytics Potenziate**: Confronta budget vs spesa effettiva per analisi approfondite
+
+**Gestione Budget Orfani:**
+
+Se elimini una categoria che ha budget attivi, questi diventano "budget orfani". Il sistema:
+- Li mantiene attivi e visibili
+- Mostra un avviso nella dashboard
+- Ti permette di riassegnarli a un'altra categoria o eliminarli
+- Preserva lo storico delle spese associate
+
+Questo approccio "permissivo" ti dà massima flessibilità nella gestione delle tue categorie senza perdere dati o controllo sui tuoi budget.
+
 #### 🏖️ Gestione Ferie (Vacation Planning)
 
 - ✅ **Maturazione Separata per Tipo**: Tracciamento indipendente Ferie, ROL, Permessi

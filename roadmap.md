@@ -4859,6 +4859,1226 @@ Dettaglio:
 - ✅ ROL/Permessi richiedono ore manuali
 - ✅ Ferie usano ore automatiche
 
+# FASE 3.9: Backend API - Budget Planning (2-3 giorni)
+
+## 🎯 Obiettivo
+Implementare il backend completo per il sistema di budgeting mensile, permettendo agli utenti di creare budget per sotto-categorie, monitorare la spesa in tempo reale e ricevere indicatori visivi sul rispetto del budget.
+
+**Target:** Utenti privati (gestione budget personale)  
+**Integrazione:** Transazioni esistenti (calcolo spesa real-time)
+
+---
+
+## 📋 Panoramica Funzionalità
+
+### Core Features MVP
+- ✅ **Budget mensili per sotto-categoria**: Crea budget specifici per ogni sotto-categoria customizzabile
+- ✅ **Budget ricorrenti**: I budget si resettano automaticamente ogni mese
+- ✅ **Calcolo spesa real-time**: Confronto automatico budget vs spesa effettiva del mese corrente
+- ✅ **Indicatori visivi a semaforo**: 🟢 < 70% | 🟡 70-90% | 🔴 > 90% | 🚨 > 100%
+- ✅ **Gestione budget orfani**: Quando una categoria viene eliminata, il budget rimane visibile e gestibile
+- ✅ **Storico budget**: Possibilità di disattivare budget mantenendo lo storico
+- ✅ **Dashboard summary**: Endpoint aggregato con tutti i budget e relative statistiche
+- ✅ **Validazione business**: Solo categorie di tipo expense (no income)
+
+### Decisioni Architetturali
+- **Period**: Solo "monthly" per MVP (stringa fissa)
+- **Calcolo**: Real-time tramite query (no cache)
+- **Unicità**: Un solo budget attivo per categoria (constraint UNIQUE con is_active)
+- **Orfani**: ON DELETE SET NULL per category_id (gestione tramite UI)
+- **Rollover**: NO - budget riparte da zero ogni mese
+- **Alert**: Solo indicatori visivi (no email/push notifications)
+
+---
+
+## 🗄️ 3.9.1 - Database Models
+
+### 3.9.1.1 - Crea model Budget
+- [ ] 📝 Crea `backend/app/models/budget.py`
+
+```python
+"""
+Budget model for monthly expense tracking and planning.
+"""
+from datetime import datetime, date
+from typing import Optional, TYPE_CHECKING
+from decimal import Decimal
+from sqlalchemy import String, Boolean, DateTime, Date, Numeric, ForeignKey, Index, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.database import Base
+import uuid as uuid_lib
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.category import Category
+
+
+class Budget(Base):
+    """Budget model for tracking monthly spending limits."""
+    
+    __tablename__ = "budgets"
+    
+    # Primary Key
+    id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid_lib.uuid4,
+        index=True
+    )
+    
+    # Foreign Keys
+    user_id: Mapped[uuid_lib.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    category_id: Mapped[Optional[uuid_lib.UUID]] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    
+    # Budget Information
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), 
+        nullable=False,
+        comment="Budget amount for the period"
+    )
+    
+    period: Mapped[str] = mapped_column(
+        String(20), 
+        default="monthly", 
+        nullable=False,
+        comment="Budget period: 'monthly' for MVP"
+    )
+    
+    # Dates
+    start_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        comment="Date when this budget becomes active"
+    )
+    
+    # Status
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, 
+        default=True, 
+        nullable=False,
+        comment="Active budgets are used for current tracking"
+    )
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="budgets")
+    category: Mapped[Optional["Category"]] = relationship("Category")
+    
+    # Indexes and Constraints
+    __table_args__ = (
+        Index('ix_budgets_user_active', 'user_id', 'is_active'),
+        Index('ix_budgets_category', 'category_id'),
+        Index('ix_budgets_start_date', 'start_date'),
+        # Only one active budget per category per user
+        # Allows historical inactive budgets
+        UniqueConstraint(
+            'user_id', 'category_id', 'is_active',
+            name='uq_budget_user_category_active',
+            # This constraint only applies when is_active = true
+            # Requires PostgreSQL for partial index
+            postgresql_where='is_active = true'
+        ),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Budget(id={self.id}, amount={self.amount}, period={self.period}, active={self.is_active})>"
+```
+
+**⚠️ Note:**
+- `category_id` nullable con `ON DELETE SET NULL` per gestire budget orfani
+- Constraint UNIQUE parziale: solo budget attivi devono essere unici per categoria
+- `period` fixed a "monthly" ma pronto per espansioni future
+- `amount` generico per supportare future granularità (settimanale, annuale)
+
+---
+
+### 3.9.1.2 - Aggiorna User model
+- [ ] 📝 Apri `backend/app/models/user.py`
+- [ ] Aggiungi relationship budgets:
+
+```python
+# In User model, nella sezione Relationships:
+budgets: Mapped[List["Budget"]] = relationship(
+    "Budget",
+    back_populates="user",
+    cascade="all, delete-orphan",
+    lazy="selectin"
+)
+```
+
+---
+
+### 3.9.1.3 - Aggiorna models __init__.py
+- [ ] 📝 Apri `backend/app/models/__init__.py`
+- [ ] Aggiungi import:
+
+```python
+from app.models.budget import Budget
+```
+
+---
+
+### 3.9.1.4 - Crea migration
+- [ ] Terminal in `backend/`:
+
+```bash
+source venv/bin/activate
+alembic revision --autogenerate -m "Add budgets table"
+```
+
+- [ ] Verifica file migration in `backend/alembic/versions/`
+- [ ] Controlla che contenga:
+  - CREATE TABLE budgets
+  - Indexes corretti
+  - Constraint UNIQUE parziale
+  - Foreign keys con ON DELETE SET NULL/CASCADE
+
+---
+
+### 3.9.1.5 - Esegui migration
+- [ ] Terminal:
+
+```bash
+alembic upgrade head
+```
+
+- [ ] Verifica in **pgAdmin**:
+  - Tabella `budgets` creata
+  - Colonne corrette (id, user_id, category_id, amount, period, start_date, is_active, created_at, updated_at)
+  - Indexes presenti
+  - Constraint uq_budget_user_category_active presente
+
+---
+
+### 3.9.1.6 - Commit database models
+- [ ] In **GitHub Desktop**:
+  - [x] Commit: `Add Budget model with monthly tracking support - Phase 3.9.1`
+  - [x] Push
+
+---
+
+## 📐 3.9.2 - Pydantic Schemas
+
+### 3.9.2.1 - Crea budget schemas
+- [ ] 📝 Crea `backend/app/schemas/budget.py`
+
+```python
+"""
+Budget-related Pydantic schemas for request/response validation.
+
+Budgets track monthly spending limits for expense categories.
+"""
+
+from datetime import datetime, date
+from typing import Optional
+from uuid import UUID
+from decimal import Decimal
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class BudgetBase(BaseModel):
+    """Base budget schema with common fields."""
+    category_id: UUID = Field(..., description="Category ID this budget applies to")
+    amount: Decimal = Field(..., gt=0, description="Budget amount (must be positive)")
+    period: str = Field(default="monthly", description="Budget period")
+    start_date: date = Field(..., description="Date when budget becomes active")
+    
+    @field_validator('period')
+    @classmethod
+    def validate_period(cls, v: str) -> str:
+        """Validate budget period (only monthly for MVP)."""
+        if v.lower() != "monthly":
+            raise ValueError("Only 'monthly' period is supported in MVP")
+        return v.lower()
+    
+    @field_validator('amount')
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        """Validate amount is positive and reasonable."""
+        if v <= 0:
+            raise ValueError("Budget amount must be positive")
+        if v > Decimal('999999.99'):
+            raise ValueError("Budget amount too large")
+        return v
+
+
+class BudgetCreate(BudgetBase):
+    """Schema for creating a new budget."""
+    pass
+
+
+class BudgetUpdate(BaseModel):
+    """Schema for updating an existing budget."""
+    amount: Optional[Decimal] = Field(None, gt=0, description="New budget amount")
+    start_date: Optional[date] = Field(None, description="New start date")
+    is_active: Optional[bool] = Field(None, description="Active status")
+    
+    @field_validator('amount')
+    @classmethod
+    def validate_amount(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Validate amount if provided."""
+        if v is not None:
+            if v <= 0:
+                raise ValueError("Budget amount must be positive")
+            if v > Decimal('999999.99'):
+                raise ValueError("Budget amount too large")
+        return v
+
+
+class BudgetResponse(BaseModel):
+    """Schema for budget response."""
+    id: UUID = Field(..., description="Budget unique identifier")
+    user_id: UUID = Field(..., description="Owner user ID")
+    category_id: Optional[UUID] = Field(None, description="Category ID (null if orphaned)")
+    amount: Decimal = Field(..., description="Budget amount")
+    period: str = Field(..., description="Budget period")
+    start_date: date = Field(..., description="Start date")
+    is_active: bool = Field(..., description="Active status")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    
+    class Config:
+        from_attributes = True
+
+
+class CategoryInfo(BaseModel):
+    """Minimal category info for budget responses."""
+    id: UUID
+    name: str
+    type: str
+    color: Optional[str] = None
+
+
+class BudgetWithStatus(BudgetResponse):
+    """Budget response with spending status for current period."""
+    category: Optional[CategoryInfo] = Field(None, description="Category details (null if orphaned)")
+    category_name: str = Field(..., description="Category name or 'Categoria Eliminata'")
+    spent: Decimal = Field(..., description="Amount spent in current period")
+    remaining: Decimal = Field(..., description="Amount remaining")
+    percentage: Decimal = Field(..., description="Percentage used (0-100+)")
+    status: str = Field(..., description="Status: 'ok', 'warning', 'danger', 'exceeded', 'orphan'")
+    indicator: str = Field(..., description="Visual indicator emoji")
+    color: str = Field(..., description="Color for UI display")
+
+
+class BudgetSummaryResponse(BaseModel):
+    """Summary response with all budgets and totals."""
+    month: str = Field(..., description="Current month in YYYY-MM format")
+    budgets: list[BudgetWithStatus] = Field(..., description="List of budgets with status")
+    totals: dict = Field(..., description="Aggregate totals")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "month": "2025-01",
+                "budgets": [
+                    {
+                        "id": "uuid",
+                        "category": {"id": "uuid", "name": "Ristoranti", "type": "expense_extra"},
+                        "category_name": "Ristoranti",
+                        "amount": 200.00,
+                        "spent": 150.50,
+                        "remaining": 49.50,
+                        "percentage": 75.25,
+                        "status": "warning",
+                        "indicator": "🟡",
+                        "color": "yellow"
+                    }
+                ],
+                "totals": {
+                    "total_budget": 500.00,
+                    "total_spent": 350.00,
+                    "total_remaining": 150.00,
+                    "overall_percentage": 70.00
+                }
+            }
+        }
+```
+
+---
+
+### 3.9.2.2 - Aggiorna schemas __init__.py
+- [ ] 📝 Apri `backend/app/schemas/__init__.py`
+- [ ] Aggiungi exports:
+
+```python
+from app.schemas.budget import (
+    BudgetCreate,
+    BudgetUpdate,
+    BudgetResponse,
+    BudgetWithStatus,
+    BudgetSummaryResponse,
+    CategoryInfo
+)
+```
+
+---
+
+### 3.9.2.3 - Commit schemas
+- [ ] Commit: `Add Budget Pydantic schemas - Phase 3.9.2`
+- [ ] Push
+
+---
+
+## 🔧 3.9.3 - CRUD Operations
+
+### 3.9.3.1 - Crea budget CRUD
+- [ ] 📝 Crea `backend/app/crud/budget.py`
+
+```python
+"""
+Budget CRUD Operations
+Database operations for Budget model with spending calculations.
+"""
+from sqlalchemy.orm import Session
+from sqlalchemy import func, and_
+from typing import List, Optional, Union
+from uuid import UUID
+from datetime import date, datetime
+from decimal import Decimal
+from calendar import monthrange
+
+from app.models.budget import Budget
+from app.models.transaction import Transaction
+from app.models.category import Category
+from app.schemas.budget import BudgetCreate, BudgetUpdate
+
+
+def _to_uuid(value: Union[str, UUID, None]) -> Optional[UUID]:
+    """Convert string to UUID if necessary."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return UUID(value)
+    return value
+
+
+def get_budgets(
+    db: Session,
+    user_id: Union[str, UUID],
+    skip: int = 0,
+    limit: int = 100,
+    is_active: Optional[bool] = None,
+    category_id: Optional[Union[str, UUID]] = None
+) -> List[Budget]:
+    """
+    List user's budgets with optional filters.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        skip: Pagination offset
+        limit: Maximum results
+        is_active: Filter by active status
+        category_id: Filter by category
+    """
+    user_id = _to_uuid(user_id)
+    query = db.query(Budget).filter(Budget.user_id == user_id)
+    
+    if is_active is not None:
+        query = query.filter(Budget.is_active == is_active)
+    
+    if category_id is not None:
+        category_id = _to_uuid(category_id)
+        query = query.filter(Budget.category_id == category_id)
+    
+    return query.order_by(Budget.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def get_budget(
+    db: Session,
+    budget_id: Union[str, UUID],
+    user_id: Union[str, UUID]
+) -> Optional[Budget]:
+    """Get single budget by ID, verifying ownership."""
+    budget_id = _to_uuid(budget_id)
+    user_id = _to_uuid(user_id)
+    
+    return db.query(Budget).filter(
+        Budget.id == budget_id,
+        Budget.user_id == user_id
+    ).first()
+
+
+def create_budget(
+    db: Session,
+    budget: BudgetCreate,
+    user_id: Union[str, UUID]
+) -> Budget:
+    """
+    Create a new budget.
+    
+    Validates:
+    - Category belongs to user
+    - Category is expense type (not income)
+    - No other active budget exists for this category
+    """
+    user_id = _to_uuid(user_id)
+    
+    # Verify category exists and belongs to user
+    category = db.query(Category).filter(
+        Category.id == budget.category_id,
+        Category.user_id == user_id
+    ).first()
+    
+    if not category:
+        raise ValueError("Category not found or does not belong to user")
+    
+    # Verify category is expense type
+    if category.type not in ['expense_necessity', 'expense_extra']:
+        raise ValueError("Budgets can only be created for expense categories")
+    
+    # Check for existing active budget (constraint will also catch this)
+    existing = db.query(Budget).filter(
+        Budget.user_id == user_id,
+        Budget.category_id == budget.category_id,
+        Budget.is_active == True
+    ).first()
+    
+    if existing:
+        raise ValueError("An active budget already exists for this category")
+    
+    db_budget = Budget(
+        **budget.model_dump(),
+        user_id=user_id
+    )
+    db.add(db_budget)
+    db.commit()
+    db.refresh(db_budget)
+    
+    return db_budget
+
+
+def update_budget(
+    db: Session,
+    budget_id: Union[str, UUID],
+    budget_update: BudgetUpdate,
+    user_id: Union[str, UUID]
+) -> Optional[Budget]:
+    """Update existing budget."""
+    db_budget = get_budget(db, budget_id, user_id)
+    
+    if not db_budget:
+        return None
+    
+    update_data = budget_update.model_dump(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(db_budget, field, value)
+    
+    db.commit()
+    db.refresh(db_budget)
+    
+    return db_budget
+
+
+def delete_budget(
+    db: Session,
+    budget_id: Union[str, UUID],
+    user_id: Union[str, UUID]
+) -> bool:
+    """Delete a budget."""
+    db_budget = get_budget(db, budget_id, user_id)
+    
+    if not db_budget:
+        return False
+    
+    db.delete(db_budget)
+    db.commit()
+    
+    return True
+
+
+def calculate_spent_for_month(
+    db: Session,
+    user_id: Union[str, UUID],
+    category_id: Union[str, UUID],
+    year: int,
+    month: int
+) -> Decimal:
+    """
+    Calculate total spent for a category in a specific month.
+    
+    Returns absolute value (positive number).
+    """
+    user_id = _to_uuid(user_id)
+    category_id = _to_uuid(category_id)
+    
+    # Get first and last day of month
+    start_date = date(year, month, 1)
+    last_day = monthrange(year, month)[1]
+    end_date = date(year, month, last_day)
+    
+    # Query transactions for this category in this month
+    # Only expenses (amount < 0)
+    result = db.query(func.sum(Transaction.amount)).filter(
+        Transaction.user_id == user_id,
+        Transaction.category_id == category_id,
+        Transaction.date >= start_date,
+        Transaction.date <= end_date,
+        Transaction.amount < 0  # Only expenses
+    ).scalar()
+    
+    if result is None:
+        return Decimal('0')
+    
+    # Return absolute value (positive)
+    return abs(Decimal(str(result)))
+
+
+def get_budget_status(spent: Decimal, budget_amount: Decimal) -> dict:
+    """
+    Calculate budget status based on spending percentage.
+    
+    Returns:
+        dict with status, indicator emoji, and color
+    """
+    if budget_amount == 0:
+        return {
+            "status": "invalid",
+            "indicator": "❌",
+            "color": "gray"
+        }
+    
+    percentage = (spent / budget_amount) * 100
+    
+    if percentage < 70:
+        return {"status": "ok", "indicator": "🟢", "color": "green"}
+    elif percentage < 90:
+        return {"status": "warning", "indicator": "🟡", "color": "yellow"}
+    elif percentage < 100:
+        return {"status": "danger", "indicator": "🔴", "color": "red"}
+    else:
+        return {"status": "exceeded", "indicator": "🚨", "color": "darkred"}
+
+
+def get_budget_with_spending(
+    db: Session,
+    budget: Budget,
+    year: int,
+    month: int
+) -> dict:
+    """
+    Get budget with current spending data.
+    
+    Returns enriched budget dict with spending info and status.
+    """
+    # Calculate spent amount
+    spent = Decimal('0')
+    if budget.category_id:
+        spent = calculate_spent_for_month(
+            db, 
+            budget.user_id, 
+            budget.category_id, 
+            year, 
+            month
+        )
+    
+    # Calculate remaining and percentage
+    remaining = budget.amount - spent
+    percentage = (spent / budget.amount * 100) if budget.amount > 0 else Decimal('0')
+    
+    # Get status
+    if budget.category_id is None:
+        # Orphaned budget
+        status_info = {"status": "orphan", "indicator": "⚠️", "color": "gray"}
+    else:
+        status_info = get_budget_status(spent, budget.amount)
+    
+    # Get category info
+    category_info = None
+    category_name = "Categoria Eliminata"
+    
+    if budget.category:
+        category_info = {
+            "id": str(budget.category.id),
+            "name": budget.category.name,
+            "type": budget.category.type,
+            "color": budget.category.color
+        }
+        category_name = budget.category.name
+    
+    return {
+        "id": str(budget.id),
+        "user_id": str(budget.user_id),
+        "category_id": str(budget.category_id) if budget.category_id else None,
+        "amount": budget.amount,
+        "period": budget.period,
+        "start_date": budget.start_date,
+        "is_active": budget.is_active,
+        "created_at": budget.created_at,
+        "updated_at": budget.updated_at,
+        "category": category_info,
+        "category_name": category_name,
+        "spent": spent,
+        "remaining": remaining,
+        "percentage": percentage,
+        **status_info
+    }
+
+
+def get_budgets_summary(
+    db: Session,
+    user_id: Union[str, UUID],
+    year: Optional[int] = None,
+    month: Optional[int] = None
+) -> dict:
+    """
+    Get summary of all active budgets with spending data.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        year: Target year (default: current year)
+        month: Target month (default: current month)
+    
+    Returns:
+        dict with budgets list and aggregate totals
+    """
+    user_id = _to_uuid(user_id)
+    
+    # Default to current month
+    now = datetime.now()
+    if year is None:
+        year = now.year
+    if month is None:
+        month = now.month
+    
+    # Get all active budgets
+    budgets = get_budgets(db, user_id, is_active=True, limit=500)
+    
+    # Enrich each budget with spending data
+    enriched_budgets = []
+    total_budget = Decimal('0')
+    total_spent = Decimal('0')
+    
+    for budget in budgets:
+        budget_data = get_budget_with_spending(db, budget, year, month)
+        enriched_budgets.append(budget_data)
+        
+        total_budget += budget.amount
+        total_spent += budget_data['spent']
+    
+    total_remaining = total_budget - total_spent
+    overall_percentage = (
+        (total_spent / total_budget * 100) 
+        if total_budget > 0 
+        else Decimal('0')
+    )
+    
+    return {
+        "month": f"{year}-{month:02d}",
+        "budgets": enriched_budgets,
+        "totals": {
+            "total_budget": total_budget,
+            "total_spent": total_spent,
+            "total_remaining": total_remaining,
+            "overall_percentage": round(overall_percentage, 2)
+        }
+    }
+```
+
+---
+
+### 3.9.3.2 - Aggiorna CRUD __init__.py
+- [ ] 📝 Apri `backend/app/crud/__init__.py`
+- [ ] Aggiungi import:
+
+```python
+from app.crud import budget
+```
+
+---
+
+### 3.9.3.3 - Commit CRUD
+- [ ] Commit: `Add Budget CRUD operations with real-time spending calc - Phase 3.9.3`
+- [ ] Push
+
+---
+
+## 🛣️ 3.9.4 - API Router
+
+### 3.9.4.1 - Crea budget router
+- [ ] 📝 Crea `backend/app/routers/budgets.py`
+
+```python
+"""
+Budgets Router
+User budget management with monthly spending tracking.
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from app.database import get_db
+from app.schemas.budget import (
+    BudgetCreate,
+    BudgetUpdate,
+    BudgetResponse,
+    BudgetWithStatus,
+    BudgetSummaryResponse
+)
+from app.crud import budget as budget_crud
+from app.dependencies import get_current_user
+from app.models.user import User
+
+router = APIRouter(prefix="/budgets", tags=["Budgets"])
+
+
+@router.get("/", response_model=List[BudgetResponse])
+async def get_budgets(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum results"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    category_id: Optional[str] = Query(None, description="Filter by category ID")
+):
+    """
+    List all budgets for the current user.
+    
+    - **skip**: Pagination offset (default: 0)
+    - **limit**: Maximum results (default: 100, max: 500)
+    - **is_active**: Filter active/inactive budgets
+    - **category_id**: Filter by specific category
+    """
+    budgets = budget_crud.get_budgets(
+        db,
+        user_id=str(current_user.id),
+        skip=skip,
+        limit=limit,
+        is_active=is_active,
+        category_id=category_id
+    )
+    return budgets
+
+
+@router.get("/summary", response_model=BudgetSummaryResponse)
+async def get_budgets_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    year: Optional[int] = Query(None, description="Target year (default: current)"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Target month (default: current)")
+):
+    """
+    Get budget summary with spending data for all active budgets.
+    
+    Returns:
+    - List of budgets with spent/remaining/percentage/status
+    - Aggregate totals across all budgets
+    - Status indicators (🟢🟡🔴🚨)
+    
+    Default: current month. Use year/month params for historical data.
+    """
+    summary = budget_crud.get_budgets_summary(
+        db,
+        user_id=str(current_user.id),
+        year=year,
+        month=month
+    )
+    return summary
+
+
+@router.get("/{budget_id}", response_model=BudgetResponse)
+async def get_budget(
+    budget_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific budget by ID.
+    
+    Returns budget details without spending data.
+    Use /summary for spending info.
+    """
+    budget = budget_crud.get_budget(db, budget_id, str(current_user.id))
+    
+    if not budget:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Budget not found"
+        )
+    
+    return budget
+
+
+@router.post("/", response_model=BudgetResponse, status_code=status.HTTP_201_CREATED)
+async def create_budget(
+    budget: BudgetCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new budget.
+    
+    - **category_id**: Must be an expense category (not income)
+    - **amount**: Budget amount (must be positive)
+    - **period**: "monthly" (only option in MVP)
+    - **start_date**: When budget becomes active
+    
+    Validation:
+    - Category must exist and belong to user
+    - Category must be expense type
+    - No other active budget for this category
+    
+    Example:
+    ```json
+    {
+        "category_id": "uuid-of-restaurants-category",
+        "amount": 200.00,
+        "period": "monthly",
+        "start_date": "2025-01-01"
+    }
+    ```
+    """
+    try:
+        new_budget = budget_crud.create_budget(
+            db,
+            budget=budget,
+            user_id=str(current_user.id)
+        )
+        return new_budget
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.put("/{budget_id}", response_model=BudgetResponse)
+async def update_budget(
+    budget_id: str,
+    budget_update: BudgetUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing budget.
+    
+    You can update:
+    - **amount**: New budget amount
+    - **start_date**: New start date
+    - **is_active**: Activate/deactivate budget
+    
+    Partial updates allowed - only provide fields you want to change.
+    
+    💡 **Tip**: To "change" a budget amount and keep history:
+    1. Set current budget is_active=false
+    2. Create new budget with new amount
+    """
+    updated_budget = budget_crud.update_budget(
+        db,
+        budget_id=budget_id,
+        budget_update=budget_update,
+        user_id=str(current_user.id)
+    )
+    
+    if not updated_budget:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Budget not found"
+        )
+    
+    return updated_budget
+
+
+@router.delete("/{budget_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_budget(
+    budget_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a budget.
+    
+    ⚠️ **Warning**: This permanently deletes the budget.
+    
+    💡 **Alternative**: Consider setting is_active=false to keep history.
+    """
+    success = budget_crud.delete_budget(
+        db,
+        budget_id=budget_id,
+        user_id=str(current_user.id)
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Budget not found"
+        )
+    
+    return None
+```
+
+---
+
+### 3.9.4.2 - Registra router in main.py
+- [ ] 📝 Apri `backend/app/main.py`
+- [ ] Aggiungi import e registrazione:
+
+```python
+from app.routers import budgets
+
+# Nella sezione routers:
+app.include_router(budgets.router, prefix="/api/v1")
+```
+
+---
+
+### 3.9.4.3 - Commit router
+- [ ] Commit: `Add Budget API router with summary endpoint - Phase 3.9.4`
+- [ ] Push
+
+---
+
+## 🧪 3.9.5 - Testing Manuale
+
+### 3.9.5.1 - Avvia server
+- [ ] Terminal:
+
+```bash
+cd backend
+source venv/bin/activate
+python run.py
+```
+
+- [ ] Verifica: http://localhost:8000/docs
+
+---
+
+### 3.9.5.2 - Test workflow completo
+
+**1. Setup iniziale:**
+- [ ] POST /auth/register (crea utente)
+- [ ] POST /auth/login (ottieni token)
+- [ ] Authorize in Swagger con token
+
+**2. Crea categorie expense:**
+- [ ] POST /categories 
+  - Crea "Ristoranti" (expense_extra)
+  - Crea "Spesa" (expense_necessity)
+  - Crea "Benzina" (expense_extra)
+
+**3. Crea budgets:**
+- [ ] POST /budgets
+  ```json
+  {
+    "category_id": "[id-ristoranti]",
+    "amount": 200.00,
+    "period": "monthly",
+    "start_date": "2025-01-01"
+  }
+  ```
+- [ ] POST /budgets (per "Spesa": €400)
+- [ ] POST /budgets (per "Benzina": €100)
+
+**4. Verifica constraint unicità:**
+- [ ] POST /budgets (stesso category_id di prima)
+- [ ] Aspettato: 400 Bad Request "An active budget already exists"
+
+**5. Crea transazioni:**
+- [ ] POST /transactions 
+  - Ristoranti: -€150 (date: oggi)
+  - Ristoranti: -€30 (date: oggi)
+  - Spesa: -€380 (date: oggi)
+  - Benzina: -€45 (date: oggi)
+
+**6. Test summary endpoint:**
+- [ ] GET /budgets/summary
+- [ ] Verifica response:
+  ```json
+  {
+    "month": "2025-01",
+    "budgets": [
+      {
+        "category_name": "Ristoranti",
+        "amount": 200.00,
+        "spent": 180.00,
+        "remaining": 20.00,
+        "percentage": 90.00,
+        "status": "danger",
+        "indicator": "🔴"
+      },
+      {
+        "category_name": "Spesa",
+        "spent": 380.00,
+        "percentage": 95.00,
+        "status": "danger",
+        "indicator": "🔴"
+      },
+      {
+        "category_name": "Benzina",
+        "spent": 45.00,
+        "percentage": 45.00,
+        "status": "ok",
+        "indicator": "🟢"
+      }
+    ],
+    "totals": {
+      "total_budget": 700.00,
+      "total_spent": 605.00,
+      "total_remaining": 95.00,
+      "overall_percentage": 86.43
+    }
+  }
+  ```
+
+**7. Test budget orfano:**
+- [ ] DELETE /categories/[id-ristoranti] (elimina categoria)
+- [ ] GET /budgets/summary
+- [ ] Verifica budget "Ristoranti" ora mostra:
+  - category_id: null
+  - category_name: "Categoria Eliminata"
+  - status: "orphan"
+  - indicator: "⚠️"
+
+**8. Test update budget:**
+- [ ] PUT /budgets/[id-spesa]
+  ```json
+  {
+    "amount": 500.00
+  }
+  ```
+- [ ] GET /budgets/summary
+- [ ] Verifica nuovo amount e percentage aggiornata
+
+**9. Test disattiva budget:**
+- [ ] PUT /budgets/[id-benzina]
+  ```json
+  {
+    "is_active": false
+  }
+  ```
+- [ ] GET /budgets/summary
+- [ ] Verifica budget "Benzina" non compare più
+
+**10. Test delete:**
+- [ ] DELETE /budgets/[id-spesa]
+- [ ] GET /budgets
+- [ ] Verifica budget eliminato
+
+---
+
+### 3.9.5.3 - Verifica in pgAdmin
+- [ ] Apri pgAdmin
+- [ ] Query: `SELECT * FROM budgets;`
+- [ ] Verifica:
+  - Budget creati correttamente
+  - category_id NULL per budget orfani
+  - is_active correttamente gestito
+
+---
+
+### 3.9.5.4 - Commit testing notes
+- [ ] 📝 Crea `backend/docs/TESTING_BUDGETS.md` con workflow sopra
+- [ ] Commit: `Add Budget testing documentation - Phase 3.9.5`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 3.9
+
+Prima di procedere, verifica:
+
+### Database
+- [ ] ✅ Tabella `budgets` creata con tutte le colonne
+- [ ] ✅ Indexes presenti e funzionanti
+- [ ] ✅ Constraint UNIQUE parziale (is_active=true) funziona
+- [ ] ✅ Foreign keys con ON DELETE corretto
+- [ ] ✅ User model ha relationship budgets
+
+### Backend
+- [ ] ✅ Model Budget creato e funzionante
+- [ ] ✅ Schemas validano correttamente (amount > 0, period="monthly")
+- [ ] ✅ CRUD operations implementate
+- [ ] ✅ Calcolo spesa real-time funziona
+- [ ] ✅ get_budget_status restituisce indicatori corretti
+- [ ] ✅ Router registrato in main.py
+
+### API Endpoints
+- [ ] ✅ GET /budgets (lista)
+- [ ] ✅ GET /budgets/summary (con spending data)
+- [ ] ✅ GET /budgets/{id} (dettaglio)
+- [ ] ✅ POST /budgets (crea con validazioni)
+- [ ] ✅ PUT /budgets/{id} (update)
+- [ ] ✅ DELETE /budgets/{id} (elimina)
+
+### Validazioni
+- [ ] ✅ Solo expense categories accettate
+- [ ] ✅ Constraint unicità: un budget attivo per categoria
+- [ ] ✅ Budget orfani gestiti (category_id NULL)
+- [ ] ✅ Amount sempre positivo
+- [ ] ✅ Period validato ("monthly")
+
+### Test Completo
+- [ ] ✅ Crea budget → OK
+- [ ] ✅ Crea transazioni → Spesa calcolata correttamente
+- [ ] ✅ Summary mostra indicatori corretti
+- [ ] ✅ Elimina categoria → Budget diventa orfano
+- [ ] ✅ Update budget → Modifiche applicate
+- [ ] ✅ Disattiva budget → Non appare in summary
+- [ ] ✅ Delete budget → Rimosso da DB
+
+### Documentazione
+- [ ] ✅ TESTING_BUDGETS.md creato
+- [ ] ✅ Tutti i commit pushati su GitHub
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 2-3 giorni
+
+**Funzionalità implementate:**
+- ✅ Budget mensili per sotto-categorie
+- ✅ Calcolo spesa real-time
+- ✅ Indicatori visivi a semaforo
+- ✅ Gestione budget orfani
+- ✅ Storico budget (via is_active)
+- ✅ Validazioni business complete
+
+**Pronto per:**
+- Fase 4.7 - Testing automatici con Pytest
+- Fase 5.10 - Frontend Budget UI
+
+**Sviluppi futuri (Fase 7):**
+- [ ] Period: weekly, yearly, custom ranges
+- [ ] Budget rollover configurabile
+- [ ] Alert email/push notifications
+- [ ] Budget per income categories
+- [ ] Budget multipli per categoria (periodi diversi)
+- [ ] Previsioni e forecast
+- [ ] Export budget report (PDF/Excel)
+
+---
+
+**FASE 3.9 COMPLETATA! 🎉**
+
 **Prossimo:** FASE 4 - Testing & Debug
 
 ---
@@ -5624,6 +6844,1101 @@ class TestVacationBridges:
 
 ### 4.6.7.3 - Commit
 - [ ] Commit: `Add Pytest tests for vacation module with separate accrual (Phase 4.6)`
+
+# FASE 4.7: Testing Budget Module (1 giorno)
+
+## 🎯 Obiettivo
+Implementare test automatici con Pytest per il modulo Budget, garantendo copertura completa delle funzionalità di budgeting mensile, calcolo spesa real-time, gestione budget orfani e validazioni business.
+
+**Target:** Coverage >80% per modulo Budget  
+**Focus:** Test CRUD, validazioni, calcolo spesa, indicatori status
+
+---
+
+## 📋 Panoramica Testing
+
+### Aree da Testare
+- ✅ **Model Budget**: Creazione, relationships, constraints
+- ✅ **CRUD Operations**: Create, Read, Update, Delete con validazioni
+- ✅ **Business Logic**: Calcolo spesa mensile, status indicators, budget summary
+- ✅ **API Endpoints**: Tutti i 6 endpoints con autenticazione
+- ✅ **Edge Cases**: Budget orfani, constraint unicità, validazioni categoria
+- ✅ **Integration**: Interazione con Transaction model per calcolo spesa
+
+### Decisioni Testing
+- **Database**: Test database separato (`budget_app_test`)
+- **Fixtures**: User, categories, accounts, transactions per setup
+- **Isolation**: Ogni test indipendente con rollback
+- **Coverage**: pytest-cov per verificare coverage
+- **Mock**: Nessun mock necessario (test reali su DB test)
+
+---
+
+## 🧪 4.7.1 - Setup Test Environment
+
+### 4.7.1.1 - Verifica pytest setup
+- [ ] Verifica `backend/pytest.ini` configurato
+- [ ] Verifica `backend/tests/conftest.py` con fixtures base
+- [ ] Database test `budget_app_test` esiste e accessibile
+
+---
+
+### 4.7.1.2 - Crea budget test fixtures
+- [ ] 📝 Apri `backend/tests/conftest.py`
+- [ ] Aggiungi fixtures budget:
+
+```python
+import pytest
+from decimal import Decimal
+from datetime import date, timedelta
+from app.models.budget import Budget
+from app.models.category import Category
+from app.models.transaction import Transaction
+
+
+@pytest.fixture
+def expense_categories(db, test_user):
+    """Create expense categories for budget testing."""
+    categories = []
+    
+    # Expense necessity category
+    cat1 = Category(
+        user_id=test_user.id,
+        name="Spesa",
+        type="expense_necessity",
+        color="#EF4444",
+        is_active=True
+    )
+    db.add(cat1)
+    
+    # Expense extra categories
+    cat2 = Category(
+        user_id=test_user.id,
+        name="Ristoranti",
+        type="expense_extra",
+        color="#8B5CF6",
+        is_active=True
+    )
+    db.add(cat2)
+    
+    cat3 = Category(
+        user_id=test_user.id,
+        name="Benzina",
+        type="expense_extra",
+        color="#F59E0B",
+        is_active=True
+    )
+    db.add(cat3)
+    
+    db.commit()
+    db.refresh(cat1)
+    db.refresh(cat2)
+    db.refresh(cat3)
+    
+    return [cat1, cat2, cat3]
+
+
+@pytest.fixture
+def income_category(db, test_user):
+    """Create income category (should NOT allow budget)."""
+    category = Category(
+        user_id=test_user.id,
+        name="Stipendio",
+        type="income",
+        color="#10B981",
+        is_active=True
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+@pytest.fixture
+def test_budget(db, test_user, expense_categories):
+    """Create a test budget."""
+    budget = Budget(
+        user_id=test_user.id,
+        category_id=expense_categories[0].id,  # Spesa
+        amount=Decimal('400.00'),
+        period="monthly",
+        start_date=date.today().replace(day=1),
+        is_active=True
+    )
+    db.add(budget)
+    db.commit()
+    db.refresh(budget)
+    return budget
+
+
+@pytest.fixture
+def test_budgets(db, test_user, expense_categories):
+    """Create multiple test budgets."""
+    budgets = []
+    amounts = [Decimal('400.00'), Decimal('200.00'), Decimal('100.00')]
+    
+    for i, category in enumerate(expense_categories):
+        budget = Budget(
+            user_id=test_user.id,
+            category_id=category.id,
+            amount=amounts[i],
+            period="monthly",
+            start_date=date.today().replace(day=1),
+            is_active=True
+        )
+        db.add(budget)
+        budgets.append(budget)
+    
+    db.commit()
+    for budget in budgets:
+        db.refresh(budget)
+    
+    return budgets
+
+
+@pytest.fixture
+def test_transactions(db, test_user, test_account, expense_categories):
+    """Create test transactions for budget spending calculation."""
+    transactions = []
+    today = date.today()
+    
+    # Transactions for current month
+    txn_data = [
+        (expense_categories[0].id, Decimal('-380.00')),  # Spesa
+        (expense_categories[1].id, Decimal('-150.00')),  # Ristoranti
+        (expense_categories[1].id, Decimal('-30.00')),   # Ristoranti
+        (expense_categories[2].id, Decimal('-45.00')),   # Benzina
+    ]
+    
+    for category_id, amount in txn_data:
+        txn = Transaction(
+            user_id=test_user.id,
+            account_id=test_account.id,
+            category_id=category_id,
+            amount=amount,
+            date=today,
+            description="Test transaction"
+        )
+        db.add(txn)
+        transactions.append(txn)
+    
+    db.commit()
+    for txn in transactions:
+        db.refresh(txn)
+    
+    return transactions
+
+
+@pytest.fixture
+def orphaned_budget(db, test_user):
+    """Create an orphaned budget (category_id = NULL)."""
+    budget = Budget(
+        user_id=test_user.id,
+        category_id=None,  # Orphaned
+        amount=Decimal('150.00'),
+        period="monthly",
+        start_date=date.today().replace(day=1),
+        is_active=True
+    )
+    db.add(budget)
+    db.commit()
+    db.refresh(budget)
+    return budget
+```
+
+---
+
+### 4.7.1.3 - Commit fixtures
+- [ ] Commit: `Add Budget test fixtures - Phase 4.7.1`
+- [ ] Push
+
+---
+
+## 🧪 4.7.2 - Test Budget CRUD Operations
+
+### 4.7.2.1 - Crea test file
+- [ ] 📝 Crea `backend/tests/test_budget_crud.py`
+
+```python
+"""
+Tests for Budget CRUD operations.
+"""
+import pytest
+from decimal import Decimal
+from datetime import date
+from app.crud import budget as budget_crud
+from app.schemas.budget import BudgetCreate, BudgetUpdate
+
+
+def test_create_budget(db, test_user, expense_categories):
+    """Test creating a budget."""
+    budget_data = BudgetCreate(
+        category_id=expense_categories[0].id,
+        amount=Decimal('500.00'),
+        period="monthly",
+        start_date=date.today()
+    )
+    
+    budget = budget_crud.create_budget(db, budget_data, test_user.id)
+    
+    assert budget is not None
+    assert budget.user_id == test_user.id
+    assert budget.category_id == expense_categories[0].id
+    assert budget.amount == Decimal('500.00')
+    assert budget.period == "monthly"
+    assert budget.is_active is True
+
+
+def test_create_budget_for_income_category_fails(db, test_user, income_category):
+    """Test that creating budget for income category fails."""
+    budget_data = BudgetCreate(
+        category_id=income_category.id,
+        amount=Decimal('500.00'),
+        period="monthly",
+        start_date=date.today()
+    )
+    
+    with pytest.raises(ValueError, match="expense categories"):
+        budget_crud.create_budget(db, budget_data, test_user.id)
+
+
+def test_create_duplicate_budget_fails(db, test_user, test_budget, expense_categories):
+    """Test that creating duplicate active budget for same category fails."""
+    budget_data = BudgetCreate(
+        category_id=test_budget.category_id,  # Same category as existing
+        amount=Decimal('600.00'),
+        period="monthly",
+        start_date=date.today()
+    )
+    
+    with pytest.raises(ValueError, match="already exists"):
+        budget_crud.create_budget(db, budget_data, test_user.id)
+
+
+def test_get_budgets(db, test_user, test_budgets):
+    """Test listing budgets."""
+    budgets = budget_crud.get_budgets(db, test_user.id)
+    
+    assert len(budgets) == 3
+    assert all(b.user_id == test_user.id for b in budgets)
+    assert all(b.is_active is True for b in budgets)
+
+
+def test_get_budgets_filter_by_active(db, test_user, test_budgets):
+    """Test filtering budgets by active status."""
+    # Deactivate one budget
+    test_budgets[0].is_active = False
+    db.commit()
+    
+    active = budget_crud.get_budgets(db, test_user.id, is_active=True)
+    inactive = budget_crud.get_budgets(db, test_user.id, is_active=False)
+    
+    assert len(active) == 2
+    assert len(inactive) == 1
+
+
+def test_get_budgets_filter_by_category(db, test_user, test_budgets, expense_categories):
+    """Test filtering budgets by category."""
+    budgets = budget_crud.get_budgets(
+        db, 
+        test_user.id, 
+        category_id=expense_categories[0].id
+    )
+    
+    assert len(budgets) == 1
+    assert budgets[0].category_id == expense_categories[0].id
+
+
+def test_get_budget(db, test_user, test_budget):
+    """Test getting single budget."""
+    budget = budget_crud.get_budget(db, test_budget.id, test_user.id)
+    
+    assert budget is not None
+    assert budget.id == test_budget.id
+    assert budget.user_id == test_user.id
+
+
+def test_get_budget_wrong_user(db, test_user, test_budget, db_session):
+    """Test that getting budget from different user returns None."""
+    # Create another user
+    from app.models.user import User
+    other_user = User(
+        email="other@test.com",
+        full_name="Other User",
+        hashed_password="dummy"
+    )
+    db.add(other_user)
+    db.commit()
+    
+    budget = budget_crud.get_budget(db, test_budget.id, other_user.id)
+    
+    assert budget is None
+
+
+def test_update_budget(db, test_user, test_budget):
+    """Test updating budget."""
+    update_data = BudgetUpdate(
+        amount=Decimal('600.00'),
+        is_active=False
+    )
+    
+    updated = budget_crud.update_budget(
+        db,
+        test_budget.id,
+        update_data,
+        test_user.id
+    )
+    
+    assert updated is not None
+    assert updated.amount == Decimal('600.00')
+    assert updated.is_active is False
+
+
+def test_delete_budget(db, test_user, test_budget):
+    """Test deleting budget."""
+    success = budget_crud.delete_budget(db, test_budget.id, test_user.id)
+    
+    assert success is True
+    
+    # Verify it's gone
+    budget = budget_crud.get_budget(db, test_budget.id, test_user.id)
+    assert budget is None
+
+
+def test_delete_nonexistent_budget(db, test_user):
+    """Test deleting non-existent budget returns False."""
+    from uuid import uuid4
+    
+    success = budget_crud.delete_budget(db, uuid4(), test_user.id)
+    
+    assert success is False
+```
+
+---
+
+### 4.7.2.2 - Run CRUD tests
+- [ ] Terminal:
+
+```bash
+cd backend
+source venv/bin/activate
+pytest tests/test_budget_crud.py -v
+```
+
+- [ ] Verifica tutti i test passano (13 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.7.2.3 - Commit CRUD tests
+- [ ] Commit: `Add Budget CRUD tests - Phase 4.7.2`
+- [ ] Push
+
+---
+
+## 🧪 4.7.3 - Test Budget Business Logic
+
+### 4.7.3.1 - Crea business logic test file
+- [ ] 📝 Crea `backend/tests/test_budget_logic.py`
+
+```python
+"""
+Tests for Budget business logic (spending calculation, status, summary).
+"""
+import pytest
+from decimal import Decimal
+from datetime import date
+from calendar import monthrange
+from app.crud import budget as budget_crud
+
+
+def test_calculate_spent_for_month(db, test_user, expense_categories, test_account, test_transactions):
+    """Test calculating spent amount for a budget in current month."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    # Spesa category has one transaction of -380.00
+    spent = budget_crud.calculate_spent_for_month(
+        db,
+        test_user.id,
+        expense_categories[0].id,  # Spesa
+        year,
+        month
+    )
+    
+    assert spent == Decimal('380.00')  # Absolute value
+
+
+def test_calculate_spent_for_month_multiple_transactions(db, test_user, expense_categories, test_account, test_transactions):
+    """Test calculating spent with multiple transactions."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    # Ristoranti has two transactions: -150.00 and -30.00
+    spent = budget_crud.calculate_spent_for_month(
+        db,
+        test_user.id,
+        expense_categories[1].id,  # Ristoranti
+        year,
+        month
+    )
+    
+    assert spent == Decimal('180.00')
+
+
+def test_calculate_spent_for_month_no_transactions(db, test_user, expense_categories):
+    """Test calculating spent with no transactions."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    # Create new category with no transactions
+    from app.models.category import Category
+    new_cat = Category(
+        user_id=test_user.id,
+        name="Empty Category",
+        type="expense_extra",
+        is_active=True
+    )
+    db.add(new_cat)
+    db.commit()
+    
+    spent = budget_crud.calculate_spent_for_month(
+        db,
+        test_user.id,
+        new_cat.id,
+        year,
+        month
+    )
+    
+    assert spent == Decimal('0')
+
+
+def test_get_budget_status_ok(db):
+    """Test budget status indicator - OK (< 70%)."""
+    status = budget_crud.get_budget_status(
+        Decimal('50.00'),
+        Decimal('100.00')
+    )
+    
+    assert status['status'] == 'ok'
+    assert status['indicator'] == '🟢'
+    assert status['color'] == 'green'
+
+
+def test_get_budget_status_warning(db):
+    """Test budget status indicator - WARNING (70-90%)."""
+    status = budget_crud.get_budget_status(
+        Decimal('80.00'),
+        Decimal('100.00')
+    )
+    
+    assert status['status'] == 'warning'
+    assert status['indicator'] == '🟡'
+    assert status['color'] == 'yellow'
+
+
+def test_get_budget_status_danger(db):
+    """Test budget status indicator - DANGER (90-100%)."""
+    status = budget_crud.get_budget_status(
+        Decimal('95.00'),
+        Decimal('100.00')
+    )
+    
+    assert status['status'] == 'danger'
+    assert status['indicator'] == '🔴'
+    assert status['color'] == 'red'
+
+
+def test_get_budget_status_exceeded(db):
+    """Test budget status indicator - EXCEEDED (> 100%)."""
+    status = budget_crud.get_budget_status(
+        Decimal('120.00'),
+        Decimal('100.00')
+    )
+    
+    assert status['status'] == 'exceeded'
+    assert status['indicator'] == '🚨'
+    assert status['color'] == 'darkred'
+
+
+def test_get_budget_with_spending(db, test_user, test_budget, test_account, test_transactions, expense_categories):
+    """Test enriching budget with spending data."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    enriched = budget_crud.get_budget_with_spending(
+        db,
+        test_budget,
+        year,
+        month
+    )
+    
+    assert enriched['amount'] == Decimal('400.00')
+    assert enriched['spent'] == Decimal('380.00')
+    assert enriched['remaining'] == Decimal('20.00')
+    assert enriched['percentage'] == Decimal('95.00')
+    assert enriched['status'] == 'danger'
+    assert enriched['indicator'] == '🔴'
+    assert enriched['category_name'] == 'Spesa'
+
+
+def test_get_budget_with_spending_orphaned(db, test_user, orphaned_budget):
+    """Test enriching orphaned budget."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    enriched = budget_crud.get_budget_with_spending(
+        db,
+        orphaned_budget,
+        year,
+        month
+    )
+    
+    assert enriched['category_id'] is None
+    assert enriched['category'] is None
+    assert enriched['category_name'] == 'Categoria Eliminata'
+    assert enriched['status'] == 'orphan'
+    assert enriched['indicator'] == '⚠️'
+
+
+def test_get_budgets_summary(db, test_user, test_budgets, test_account, test_transactions):
+    """Test budget summary with all budgets and totals."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    summary = budget_crud.get_budgets_summary(db, test_user.id, year, month)
+    
+    assert summary['month'] == f"{year}-{month:02d}"
+    assert len(summary['budgets']) == 3
+    
+    # Check totals
+    totals = summary['totals']
+    assert totals['total_budget'] == Decimal('700.00')  # 400 + 200 + 100
+    assert totals['total_spent'] == Decimal('605.00')   # 380 + 180 + 45
+    assert totals['total_remaining'] == Decimal('95.00')
+    
+    # Check individual budgets
+    budgets = summary['budgets']
+    
+    # Spesa: 380/400 = 95%
+    spesa = next(b for b in budgets if b['category_name'] == 'Spesa')
+    assert spesa['spent'] == Decimal('380.00')
+    assert spesa['percentage'] == Decimal('95.00')
+    assert spesa['status'] == 'danger'
+    
+    # Ristoranti: 180/200 = 90%
+    rist = next(b for b in budgets if b['category_name'] == 'Ristoranti')
+    assert rist['spent'] == Decimal('180.00')
+    assert rist['percentage'] == Decimal('90.00')
+    assert rist['status'] == 'danger'
+    
+    # Benzina: 45/100 = 45%
+    benz = next(b for b in budgets if b['category_name'] == 'Benzina')
+    assert benz['spent'] == Decimal('45.00')
+    assert benz['percentage'] == Decimal('45.00')
+    assert benz['status'] == 'ok'
+
+
+def test_get_budgets_summary_no_budgets(db, test_user):
+    """Test summary with no budgets."""
+    today = date.today()
+    year = today.year
+    month = today.month
+    
+    summary = budget_crud.get_budgets_summary(db, test_user.id, year, month)
+    
+    assert len(summary['budgets']) == 0
+    assert summary['totals']['total_budget'] == Decimal('0')
+    assert summary['totals']['total_spent'] == Decimal('0')
+```
+
+---
+
+### 4.7.3.2 - Run business logic tests
+- [ ] Terminal:
+
+```bash
+pytest tests/test_budget_logic.py -v
+```
+
+- [ ] Verifica tutti i test passano (14 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.7.3.3 - Commit business logic tests
+- [ ] Commit: `Add Budget business logic tests - Phase 4.7.3`
+- [ ] Push
+
+---
+
+## 🧪 4.7.4 - Test Budget API Endpoints
+
+### 4.7.4.1 - Crea API test file
+- [ ] 📝 Crea `backend/tests/test_budget_api.py`
+
+```python
+"""
+Tests for Budget API endpoints.
+"""
+import pytest
+from decimal import Decimal
+from datetime import date
+
+
+def test_get_budgets(client, auth_headers, test_budgets):
+    """Test GET /budgets endpoint."""
+    response = client.get("/api/v1/budgets", headers=auth_headers)
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 3
+    assert all('id' in b for b in data)
+    assert all('amount' in b for b in data)
+
+
+def test_get_budgets_filter_active(client, auth_headers, db, test_budgets):
+    """Test GET /budgets with is_active filter."""
+    # Deactivate one budget
+    test_budgets[0].is_active = False
+    db.commit()
+    
+    response = client.get("/api/v1/budgets?is_active=true", headers=auth_headers)
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+    
+    response = client.get("/api/v1/budgets?is_active=false", headers=auth_headers)
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_get_budget_by_id(client, auth_headers, test_budget):
+    """Test GET /budgets/{id} endpoint."""
+    response = client.get(
+        f"/api/v1/budgets/{test_budget.id}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data['id'] == str(test_budget.id)
+    assert Decimal(data['amount']) == test_budget.amount
+
+
+def test_get_budget_not_found(client, auth_headers):
+    """Test GET /budgets/{id} with non-existent ID."""
+    from uuid import uuid4
+    
+    response = client.get(
+        f"/api/v1/budgets/{uuid4()}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 404
+
+
+def test_get_budgets_summary(client, auth_headers, test_budgets, test_transactions):
+    """Test GET /budgets/summary endpoint."""
+    response = client.get("/api/v1/budgets/summary", headers=auth_headers)
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert 'month' in data
+    assert 'budgets' in data
+    assert 'totals' in data
+    
+    assert len(data['budgets']) == 3
+    assert Decimal(data['totals']['total_budget']) == Decimal('700.00')
+    assert Decimal(data['totals']['total_spent']) == Decimal('605.00')
+    
+    # Check budget structure
+    budget = data['budgets'][0]
+    assert 'id' in budget
+    assert 'amount' in budget
+    assert 'spent' in budget
+    assert 'remaining' in budget
+    assert 'percentage' in budget
+    assert 'status' in budget
+    assert 'indicator' in budget
+    assert 'category_name' in budget
+
+
+def test_create_budget(client, auth_headers, expense_categories):
+    """Test POST /budgets endpoint."""
+    budget_data = {
+        "category_id": str(expense_categories[0].id),
+        "amount": 500.00,
+        "period": "monthly",
+        "start_date": date.today().isoformat()
+    }
+    
+    response = client.post(
+        "/api/v1/budgets",
+        headers=auth_headers,
+        json=budget_data
+    )
+    
+    assert response.status_code == 201
+    data = response.json()
+    assert Decimal(data['amount']) == Decimal('500.00')
+    assert data['period'] == 'monthly'
+    assert data['is_active'] is True
+
+
+def test_create_budget_for_income_fails(client, auth_headers, income_category):
+    """Test POST /budgets for income category returns 400."""
+    budget_data = {
+        "category_id": str(income_category.id),
+        "amount": 500.00,
+        "period": "monthly",
+        "start_date": date.today().isoformat()
+    }
+    
+    response = client.post(
+        "/api/v1/budgets",
+        headers=auth_headers,
+        json=budget_data
+    )
+    
+    assert response.status_code == 400
+    assert "expense" in response.json()['detail'].lower()
+
+
+def test_create_duplicate_budget_fails(client, auth_headers, test_budget):
+    """Test POST /budgets with duplicate category returns 400."""
+    budget_data = {
+        "category_id": str(test_budget.category_id),
+        "amount": 600.00,
+        "period": "monthly",
+        "start_date": date.today().isoformat()
+    }
+    
+    response = client.post(
+        "/api/v1/budgets",
+        headers=auth_headers,
+        json=budget_data
+    )
+    
+    assert response.status_code == 400
+    assert "already exists" in response.json()['detail']
+
+
+def test_create_budget_negative_amount_fails(client, auth_headers, expense_categories):
+    """Test POST /budgets with negative amount returns 422."""
+    budget_data = {
+        "category_id": str(expense_categories[0].id),
+        "amount": -100.00,
+        "period": "monthly",
+        "start_date": date.today().isoformat()
+    }
+    
+    response = client.post(
+        "/api/v1/budgets",
+        headers=auth_headers,
+        json=budget_data
+    )
+    
+    assert response.status_code == 422
+
+
+def test_update_budget(client, auth_headers, test_budget):
+    """Test PUT /budgets/{id} endpoint."""
+    update_data = {
+        "amount": 600.00,
+        "is_active": False
+    }
+    
+    response = client.put(
+        f"/api/v1/budgets/{test_budget.id}",
+        headers=auth_headers,
+        json=update_data
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert Decimal(data['amount']) == Decimal('600.00')
+    assert data['is_active'] is False
+
+
+def test_update_budget_not_found(client, auth_headers):
+    """Test PUT /budgets/{id} with non-existent ID."""
+    from uuid import uuid4
+    
+    response = client.put(
+        f"/api/v1/budgets/{uuid4()}",
+        headers=auth_headers,
+        json={"amount": 500.00}
+    )
+    
+    assert response.status_code == 404
+
+
+def test_delete_budget(client, auth_headers, test_budget):
+    """Test DELETE /budgets/{id} endpoint."""
+    response = client.delete(
+        f"/api/v1/budgets/{test_budget.id}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 204
+    
+    # Verify it's deleted
+    response = client.get(
+        f"/api/v1/budgets/{test_budget.id}",
+        headers=auth_headers
+    )
+    assert response.status_code == 404
+
+
+def test_delete_budget_not_found(client, auth_headers):
+    """Test DELETE /budgets/{id} with non-existent ID."""
+    from uuid import uuid4
+    
+    response = client.delete(
+        f"/api/v1/budgets/{uuid4()}",
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 404
+
+
+def test_budgets_require_authentication(client, test_budget):
+    """Test that budget endpoints require authentication."""
+    # No auth headers
+    
+    response = client.get("/api/v1/budgets")
+    assert response.status_code == 401
+    
+    response = client.get(f"/api/v1/budgets/{test_budget.id}")
+    assert response.status_code == 401
+    
+    response = client.get("/api/v1/budgets/summary")
+    assert response.status_code == 401
+    
+    response = client.post("/api/v1/budgets", json={})
+    assert response.status_code == 401
+```
+
+---
+
+### 4.7.4.2 - Run API tests
+- [ ] Terminal:
+
+```bash
+pytest tests/test_budget_api.py -v
+```
+
+- [ ] Verifica tutti i test passano (17 test)
+- [ ] Fix eventuali errori
+
+---
+
+### 4.7.4.3 - Commit API tests
+- [ ] Commit: `Add Budget API endpoint tests - Phase 4.7.4`
+- [ ] Push
+
+---
+
+## 🧪 4.7.5 - Test Coverage & Final Verification
+
+### 4.7.5.1 - Run all budget tests with coverage
+- [ ] Terminal:
+
+```bash
+pytest tests/test_budget*.py -v --cov=app/models/budget --cov=app/crud/budget --cov=app/routers/budgets --cov-report=html
+```
+
+- [ ] Verifica coverage totale:
+  - [ ] `app/models/budget.py`: >90%
+  - [ ] `app/crud/budget.py`: >85%
+  - [ ] `app/routers/budgets.py`: >80%
+
+---
+
+### 4.7.5.2 - Open coverage report
+- [ ] Terminal:
+
+```bash
+open htmlcov/index.html  # macOS
+# or
+xdg-open htmlcov/index.html  # Linux
+```
+
+- [ ] Verifica aree non coperte
+- [ ] Aggiungi test per coverage mancante se <80%
+
+---
+
+### 4.7.5.3 - Run full test suite
+- [ ] Terminal:
+
+```bash
+pytest -v
+```
+
+- [ ] Verifica tutti i test passano (inclusi budget tests)
+- [ ] Totale test budget: ~44 test
+  - [ ] test_budget_crud.py: 13 test
+  - [ ] test_budget_logic.py: 14 test
+  - [ ] test_budget_api.py: 17 test
+
+---
+
+### 4.7.5.4 - Commit coverage report
+- [ ] 📝 Crea `backend/docs/TESTING_BUDGET_COVERAGE.md`:
+
+```markdown
+# Budget Module Test Coverage
+
+**Data:** [DATA]  
+**Coverage Totale:** [XX]%
+
+## Coverage per File
+
+### app/models/budget.py
+- **Coverage:** XX%
+- **Lines Covered:** XX/XX
+- **Missing Lines:** [se presenti]
+
+### app/crud/budget.py
+- **Coverage:** XX%
+- **Lines Covered:** XX/XX
+- **Missing Lines:** [se presenti]
+
+### app/routers/budgets.py
+- **Coverage:** XX%
+- **Lines Covered:** XX/XX
+- **Missing Lines:** [se presenti]
+
+## Test Summary
+
+**Total Tests:** 44
+- CRUD Tests: 13 ✅
+- Business Logic Tests: 14 ✅
+- API Tests: 17 ✅
+
+**All Tests Passing:** ✅
+
+## Test Scenarios Covered
+
+### CRUD Operations
+- ✅ Create budget (success)
+- ✅ Create budget for income category (fail)
+- ✅ Create duplicate budget (fail)
+- ✅ List budgets with filters
+- ✅ Get single budget
+- ✅ Get budget wrong user
+- ✅ Update budget
+- ✅ Delete budget
+
+### Business Logic
+- ✅ Calculate spent (single transaction)
+- ✅ Calculate spent (multiple transactions)
+- ✅ Calculate spent (no transactions)
+- ✅ Status indicators (ok/warning/danger/exceeded)
+- ✅ Enrich budget with spending data
+- ✅ Orphaned budget handling
+- ✅ Summary with totals
+
+### API Endpoints
+- ✅ GET /budgets (with filters)
+- ✅ GET /budgets/{id}
+- ✅ GET /budgets/summary
+- ✅ POST /budgets (with validations)
+- ✅ PUT /budgets/{id}
+- ✅ DELETE /budgets/{id}
+- ✅ Authentication required
+
+### Edge Cases
+- ✅ Budget orfani (category_id NULL)
+- ✅ Constraint unicità attivo
+- ✅ Negative amount validation
+- ✅ Income category rejection
+- ✅ User isolation
+
+## Next Steps
+
+- [x] Budget CRUD: 100% tested
+- [x] Budget Logic: 100% tested
+- [x] Budget API: 100% tested
+- [ ] Integration tests with frontend (Fase 5.10)
+```
+
+- [ ] Commit: `Add Budget test coverage report - Phase 4.7.5`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 4.7
+
+Prima di procedere, verifica:
+
+### Test Files
+- [ ] ✅ `tests/conftest.py` aggiornato con budget fixtures
+- [ ] ✅ `tests/test_budget_crud.py` creato (13 test)
+- [ ] ✅ `tests/test_budget_logic.py` creato (14 test)
+- [ ] ✅ `tests/test_budget_api.py` creato (17 test)
+- [ ] ✅ Totale: ~44 test budget
+
+### Coverage
+- [ ] ✅ `app/models/budget.py`: >90% coverage
+- [ ] ✅ `app/crud/budget.py`: >85% coverage
+- [ ] ✅ `app/routers/budgets.py`: >80% coverage
+- [ ] ✅ Coverage report generato in `htmlcov/`
+
+### Test Results
+- [ ] ✅ Tutti i test budget passano
+- [ ] ✅ Full test suite passa (inclusi test precedenti)
+- [ ] ✅ Nessun warning critico
+
+### Documentation
+- [ ] ✅ `TESTING_BUDGET_COVERAGE.md` creato
+- [ ] ✅ Coverage percentages documentate
+- [ ] ✅ Test scenarios listed
+
+### Quality Checks
+- [ ] ✅ CRUD operations: completamente testati
+- [ ] ✅ Business logic: calcoli e status testati
+- [ ] ✅ API endpoints: tutti i 6 endpoint testati
+- [ ] ✅ Validations: income reject, duplicate fail, negative fail
+- [ ] ✅ Edge cases: orfani, user isolation, non-existent
+- [ ] ✅ Authentication: endpoint protection verificata
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 1 giorno
+
+**Test implementati:**
+- ✅ 13 CRUD tests (create, read, update, delete, filters, validations)
+- ✅ 14 Business logic tests (calcolo spesa, status, summary, orfani)
+- ✅ 17 API tests (tutti i 6 endpoint + auth + validations)
+- ✅ Coverage >80% per tutto il modulo Budget
+
+**Pronto per:**
+- Fase 5.10 - Frontend Budget UI
+- Integration testing con frontend
+
+**Quality Assurance:**
+- ✅ Real-time spending calculation testato
+- ✅ Status indicators (🟢🟡🔴🚨) testati
+- ✅ Budget summary con totali testato
+- ✅ Orphaned budgets handling testato
+- ✅ Constraint uniqueness verificato
+- ✅ Category type validation verificata
+- ✅ User isolation garantito
+
+---
+
+**FASE 4.7 COMPLETATA! 🎉**
 
 ---
 
@@ -7885,6 +10200,1145 @@ import VacationPage from './pages/VacationPage';
 - ✅ Validazioni lato client e server
 - ✅ Error handling completo
 - ✅ Responsive design
+
+# FASE 5.10: Frontend Budget Module (2-3 giorni)
+
+## 🎯 Obiettivo
+Implementare l'interfaccia utente completa per il modulo Budget, permettendo agli utenti di creare, gestire e monitorare budget mensili per le sotto-categorie con indicatori visivi real-time e dashboard interattiva.
+
+**Target:** UI intuitiva per gestione budget mensili  
+**Integrazione:** Transaction module (per calcolo spesa), Category module (per selezione categorie)
+
+---
+
+## 📋 Panoramica Funzionalità
+
+### Core Features UI
+- ✅ **Budget Dashboard**: Vista principale con tutti i budget e indicatori 🟢🟡🔴🚨
+- ✅ **Budget List**: Tabella budget con spent/remaining/percentage
+- ✅ **Budget Creation Modal**: Form per creare nuovi budget
+- ✅ **Budget Edit Modal**: Modifica amount e status
+- ✅ **Category Selector**: Dropdown categorie expense (no income)
+- ✅ **Visual Indicators**: Progress bar + emoji status + colori
+- ✅ **Orphan Budget Handling**: UI speciale per budget senza categoria
+- ✅ **Totals Summary**: Aggregati totali budget/spent/remaining
+- ✅ **Responsive Design**: Mobile-friendly
+
+### Design Decisions
+- **Layout**: Dashboard card + table list
+- **Colors**: Tailwind utility classes per status
+- **Icons**: Emoji indicators (🟢🟡🔴🚨⚠️)
+- **State Management**: React useState + useEffect
+- **API Integration**: budgetService.js con axios
+- **Error Handling**: Toast notifications per feedback
+- **Loading States**: Skeleton loaders durante fetch
+
+---
+
+## 🔧 5.10.1 - Budget API Service
+
+### 5.10.1.1 - Crea budget service
+- [ ] 📝 Crea `frontend/src/services/budgetService.js`
+
+```javascript
+/**
+ * Budget API Service
+ * Handles all API calls for Budget management
+ */
+import api from './api';
+
+const budgetService = {
+  /**
+   * Get all budgets for current user
+   * @param {Object} params - Query params (is_active, category_id)
+   * @returns {Promise<Array>}
+   */
+  getBudgets: async (params = {}) => {
+    const response = await api.get('/budgets', { params });
+    return response.data;
+  },
+
+  /**
+   * Get budget summary with spending data
+   * @param {number} year - Target year (optional)
+   * @param {number} month - Target month (optional)
+   * @returns {Promise<Object>} Summary with budgets array and totals
+   */
+  getBudgetsSummary: async (year = null, month = null) => {
+    const params = {};
+    if (year) params.year = year;
+    if (month) params.month = month;
+    
+    const response = await api.get('/budgets/summary', { params });
+    return response.data;
+  },
+
+  /**
+   * Get single budget by ID
+   * @param {string} budgetId - Budget UUID
+   * @returns {Promise<Object>}
+   */
+  getBudget: async (budgetId) => {
+    const response = await api.get(`/budgets/${budgetId}`);
+    return response.data;
+  },
+
+  /**
+   * Create new budget
+   * @param {Object} budgetData - { category_id, amount, period, start_date }
+   * @returns {Promise<Object>}
+   */
+  createBudget: async (budgetData) => {
+    const response = await api.post('/budgets', budgetData);
+    return response.data;
+  },
+
+  /**
+   * Update existing budget
+   * @param {string} budgetId - Budget UUID
+   * @param {Object} updates - { amount?, is_active?, start_date? }
+   * @returns {Promise<Object>}
+   */
+  updateBudget: async (budgetId, updates) => {
+    const response = await api.put(`/budgets/${budgetId}`, updates);
+    return response.data;
+  },
+
+  /**
+   * Delete budget
+   * @param {string} budgetId - Budget UUID
+   * @returns {Promise<void>}
+   */
+  deleteBudget: async (budgetId) => {
+    await api.delete(`/budgets/${budgetId}`);
+  },
+
+  /**
+   * Helper: Format currency
+   */
+  formatCurrency: (amount) => {
+    return new Intl.NumberFormat('it-IT', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(amount);
+  },
+
+  /**
+   * Helper: Get status color class
+   */
+  getStatusColor: (status) => {
+    const colors = {
+      ok: 'text-green-600 bg-green-100',
+      warning: 'text-yellow-600 bg-yellow-100',
+      danger: 'text-red-600 bg-red-100',
+      exceeded: 'text-red-800 bg-red-200',
+      orphan: 'text-gray-600 bg-gray-100'
+    };
+    return colors[status] || colors.ok;
+  },
+
+  /**
+   * Helper: Get progress bar color
+   */
+  getProgressColor: (percentage) => {
+    if (percentage < 70) return 'bg-green-500';
+    if (percentage < 90) return 'bg-yellow-500';
+    return 'bg-red-500';
+  }
+};
+
+export default budgetService;
+```
+
+---
+
+### 5.10.1.2 - Test service
+- [ ] Terminal:
+
+```bash
+cd frontend
+npm start
+```
+
+- [ ] Browser console:
+
+```javascript
+import budgetService from './services/budgetService';
+
+// Test (con token valido)
+budgetService.getBudgetsSummary().then(console.log);
+```
+
+- [ ] Verifica response corretto
+
+---
+
+### 5.10.1.3 - Commit service
+- [ ] Commit: `Add Budget API service - Phase 5.10.1`
+- [ ] Push
+
+---
+
+## 🎨 5.10.2 - Budget Dashboard Component
+
+### 5.10.2.1 - Crea dashboard component
+- [ ] 📝 Crea `frontend/src/components/budget/BudgetDashboard.jsx`
+
+```javascript
+/**
+ * BudgetDashboard Component
+ * Main dashboard showing all budgets with spending indicators
+ */
+import React, { useState, useEffect } from 'react';
+import budgetService from '../../services/budgetService';
+import BudgetCard from './BudgetCard';
+import BudgetCreateModal from './BudgetCreateModal';
+import BudgetEditModal from './BudgetEditModal';
+
+const BudgetDashboard = () => {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingBudget, setEditingBudget] = useState(null);
+
+  useEffect(() => {
+    loadSummary();
+  }, []);
+
+  const loadSummary = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await budgetService.getBudgetsSummary();
+      setSummary(data);
+    } catch (err) {
+      setError('Errore nel caricamento dei budget');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBudgetCreated = () => {
+    setShowCreateModal(false);
+    loadSummary();
+  };
+
+  const handleBudgetUpdated = () => {
+    setEditingBudget(null);
+    loadSummary();
+  };
+
+  const handleDeleteBudget = async (budgetId) => {
+    if (!window.confirm('Sei sicuro di voler eliminare questo budget?')) {
+      return;
+    }
+
+    try {
+      await budgetService.deleteBudget(budgetId);
+      loadSummary();
+    } catch (err) {
+      alert('Errore nell\'eliminazione del budget');
+      console.error(err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-48 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  const { budgets, totals, month } = summary || { budgets: [], totals: {} };
+  const orphanBudgets = budgets.filter(b => b.status === 'orphan');
+  const activeBudgets = budgets.filter(b => b.status !== 'orphan');
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Budget Mensili</h1>
+          <p className="text-gray-600 mt-1">
+            Mese: {new Date(month + '-01').toLocaleDateString('it-IT', { 
+              month: 'long', 
+              year: 'numeric' 
+            })}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <span>+</span>
+          Nuovo Budget
+        </button>
+      </div>
+
+      {/* Totals Summary Card */}
+      {totals && (
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 mb-6 text-white shadow-lg">
+          <h2 className="text-lg font-semibold mb-4">Riepilogo Totale</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-blue-100 text-sm">Budget Totale</p>
+              <p className="text-2xl font-bold">
+                {budgetService.formatCurrency(totals.total_budget)}
+              </p>
+            </div>
+            <div>
+              <p className="text-blue-100 text-sm">Speso</p>
+              <p className="text-2xl font-bold">
+                {budgetService.formatCurrency(totals.total_spent)}
+              </p>
+            </div>
+            <div>
+              <p className="text-blue-100 text-sm">Disponibile</p>
+              <p className="text-2xl font-bold">
+                {budgetService.formatCurrency(totals.total_remaining)}
+              </p>
+            </div>
+            <div>
+              <p className="text-blue-100 text-sm">Utilizzo</p>
+              <p className="text-2xl font-bold">
+                {totals.overall_percentage?.toFixed(1)}%
+              </p>
+              <div className="w-full bg-blue-400 rounded-full h-2 mt-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${
+                    budgetService.getProgressColor(totals.overall_percentage)
+                  }`}
+                  style={{ width: `${Math.min(totals.overall_percentage, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Orphan Budgets Warning */}
+      {orphanBudgets.length > 0 && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+          <div className="flex items-center">
+            <span className="text-2xl mr-3">⚠️</span>
+            <div className="flex-1">
+              <p className="font-semibold text-yellow-800">
+                {orphanBudgets.length} Budget Orfani
+              </p>
+              <p className="text-sm text-yellow-700">
+                Questi budget non hanno più una categoria associata. Eliminali o riassegnali.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Budgets Grid */}
+      {activeBudgets.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          {activeBudgets.map(budget => (
+            <BudgetCard
+              key={budget.id}
+              budget={budget}
+              onEdit={() => setEditingBudget(budget)}
+              onDelete={() => handleDeleteBudget(budget.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <p className="text-gray-500 text-lg mb-4">
+            Nessun budget attivo per questo mese
+          </p>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="text-blue-600 hover:text-blue-700 font-semibold"
+          >
+            Crea il tuo primo budget →
+          </button>
+        </div>
+      )}
+
+      {/* Orphan Budgets Section */}
+      {orphanBudgets.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">
+            Budget Orfani
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {orphanBudgets.map(budget => (
+              <BudgetCard
+                key={budget.id}
+                budget={budget}
+                onEdit={() => setEditingBudget(budget)}
+                onDelete={() => handleDeleteBudget(budget.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      {showCreateModal && (
+        <BudgetCreateModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleBudgetCreated}
+        />
+      )}
+
+      {editingBudget && (
+        <BudgetEditModal
+          budget={editingBudget}
+          onClose={() => setEditingBudget(null)}
+          onSuccess={handleBudgetUpdated}
+        />
+      )}
+    </div>
+  );
+};
+
+export default BudgetDashboard;
+```
+
+---
+
+### 5.10.2.2 - Commit dashboard
+- [ ] Commit: `Add Budget dashboard component - Phase 5.10.2`
+- [ ] Push
+
+---
+
+## 🎨 5.10.3 - Budget Card Component
+
+### 5.10.3.1 - Crea card component
+- [ ] 📝 Crea `frontend/src/components/budget/BudgetCard.jsx`
+
+```javascript
+/**
+ * BudgetCard Component
+ * Individual budget card with progress bar and indicators
+ */
+import React from 'react';
+import budgetService from '../../services/budgetService';
+
+const BudgetCard = ({ budget, onEdit, onDelete }) => {
+  const {
+    category_name,
+    category,
+    amount,
+    spent,
+    remaining,
+    percentage,
+    status,
+    indicator
+  } = budget;
+
+  const isOrphan = status === 'orphan';
+  const statusColorClass = budgetService.getStatusColor(status);
+  const progressColor = budgetService.getProgressColor(percentage);
+
+  return (
+    <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow ${
+      isOrphan ? 'border-2 border-yellow-400' : ''
+    }`}>
+      {/* Header */}
+      <div className="p-4 border-b">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              {category?.color && (
+                <div
+                  className="w-4 h-4 rounded-full"
+                  style={{ backgroundColor: category.color }}
+                ></div>
+              )}
+              <h3 className="font-semibold text-gray-900">
+                {category_name}
+              </h3>
+              <span className="text-2xl">{indicator}</span>
+            </div>
+            {isOrphan && (
+              <p className="text-xs text-yellow-700 mt-1">
+                Categoria eliminata
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onEdit}
+              className="text-gray-400 hover:text-blue-600 transition-colors"
+              title="Modifica"
+            >
+              ✏️
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-gray-400 hover:text-red-600 transition-colors"
+              title="Elimina"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-4">
+        {/* Amounts */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div>
+            <p className="text-xs text-gray-500">Budget</p>
+            <p className="text-sm font-semibold">
+              {budgetService.formatCurrency(amount)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Speso</p>
+            <p className="text-sm font-semibold text-red-600">
+              {budgetService.formatCurrency(spent)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Disponibile</p>
+            <p className={`text-sm font-semibold ${
+              remaining >= 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {budgetService.formatCurrency(remaining)}
+            </p>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mb-3">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs text-gray-500">Utilizzo</span>
+            <span className={`text-xs font-semibold ${statusColorClass}`}>
+              {percentage.toFixed(1)}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all ${progressColor}`}
+              style={{ width: `${Math.min(percentage, 100)}%` }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Status Badge */}
+        <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColorClass}`}>
+          {status === 'ok' && 'Sotto controllo'}
+          {status === 'warning' && 'Attenzione'}
+          {status === 'danger' && 'Quasi esaurito'}
+          {status === 'exceeded' && 'Budget sforato'}
+          {status === 'orphan' && 'Budget orfano'}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BudgetCard;
+```
+
+---
+
+### 5.10.3.2 - Commit card
+- [ ] Commit: `Add Budget card component - Phase 5.10.3`
+- [ ] Push
+
+---
+
+## 🎨 5.10.4 - Budget Create Modal
+
+### 5.10.4.1 - Crea create modal
+- [ ] 📝 Crea `frontend/src/components/budget/BudgetCreateModal.jsx`
+
+```javascript
+/**
+ * BudgetCreateModal Component
+ * Modal for creating new budget
+ */
+import React, { useState, useEffect } from 'react';
+import budgetService from '../../services/budgetService';
+import categoryService from '../../services/categoryService';
+
+const BudgetCreateModal = ({ onClose, onSuccess }) => {
+  const [categories, setCategories] = useState([]);
+  const [formData, setFormData] = useState({
+    category_id: '',
+    amount: '',
+    period: 'monthly',
+    start_date: new Date().toISOString().split('T')[0]
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      // Load only expense categories (necessity + extra)
+      const allCategories = await categoryService.getCategories();
+      const expenseCategories = allCategories.filter(
+        cat => cat.type === 'expense_necessity' || cat.type === 'expense_extra'
+      );
+      setCategories(expenseCategories);
+    } catch (err) {
+      console.error('Error loading categories:', err);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.category_id || !formData.amount) {
+      setError('Categoria e importo sono obbligatori');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await budgetService.createBudget({
+        ...formData,
+        amount: parseFloat(formData.amount)
+      });
+      
+      onSuccess();
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || 'Errore nella creazione del budget';
+      setError(errorMsg);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Nuovo Budget</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+          {/* Category Select */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Categoria *
+            </label>
+            <select
+              name="category_id"
+              value={formData.category_id}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              <option value="">Seleziona categoria...</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} ({cat.type === 'expense_necessity' ? 'Necessità' : 'Extra'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Amount */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Importo Mensile (€) *
+            </label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleChange}
+              min="0.01"
+              step="0.01"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="200.00"
+              required
+            />
+          </div>
+
+          {/* Start Date */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Data Inizio
+            </label>
+            <input
+              type="date"
+              name="start_date"
+              value={formData.start_date}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          {/* Info */}
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              💡 Il budget si resetterà automaticamente ogni mese. 
+              Puoi modificarlo o disattivarlo in qualsiasi momento.
+            </p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              disabled={loading}
+            >
+              Annulla
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+              disabled={loading}
+            >
+              {loading ? 'Creazione...' : 'Crea Budget'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default BudgetCreateModal;
+```
+
+---
+
+### 5.10.4.2 - Commit create modal
+- [ ] Commit: `Add Budget create modal - Phase 5.10.4`
+- [ ] Push
+
+---
+
+## 🎨 5.10.5 - Budget Edit Modal
+
+### 5.10.5.1 - Crea edit modal
+- [ ] 📝 Crea `frontend/src/components/budget/BudgetEditModal.jsx`
+
+```javascript
+/**
+ * BudgetEditModal Component
+ * Modal for editing existing budget
+ */
+import React, { useState } from 'react';
+import budgetService from '../../services/budgetService';
+
+const BudgetEditModal = ({ budget, onClose, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    amount: budget.amount,
+    is_active: budget.is_active
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.amount || formData.amount <= 0) {
+      setError('L\'importo deve essere maggiore di zero');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await budgetService.updateBudget(budget.id, {
+        amount: parseFloat(formData.amount),
+        is_active: formData.is_active
+      });
+      
+      onSuccess();
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || 'Errore nell\'aggiornamento del budget';
+      setError(errorMsg);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData({
+      ...formData,
+      [e.target.name]: value
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Modifica Budget</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Current Budget Info */}
+        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            {budget.category?.color && (
+              <div
+                className="w-4 h-4 rounded-full"
+                style={{ backgroundColor: budget.category.color }}
+              ></div>
+            )}
+            <span className="font-semibold">{budget.category_name}</span>
+            <span className="text-2xl">{budget.indicator}</span>
+          </div>
+          <div className="text-sm text-gray-600">
+            <p>Speso: {budgetService.formatCurrency(budget.spent)} / {budgetService.formatCurrency(budget.amount)}</p>
+            <p>Utilizzo: {budget.percentage.toFixed(1)}%</p>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+          {/* Amount */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nuovo Importo Mensile (€)
+            </label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleChange}
+              min="0.01"
+              step="0.01"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          {/* Active Toggle */}
+          <div className="mb-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                name="is_active"
+                checked={formData.is_active}
+                onChange={handleChange}
+                className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Budget attivo
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1 ml-6">
+              Disattiva per mantenere lo storico senza usarlo per il tracking corrente
+            </p>
+          </div>
+
+          {/* Info */}
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              💡 Tip: Per mantenere lo storico, disattiva il budget invece di eliminarlo. 
+              Puoi creare un nuovo budget con l'importo aggiornato.
+            </p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              disabled={loading}
+            >
+              Annulla
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+              disabled={loading}
+            >
+              {loading ? 'Salvataggio...' : 'Salva Modifiche'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default BudgetEditModal;
+```
+
+---
+
+### 5.10.5.2 - Commit edit modal
+- [ ] Commit: `Add Budget edit modal - Phase 5.10.5`
+- [ ] Push
+
+---
+
+## 🎨 5.10.6 - Routing & Integration
+
+### 5.10.6.1 - Add budget route
+- [ ] 📝 Apri `frontend/src/App.jsx`
+- [ ] Aggiungi import:
+
+```javascript
+import BudgetDashboard from './components/budget/BudgetDashboard';
+```
+
+- [ ] Aggiungi route:
+
+```javascript
+<Route path="/budgets" element={<BudgetDashboard />} />
+```
+
+---
+
+### 5.10.6.2 - Add navigation link
+- [ ] 📝 Apri `frontend/src/components/Navbar.jsx` (o equivalente)
+- [ ] Aggiungi link:
+
+```javascript
+<Link to="/budgets" className="nav-link">
+  💰 Budget
+</Link>
+```
+
+---
+
+### 5.10.6.3 - Commit routing
+- [ ] Commit: `Add Budget routing and navigation - Phase 5.10.6`
+- [ ] Push
+
+---
+
+## 🧪 5.10.7 - Testing & Refinement
+
+### 5.10.7.1 - Test complete workflow
+- [ ] Avvia frontend: `npm start`
+- [ ] Naviga a `/budgets`
+- [ ] Test Dashboard:
+  - [ ] Dashboard carica correttamente
+  - [ ] Totals summary visualizzato
+  - [ ] Budget cards mostrano indicatori corretti
+  - [ ] Progress bar funzionano
+  - [ ] Colors corrispondono agli status
+
+- [ ] Test Create Budget:
+  - [ ] Click "Nuovo Budget"
+  - [ ] Seleziona categoria expense
+  - [ ] Inserisci amount (es. €300)
+  - [ ] Submit → Budget creato ✓
+  - [ ] Dashboard aggiornato automaticamente
+
+- [ ] Test Edit Budget:
+  - [ ] Click edit icon su budget
+  - [ ] Modifica amount
+  - [ ] Disattiva budget (toggle off)
+  - [ ] Submit → Modifiche salvate ✓
+  - [ ] Budget aggiornato in dashboard
+
+- [ ] Test Delete Budget:
+  - [ ] Click delete icon
+  - [ ] Conferma → Budget eliminato ✓
+  - [ ] Dashboard aggiornato
+
+- [ ] Test Budget Orfano:
+  - [ ] Crea budget per categoria
+  - [ ] Elimina la categoria (da categorie page)
+  - [ ] Torna a budget dashboard
+  - [ ] Verifica budget appare come orfano con warning ⚠️
+
+- [ ] Test Validations:
+  - [ ] Prova creare budget per income category → Errore ✓
+  - [ ] Prova creare budget duplicato → Errore ✓
+  - [ ] Prova amount negativo → Errore validazione ✓
+
+- [ ] Test Responsive:
+  - [ ] Desktop view: 3 colonne
+  - [ ] Tablet view: 2 colonne
+  - [ ] Mobile view: 1 colonna
+
+---
+
+### 5.10.7.2 - Fix bugs e refinements
+- [ ] Fix eventuali bug trovati
+- [ ] Migliora UX se necessario
+- [ ] Ottimizza performance (lazy loading, memo)
+
+---
+
+### 5.10.7.3 - Commit testing results
+- [ ] 📝 Crea `frontend/docs/BUDGET_TESTING.md` con test results
+- [ ] Commit: `Budget UI testing and refinements - Phase 5.10.7`
+- [ ] Push
+
+---
+
+## 📱 5.10.8 - Mobile Optimization
+
+### 5.10.8.1 - Responsive improvements
+- [ ] Verifica layout mobile
+- [ ] Ottimizza card size per mobile
+- [ ] Test touch interactions
+- [ ] Verifica modals su mobile
+
+---
+
+### 5.10.8.2 - Commit mobile optimizations
+- [ ] Commit: `Budget mobile optimizations - Phase 5.10.8`
+- [ ] Push
+
+---
+
+## 🎯 CHECKPOINT FASE 5.10
+
+Prima di procedere, verifica:
+
+### Components
+- [ ] ✅ BudgetDashboard.jsx completo
+- [ ] ✅ BudgetCard.jsx con progress bar + indicators
+- [ ] ✅ BudgetCreateModal.jsx con validazioni
+- [ ] ✅ BudgetEditModal.jsx funzionante
+- [ ] ✅ budgetService.js con tutti i metodi
+
+### Features
+- [ ] ✅ Dashboard mostra tutti i budget
+- [ ] ✅ Totals summary card funzionante
+- [ ] ✅ Status indicators (🟢🟡🔴🚨⚠️) corretti
+- [ ] ✅ Progress bars animate correttamente
+- [ ] ✅ Create budget con category selector
+- [ ] ✅ Edit budget (amount + is_active)
+- [ ] ✅ Delete budget con conferma
+- [ ] ✅ Orphan budgets warning visible
+- [ ] ✅ Real-time data da API
+
+### Integration
+- [ ] ✅ Routing `/budgets` funzionante
+- [ ] ✅ Navigation link aggiunto
+- [ ] ✅ API service integrato
+- [ ] ✅ Error handling implementato
+- [ ] ✅ Loading states implementati
+
+### UX/UI
+- [ ] ✅ Responsive design (desktop/tablet/mobile)
+- [ ] ✅ Colors semantic corretti
+- [ ] ✅ Typography chiara
+- [ ] ✅ Spacing consistente
+- [ ] ✅ Hover states su buttons
+- [ ] ✅ Modals centrati e responsive
+
+### Testing
+- [ ] ✅ Create workflow testato
+- [ ] ✅ Edit workflow testato
+- [ ] ✅ Delete workflow testato
+- [ ] ✅ Validations testate
+- [ ] ✅ Edge cases verificati (orfani, errors)
+- [ ] ✅ Mobile tested
+
+---
+
+## 📝 Note Finali
+
+**Tempo stimato:** 2-3 giorni
+
+**Componenti implementati:**
+- ✅ BudgetDashboard (main view)
+- ✅ BudgetCard (single budget display)
+- ✅ BudgetCreateModal (creation form)
+- ✅ BudgetEditModal (edit form)
+- ✅ budgetService (API integration)
+
+**Features complete:**
+- ✅ Dashboard con totals summary
+- ✅ Visual indicators real-time
+- ✅ CRUD operations completo
+- ✅ Orphan budget handling
+- ✅ Responsive design
+- ✅ Error handling
+- ✅ Loading states
+
+**Pronto per:**
+- MVP Launch
+- User testing
+- Feedback collection
+
+**Post-MVP enhancements (Fase 7):**
+- [ ] Budget templates
+- [ ] Budget history view
+- [ ] Export budget report (PDF/Excel)
+- [ ] Budget notifications (email/push)
+- [ ] Budget forecasting
+- [ ] Multi-period budgets (weekly, yearly)
+- [ ] Budget sharing (family mode)
+
+---
+
+**FASE 5.10 COMPLETATA! 🎉**
 
 **Prossimo:** FASE 6 - Deployment
 

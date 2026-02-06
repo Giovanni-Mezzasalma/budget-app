@@ -471,6 +471,111 @@
 - Permessi: 8.67 ore/mese = 104 ore/anno
 - Initial balance: ferie in GIORNI, ROL/Permessi in ORE
 
+## ✅ FASE 3.9: BACKEND BUDGET PLANNING
+
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+
+**Tempo Stimato:** 2-3 giorni
+
+### 3.9.1 - Database Models
+- [ ] `budget.py` model creato con:
+  - [ ] Foreign keys: user_id, category_id (ON DELETE SET NULL)
+  - [ ] Fields: amount, period, start_date, is_active
+  - [ ] UniqueConstraint parziale (user_id, category_id, is_active WHERE is_active=true)
+  - [ ] Indexes: user_active, category, start_date
+- [ ] User model aggiornato con relationship budgets
+- [ ] Models __init__.py aggiornato
+- [ ] Migration creata ed eseguita
+- [ ] Tabella `budgets` verificata in pgAdmin
+- [ ] Commit database models
+
+### 3.9.2 - Pydantic Schemas
+- [ ] `budget.py` schemas creato:
+  - [ ] BudgetBase con validazione amount > 0, period = "monthly"
+  - [ ] BudgetCreate, BudgetUpdate
+  - [ ] BudgetResponse
+  - [ ] CategoryInfo (minimal)
+  - [ ] BudgetWithStatus (con spent/remaining/percentage/status/indicator)
+  - [ ] BudgetSummaryResponse (con budgets list + totals)
+- [ ] Schemas __init__.py aggiornato
+- [ ] Commit schemas
+
+### 3.9.3 - CRUD Operations
+- [ ] `budget.py` CRUD creato con:
+  - [ ] get_budgets (con filtri is_active, category_id)
+  - [ ] get_budget (singolo con ownership)
+  - [ ] create_budget (con validazioni: category exists, is expense type, no duplicate)
+  - [ ] update_budget
+  - [ ] delete_budget
+  - [ ] calculate_spent_for_month (real-time da transactions)
+  - [ ] get_budget_status (🟢🟡🔴🚨 basato su percentage)
+  - [ ] get_budget_with_spending (arricchisce budget con dati spesa)
+  - [ ] get_budgets_summary (dashboard con tutti i budget + totali)
+- [ ] CRUD __init__.py aggiornato
+- [ ] Commit CRUD
+
+### 3.9.4 - API Router
+- [ ] `budgets.py` router creato con endpoints:
+  - [ ] GET /budgets (lista con filtri)
+  - [ ] GET /budgets/summary (dashboard principale - KEY ENDPOINT)
+  - [ ] GET /budgets/{id} (dettaglio)
+  - [ ] POST /budgets (crea con validazioni)
+  - [ ] PUT /budgets/{id} (update)
+  - [ ] DELETE /budgets/{id}
+- [ ] Router registrato in main.py
+- [ ] Commit router
+
+### 3.9.5 - Manual Testing
+- [ ] Server avviato (http://localhost:8000/docs)
+- [ ] Setup: Registra utente + login + authorize
+- [ ] Crea 3 categorie expense (Ristoranti, Spesa, Benzina)
+- [ ] POST /budgets: Crea 3 budget (€200, €400, €100)
+- [ ] Test constraint: Crea budget duplicato → 400 Bad Request ✓
+- [ ] Crea transazioni: €150 Ristoranti, €30 Ristoranti, €380 Spesa, €45 Benzina
+- [ ] GET /budgets/summary: Verifica spent/percentage/indicators corretti:
+  - [ ] Ristoranti: €180/€200 (90%) 🔴
+  - [ ] Spesa: €380/€400 (95%) 🔴
+  - [ ] Benzina: €45/€100 (45%) 🟢
+  - [ ] Totali: €605/€700 (86.43%)
+- [ ] DELETE categoria "Ristoranti" → Budget diventa orfano
+- [ ] GET /budgets/summary: Verifica budget orfano:
+  - [ ] category_id: null
+  - [ ] category_name: "Categoria Eliminata"
+  - [ ] status: "orphan"
+  - [ ] indicator: "⚠️"
+- [ ] PUT /budgets/{id}: Modifica amount Spesa a €500
+- [ ] GET /budgets/summary: Verifica percentage aggiornata
+- [ ] PUT /budgets/{id}: Disattiva budget Benzina (is_active=false)
+- [ ] GET /budgets/summary: Verifica budget Benzina non compare
+- [ ] DELETE /budgets/{id}: Elimina budget Spesa
+- [ ] GET /budgets: Verifica budget eliminato
+- [ ] Verifica in pgAdmin: Query `SELECT * FROM budgets;`
+- [ ] `TESTING_BUDGETS.md` creato con workflow
+- [ ] Commit testing documentation
+
+**CHECKPOINT FASE 3.9:**
+- [ ] ✅ Tabella budgets con constraint UNIQUE parziale
+- [ ] ✅ Model Budget con ON DELETE SET NULL per category_id
+- [ ] ✅ Schemas con validazioni (amount > 0, period = "monthly")
+- [ ] ✅ CRUD con calcolo spesa real-time
+- [ ] ✅ get_budget_status restituisce indicatori 🟢🟡🔴🚨
+- [ ] ✅ get_budgets_summary funziona (endpoint chiave dashboard)
+- [ ] ✅ Validazione: solo expense categories
+- [ ] ✅ Constraint: un budget attivo per categoria
+- [ ] ✅ Budget orfani gestiti (category_id NULL)
+- [ ] ✅ Storico budget (is_active=false)
+- [ ] ✅ 6 endpoints testati e funzionanti
+- [ ] ✅ Ready per FASE 4.7
+
+**Note Implementazione:**
+- Period: solo "monthly" per MVP
+- Calcolo: real-time (no cache)
+- Unicità: un budget attivo per categoria
+- Orfani: category_id NULL quando categoria eliminata
+- Rollover: NO - budget riparte da zero ogni mese
+- Alert: solo indicatori visivi (no email/push)
+- Status: ok (<70%) | warning (70-90%) | danger (90-100%) | exceeded (>100%) | orphan (no category)
+
 ---
 
 ## ✅ FASE 4: TESTING & DEBUG
@@ -620,6 +725,116 @@ pytest tests/ -v --cov=app
 - [ ] Festività: inserimento bloccato ✓
 - [ ] Balance: totali aggregati corretti ✓
 - [ ] Breakdown: separato per tipo ✓
+
+## ✅ FASE 4.7: TESTING BUDGET MODULE
+
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+
+**Tempo Stimato:** 1 giorno
+
+### 4.7.1 - Setup Test Environment
+- [ ] `pytest.ini` verificato
+- [ ] `conftest.py` base verificato
+- [ ] Budget fixtures aggiunte in `conftest.py`:
+  - [ ] expense_categories (3 categorie expense)
+  - [ ] income_category (per test rejection)
+  - [ ] test_budget (singolo budget)
+  - [ ] test_budgets (3 budget multipli)
+  - [ ] test_transactions (con spese per calcolo)
+  - [ ] orphaned_budget (category_id NULL)
+- [ ] Database test accessibile
+- [ ] Commit fixtures
+
+### 4.7.2 - Test Budget CRUD (13 test)
+- [ ] `test_budget_crud.py` creato con test:
+  - [ ] test_create_budget (success)
+  - [ ] test_create_budget_for_income_category_fails
+  - [ ] test_create_duplicate_budget_fails
+  - [ ] test_get_budgets
+  - [ ] test_get_budgets_filter_by_active
+  - [ ] test_get_budgets_filter_by_category
+  - [ ] test_get_budget
+  - [ ] test_get_budget_wrong_user
+  - [ ] test_update_budget
+  - [ ] test_delete_budget
+  - [ ] test_delete_nonexistent_budget
+- [ ] Run: `pytest tests/test_budget_crud.py -v`
+- [ ] Tutti i 13 test passano ✓
+- [ ] Commit CRUD tests
+
+### 4.7.3 - Test Budget Logic (14 test)
+- [ ] `test_budget_logic.py` creato con test:
+  - [ ] test_calculate_spent_for_month
+  - [ ] test_calculate_spent_for_month_multiple_transactions
+  - [ ] test_calculate_spent_for_month_no_transactions
+  - [ ] test_get_budget_status_ok (🟢)
+  - [ ] test_get_budget_status_warning (🟡)
+  - [ ] test_get_budget_status_danger (🔴)
+  - [ ] test_get_budget_status_exceeded (🚨)
+  - [ ] test_get_budget_with_spending
+  - [ ] test_get_budget_with_spending_orphaned
+  - [ ] test_get_budgets_summary (con totali)
+  - [ ] test_get_budgets_summary_no_budgets
+- [ ] Run: `pytest tests/test_budget_logic.py -v`
+- [ ] Tutti i 14 test passano ✓
+- [ ] Commit business logic tests
+
+### 4.7.4 - Test Budget API (17 test)
+- [ ] `test_budget_api.py` creato con test:
+  - [ ] test_get_budgets
+  - [ ] test_get_budgets_filter_active
+  - [ ] test_get_budget_by_id
+  - [ ] test_get_budget_not_found (404)
+  - [ ] test_get_budgets_summary (KEY ENDPOINT)
+  - [ ] test_create_budget
+  - [ ] test_create_budget_for_income_fails (400)
+  - [ ] test_create_duplicate_budget_fails (400)
+  - [ ] test_create_budget_negative_amount_fails (422)
+  - [ ] test_update_budget
+  - [ ] test_update_budget_not_found (404)
+  - [ ] test_delete_budget
+  - [ ] test_delete_budget_not_found (404)
+  - [ ] test_budgets_require_authentication (401)
+- [ ] Run: `pytest tests/test_budget_api.py -v`
+- [ ] Tutti i 17 test passano ✓
+- [ ] Commit API tests
+
+### 4.7.5 - Coverage & Verification
+- [ ] Run coverage: `pytest tests/test_budget*.py -v --cov=app/models/budget --cov=app/crud/budget --cov=app/routers/budgets --cov-report=html`
+- [ ] Coverage verificato:
+  - [ ] app/models/budget.py: >90%
+  - [ ] app/crud/budget.py: >85%
+  - [ ] app/routers/budgets.py: >80%
+- [ ] Coverage report aperto: `open htmlcov/index.html`
+- [ ] Aree non coperte identificate (se <80%)
+- [ ] Test aggiuntivi per coverage mancante (se necessario)
+- [ ] Run full suite: `pytest -v`
+- [ ] Tutti i test passano (inclusi precedenti)
+- [ ] Totale test budget: ~44 test ✓
+- [ ] `TESTING_BUDGET_COVERAGE.md` creato con:
+  - [ ] Coverage percentages
+  - [ ] Test count per file
+  - [ ] Test scenarios covered
+- [ ] Commit coverage report
+
+**CHECKPOINT FASE 4.7:**
+- [ ] ✅ 44 test budget implementati (13+14+17)
+- [ ] ✅ Coverage >80% su tutto il modulo
+- [ ] ✅ CRUD completamente testato
+- [ ] ✅ Business logic testata (calcoli + status)
+- [ ] ✅ API endpoints testati (6 endpoint + auth)
+- [ ] ✅ Validations verificate (income reject, duplicate, negative)
+- [ ] ✅ Edge cases coperti (orfani, user isolation)
+- [ ] ✅ Coverage report documentato
+- [ ] ✅ Full test suite passa
+- [ ] ✅ Ready per FASE 5
+
+**Note Testing:**
+- CRUD: 13 test - create/read/update/delete + filters + validations
+- Logic: 14 test - spent calculation + status indicators + summary
+- API: 17 test - 6 endpoints + error handling + auth
+- Coverage: >80% target per models/crud/router
+- Fixtures: 6 fixtures per setup completo
 
 ---
 
@@ -868,6 +1083,192 @@ pytest tests/ -v --cov=app
 - ✅ Validazione festività
 - ✅ Preset CCNL
 - ✅ Mobile responsive
+
+## ✅ FASE 5.10: FRONTEND BUDGET MODULE
+
+**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+
+**Tempo Stimato:** 2-3 giorni
+
+### 5.10.1 - Budget API Service
+- [ ] `budgetService.js` creato in `src/services/`:
+  - [ ] getBudgets(params)
+  - [ ] getBudgetsSummary(year, month)
+  - [ ] getBudget(budgetId)
+  - [ ] createBudget(budgetData)
+  - [ ] updateBudget(budgetId, updates)
+  - [ ] deleteBudget(budgetId)
+  - [ ] Helper: formatCurrency()
+  - [ ] Helper: getStatusColor()
+  - [ ] Helper: getProgressColor()
+- [ ] Service testato in browser console
+- [ ] Commit service
+
+### 5.10.2 - Budget Dashboard Component
+- [ ] `BudgetDashboard.jsx` creato in `src/components/budget/`:
+  - [ ] State: summary, loading, error
+  - [ ] useEffect: loadSummary() on mount
+  - [ ] Header con titolo + mese + bottone "Nuovo Budget"
+  - [ ] Totals summary card (gradient blue):
+    - [ ] Budget totale
+    - [ ] Speso
+    - [ ] Disponibile
+    - [ ] Percentuale utilizzo + progress bar
+  - [ ] Orphan budgets warning (yellow banner)
+  - [ ] Active budgets grid (responsive: 3→2→1)
+  - [ ] Empty state con CTA
+  - [ ] Orphan budgets section (separata)
+  - [ ] Loading state (skeleton)
+  - [ ] Error state (alert)
+  - [ ] Modals integration (create + edit)
+- [ ] Component testato
+- [ ] Commit dashboard
+
+### 5.10.3 - Budget Card Component
+- [ ] `BudgetCard.jsx` creato in `src/components/budget/`:
+  - [ ] Header: category name + color dot + indicator emoji
+  - [ ] Orphan indicator (se category NULL)
+  - [ ] Edit/Delete buttons
+  - [ ] Amounts grid (Budget/Speso/Disponibile)
+  - [ ] Progress bar animated con color dinamico
+  - [ ] Utilizzo percentage
+  - [ ] Status badge (ok/warning/danger/exceeded/orphan)
+  - [ ] Border yellow per orphan
+  - [ ] Hover effects
+- [ ] Component testato
+- [ ] Commit card
+
+### 5.10.4 - Budget Create Modal
+- [ ] `BudgetCreateModal.jsx` creato in `src/components/budget/`:
+  - [ ] Modal overlay (fixed + backdrop)
+  - [ ] Header con close button
+  - [ ] Form fields:
+    - [ ] Category selector (solo expense categories)
+    - [ ] Amount input (number, min 0.01)
+    - [ ] Start date (default: oggi)
+  - [ ] Error message display
+  - [ ] Info box (reset automatico mensile)
+  - [ ] Submit button con loading state
+  - [ ] Cancel button
+  - [ ] Form validation (category + amount required)
+  - [ ] API call createBudget()
+  - [ ] Success → onSuccess() callback
+  - [ ] Error handling
+- [ ] Modal testato
+- [ ] Commit create modal
+
+### 5.10.5 - Budget Edit Modal
+- [ ] `BudgetEditModal.jsx` creato in `src/components/budget/`:
+  - [ ] Modal overlay
+  - [ ] Header con close button
+  - [ ] Current budget info card (category + spent + percentage)
+  - [ ] Form fields:
+    - [ ] Amount input (nuovo importo)
+    - [ ] is_active checkbox toggle
+    - [ ] Help text per is_active
+  - [ ] Error message display
+  - [ ] Info box (tip storico)
+  - [ ] Submit button con loading state
+  - [ ] Cancel button
+  - [ ] Form validation
+  - [ ] API call updateBudget()
+  - [ ] Success → onSuccess() callback
+  - [ ] Error handling
+- [ ] Modal testato
+- [ ] Commit edit modal
+
+### 5.10.6 - Routing & Integration
+- [ ] `App.jsx` aggiornato:
+  - [ ] Import BudgetDashboard
+  - [ ] Route `/budgets` aggiunta
+- [ ] `Navbar.jsx` aggiornato:
+  - [ ] Link "Budget" aggiunto con icona 💰
+- [ ] Navigation testata
+- [ ] Commit routing
+
+### 5.10.7 - Testing & Refinement
+- [ ] Test complete workflow:
+  - [ ] Dashboard load: summary + cards visibili ✓
+  - [ ] Totals summary: calcoli corretti ✓
+  - [ ] Progress bars: animano correttamente ✓
+  - [ ] Status indicators: 🟢🟡🔴🚨 corretti ✓
+  - [ ] Colors: corrispondono agli status ✓
+- [ ] Test Create Budget:
+  - [ ] Modal apre ✓
+  - [ ] Category selector: solo expense ✓
+  - [ ] Amount validation ✓
+  - [ ] Submit → Budget creato ✓
+  - [ ] Dashboard refresh automatico ✓
+- [ ] Test Edit Budget:
+  - [ ] Modal apre con dati correnti ✓
+  - [ ] Modifica amount ✓
+  - [ ] Toggle is_active ✓
+  - [ ] Submit → Modifiche salvate ✓
+  - [ ] Dashboard aggiornato ✓
+- [ ] Test Delete Budget:
+  - [ ] Confirm dialog ✓
+  - [ ] Budget eliminato ✓
+  - [ ] Dashboard refresh ✓
+- [ ] Test Budget Orfano:
+  - [ ] Elimina categoria con budget ✓
+  - [ ] Budget appare come orphan ✓
+  - [ ] Warning banner visibile ✓
+  - [ ] Indicator ⚠️ corretto ✓
+- [ ] Test Validations:
+  - [ ] Income category → Errore ✓
+  - [ ] Budget duplicato → Errore ✓
+  - [ ] Amount negativo → Errore validazione ✓
+  - [ ] Amount zero → Errore validazione ✓
+- [ ] Test Responsive:
+  - [ ] Desktop: 3 colonne ✓
+  - [ ] Tablet: 2 colonne ✓
+  - [ ] Mobile: 1 colonna ✓
+  - [ ] Modals responsive ✓
+- [ ] Bug fixing (se trovati)
+- [ ] UX improvements
+- [ ] `BUDGET_TESTING.md` creato in `frontend/docs/`
+- [ ] Commit testing results
+
+### 5.10.8 - Mobile Optimization
+- [ ] Layout mobile verificato:
+  - [ ] Cards leggibili
+  - [ ] Touch targets sufficienti (min 44px)
+  - [ ] Modals fullscreen su mobile
+  - [ ] Form inputs accessibili
+- [ ] Touch interactions testate
+- [ ] Scroll behavior ottimizzato
+- [ ] Commit mobile optimizations
+
+**CHECKPOINT FASE 5.10:**
+- [ ] ✅ budgetService.js con 9 metodi
+- [ ] ✅ BudgetDashboard component completo
+- [ ] ✅ BudgetCard con progress + indicators
+- [ ] ✅ BudgetCreateModal con validazioni
+- [ ] ✅ BudgetEditModal funzionante
+- [ ] ✅ Routing `/budgets` attivo
+- [ ] ✅ Navigation link presente
+- [ ] ✅ Dashboard mostra tutti i budget
+- [ ] ✅ Totals summary card funzionante
+- [ ] ✅ Status indicators corretti (🟢🟡🔴🚨⚠️)
+- [ ] ✅ Progress bars animate
+- [ ] ✅ Create workflow completo
+- [ ] ✅ Edit workflow completo
+- [ ] ✅ Delete con conferma
+- [ ] ✅ Orphan budgets handling
+- [ ] ✅ Responsive design (desktop/tablet/mobile)
+- [ ] ✅ Error handling implementato
+- [ ] ✅ Loading states implementati
+- [ ] ✅ Real-time data da API
+- [ ] ✅ Mobile ottimizzato
+- [ ] ✅ Ready per MVP launch
+
+**Note Implementazione:**
+- Components: 5 (Dashboard, Card, CreateModal, EditModal, Service)
+- API Integration: budgetService con 6 endpoints
+- Status Indicators: 🟢 ok (<70%) | 🟡 warning (70-90%) | 🔴 danger (90-100%) | 🚨 exceeded (>100%) | ⚠️ orphan
+- Colors: Tailwind semantic (green/yellow/red/gray)
+- Layout: CSS Grid responsive (3→2→1)
+- Modals: Fixed overlay + backdrop blur
 
 ---
 
