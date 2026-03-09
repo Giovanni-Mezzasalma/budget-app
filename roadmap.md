@@ -3180,7 +3180,7 @@ Implementare il backend completo per il modulo di gestione ferie per dipendenti,
 ## 🗄️ 3.8.1 - Database Models
 
 ### 3.8.1.1 - Crea model VacationSettings
-- [ ] 📝 Crea `backend/app/models/vacation_settings.py`
+- [x] 📝 Crea `backend/app/models/vacation_settings.py`
 
 ```python
 """
@@ -3355,7 +3355,7 @@ class VacationEntry(Base, TimestampMixin):
 ```
 
 ### 3.8.1.3 - Crea model ItalianHoliday
-- [ ] 📝 Crea `backend/app/models/italian_holiday.py`
+- [x] 📝 Crea `backend/app/models/italian_holiday.py`
 
 ```python
 """
@@ -3414,7 +3414,7 @@ FIXED_ITALIAN_HOLIDAYS = [
 ```
 
 ### 3.8.1.4 - Crea model UserHoliday
-- [ ] 📝 Crea `backend/app/models/user_holiday.py`
+- [x] 📝 Crea `backend/app/models/user_holiday.py`
 
 ```python
 """
@@ -3506,7 +3506,7 @@ class UserHoliday(Base, TimestampMixin):
 ```
 
 ### 3.8.1.5 - Update User Model
-- [ ] 📝 Modifica `backend/app/models/user.py` - aggiungi relationships
+- [x] 📝 Modifica `backend/app/models/user.py` - aggiungi relationships
 
 ```python
 # Add these lines to the User model relationships section:
@@ -3531,7 +3531,7 @@ user_holidays = relationship(
 ```
 
 ### 3.8.1.6 - Update Models __init__.py
-- [ ] 📝 Modifica `backend/app/models/__init__.py`
+- [x] 📝 Modifica `backend/app/models/__init__.py`
 
 ```python
 # Add these imports:
@@ -3552,24 +3552,24 @@ from app.models.user_holiday import UserHoliday
 ```
 
 ### 3.8.1.7 - Generate Alembic Migration
-- [ ] Esegui: `alembic revision --autogenerate -m "Add vacation module tables with separate accrual rates"`
-- [ ] Verifica migration generata
-- [ ] **IMPORTANTE:** Se esiste già il modulo, creare migration per:
+- [x] Esegui: `alembic revision --autogenerate -m "Add vacation module tables with separate accrual rates"`
+- [x] Verifica migration generata
+- [x] **IMPORTANTE:** Se esiste già il modulo, creare migration per:
   - Aggiungere nuove colonne (ferie_days_per_month, rol_hours_per_month, etc.)
   - Migrare dati esistenti (hours_per_month → ferie_days_per_month)
   - Rimuovere vecchie colonne (hours_per_month, carryover_hours, carryover_year)
   - Rimuovere valore enum "malattia"
-- [ ] Esegui: `alembic upgrade head`
+- [x] Esegui: `alembic upgrade head`
 
 ### 3.8.1.8 - Commit models
-- [ ] Commit: `Add vacation module with separate accrual rates (Ferie/ROL/Permessi)`
+- [x] Commit: `Add vacation module with separate accrual rates (Ferie/ROL/Permessi)`
 
 ---
 
 ## 🛠️ 3.8.2 - Utility Functions
 
 ### 3.8.2.1 - Easter Calculator
-- [ ] 📝 Crea `backend/app/utils/easter.py`
+- [x] 📝 Crea `backend/app/utils/easter.py`
 
 ```python
 """
@@ -3650,7 +3650,7 @@ def get_easter_dates(year: int) -> dict:
 ```
 
 ### 3.8.2.2 - Bridge Days Calculator
-- [ ] 📝 Crea `backend/app/utils/bridge_days.py`
+- [x] 📝 Crea `backend/app/utils/bridge_days.py`
 
 ```python
 """
@@ -3812,7 +3812,7 @@ def find_bridge_opportunities(
 ```
 
 ### 3.8.2.3 - Vacation Balance Calculator (RISCRITTA COMPLETAMENTE)
-- [ ] 📝 Crea `backend/app/utils/vacation_balance.py`
+- [x] 📝 Crea `backend/app/utils/vacation_balance.py`
 
 ```python
 """
@@ -4116,7 +4116,7 @@ ITALIAN_MONTHS = {
 ```
 
 ### 3.8.2.4 - Export utils in __init__
-- [ ] 📝 Crea/Modifica `backend/app/utils/__init__.py`
+- [x] 📝 Crea/Modifica `backend/app/utils/__init__.py`
 
 ```python
 # Add these exports:
@@ -4132,7 +4132,7 @@ from app.utils.vacation_balance import calculate_balance, calculate_monthly_proj
 ```
 
 ### 3.8.2.5 - Commit utilities
-- [ ] Commit: `Add vacation utilities with separate accrual calculation`
+- [x] Commit: `Add vacation utilities with separate accrual calculation`
 
 ---
 
