@@ -43,6 +43,28 @@ from app.schemas.transfer import (
     TransferWithDetails
 )
 
+from app.schemas.vacation import (
+    VacationSettingsBase,
+    VacationSettingsCreate,
+    VacationSettingsUpdate,
+    VacationSettingsResponse,
+    VacationEntryBase,
+    VacationEntryCreate,
+    VacationEntryUpdate,
+    VacationEntryResponse,
+    VacationEntryBulkCreate,
+    UserHolidayBase,
+    UserHolidayCreate,
+    UserHolidayResponse,
+    ItalianHolidayResponse,
+    BreakdownItem,
+    VacationBalanceResponse,
+    VacationProjectionResponse,
+    CalendarDayResponse,
+    CalendarMonthResponse,
+    BridgeOpportunityResponse,
+)
+
 __all__ = [
     # User schemas
     "UserBase",
@@ -79,4 +101,25 @@ __all__ = [
     "TransferUpdate",
     "TransferResponse",
     "TransferWithDetails",
+
+    # Vacation schemas
+    "VacationSettingsBase",
+    "VacationSettingsCreate",
+    "VacationSettingsUpdate",
+    "VacationSettingsResponse",
+    "VacationEntryBase",
+    "VacationEntryCreate",
+    "VacationEntryUpdate",
+    "VacationEntryResponse",
+    "VacationEntryBulkCreate",
+    "UserHolidayBase",
+    "UserHolidayCreate",
+    "UserHolidayResponse",
+    "ItalianHolidayResponse",
+    "BreakdownItem",
+    "VacationBalanceResponse",
+    "VacationProjectionResponse",
+    "CalendarDayResponse",
+    "CalendarMonthResponse",
+    "BridgeOpportunityResponse",
 ]
