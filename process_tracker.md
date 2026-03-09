@@ -390,20 +390,20 @@
 **Tempo Stimato:** 3-4 giorni
 
 ### 3.8.1 - Database Models
-- [ ] `vacation_settings.py` creato (maturazione separata: ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
-- [ ] `tracking_start_date` implementato (invece di carryover_year)
-- [ ] `initial_ferie_days` (in GIORNI), `initial_rol_hours`, `initial_permessi_hours` implementati
-- [ ] `vacation_entry.py` creato (NO malattia - solo ferie/rol/permesso)
-- [ ] `italian_holiday.py` creato
-- [ ] `user_holiday.py` creato
-- [ ] User model aggiornato con relationships
-- [ ] Models __init__.py aggiornato
-- [ ] Migration creata ed eseguita
-- [ ] Tabelle verificate in pgAdmin
-- [ ] Commit database models
+- [x] `vacation_settings.py` creato (maturazione separata: ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
+- [x] `tracking_start_date` implementato (invece di carryover_year)
+- [x] `initial_ferie_days` (in GIORNI), `initial_rol_hours`, `initial_permessi_hours` implementati
+- [x] `vacation_entry.py` creato (NO malattia - solo ferie/rol/permesso)
+- [x] `italian_holiday.py` creato
+- [x] `user_holiday.py` creato
+- [x] User model aggiornato con relationships
+- [x] Models __init__.py aggiornato
+- [x] Migration creata ed eseguita
+- [x] Tabelle verificate in pgAdmin
+- [x] Commit database models
 
 ### 3.8.2 - Utility Functions
-- [ ] `easter.py` creato (calcolo Pasqua con validazione year >= 1583)
+- [x] `easter.py` creato (calcolo Pasqua con validazione year >= 1583)
 - [ ] `bridge_days.py` creato (calcolo ponti con validazione weekend/festività)
 - [ ] `vacation_balance.py` RISCRITTO con maturazione separata:
   - [ ] Calcolo separato per tipo (Ferie/ROL/Permessi)
