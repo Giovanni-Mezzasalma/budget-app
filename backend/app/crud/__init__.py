@@ -80,6 +80,9 @@ from app.crud.analytics import (
 )
 
 from app.crud import vacation_settings
+from app.crud import vacation_entry
+from app.crud import italian_holiday
+from app.crud import user_holiday
 
 __all__ = [
     # User CRUD
@@ -145,6 +148,9 @@ __all__ = [
     "calculate_totals_by_account",
     "calculate_daily_breakdown",
     "calculate_year_comparison",
-    # Vacation Settings CRUD module
+    # Vacation CRUD modules
     "vacation_settings",
+    "vacation_entry",
+    "italian_holiday",
+    "user_holiday",
 ]
