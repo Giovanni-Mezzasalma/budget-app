@@ -3,12 +3,17 @@ User database model.
 """
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime, Index
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 import uuid as uuid_lib
+
+if TYPE_CHECKING:
+    from app.models.vacation_settings import VacationSettings
+    from app.models.vacation_entry import VacationEntry
+    from app.models.user_holiday import UserHoliday
 class User(Base):
     """User model for authentication and user management."""
     
@@ -78,7 +83,30 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin"
     )
-    
+
+    # Vacation relationships
+    vacation_settings: Mapped[Optional["VacationSettings"]] = relationship(
+        "VacationSettings",
+        back_populates="user",
+        uselist=False,  # one-to-one
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+    vacation_entries: Mapped[List["VacationEntry"]] = relationship(
+        "VacationEntry",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+    user_holidays: Mapped[List["UserHoliday"]] = relationship(
+        "UserHoliday",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
     # Indexes
     __table_args__ = (
         Index('ix_users_email_active', 'email', 'is_active'),
