@@ -15,6 +15,7 @@ Copre tutti i moduli dell'applicazione:
   [10] Vacation Bulk     — skip weekend + festività
   [11] Vacation Balance  — breakdown per tipo + totali aggregati
   [12] Vacation Calendar — festività custom visibile
+  [13] Budgets           — CRUD, validazioni, summary con spending
 
 Uso:
     python test_full_suite.py
@@ -102,8 +103,10 @@ class Suite:
         self.transaction_id = None
         self.transfer_id    = None
         self.chart_id       = None
-        self.vac_entry_ids  = []
+        self.vac_entry_ids   = []
         self.user_holiday_id = None
+        self.budget_id       = None
+        self.budget_cat_id   = None   # categoria expense_extra dedicata ai test budget
 
         self.passed  = 0
         self.failed  = 0
@@ -787,6 +790,304 @@ class Suite:
         self.check(isinstance(body, list), "Risposta bridges è lista")
 
     # =========================================================================
+    # [13] BUDGETS
+    # =========================================================================
+
+    def test_budgets(self):
+        section("[13] Budgets — CRUD, validazioni, summary con spending")
+
+        if not self.token:
+            skip("token non disponibile")
+            self.skipped += 1
+            return
+
+        if not self.cat_income_id:
+            skip("cat_income_id non disponibile (esegui prima il modulo categories)")
+            self.skipped += 1
+            return
+
+        today = date.today()
+        start_date = date(today.year, today.month, 1).isoformat()
+
+        # ── Setup: crea categoria expense_extra dedicata ──────────────────────
+        status, body = self.req("POST", "/api/v1/categories", {
+            "name": "Ristoranti Budget Test",
+            "type": "expense_extra",
+            "color": "#F59E0B",
+        })
+        if not self.check(status == 201, "POST /categories (expense_extra per budget) → 201"):
+            info(f"body: {body}")
+            return
+        self.budget_cat_id = body.get("id")
+
+        # ── VALIDAZIONE: budget su categoria income → 400 ─────────────────────
+        status, body = self.req("POST", "/api/v1/budgets/", {
+            "category_id": self.cat_income_id,
+            "amount": 500.0,
+            "period": "monthly",
+            "start_date": start_date,
+        })
+        self.check(status == 400, "POST /budgets/ (categoria income) → 400")
+        if status == 400:
+            info(f"  Dettaglio: {body.get('detail', '')}")
+
+        # ── VALIDAZIONE: period non-monthly → 422 ────────────────────────────
+        status, body = self.req("POST", "/api/v1/budgets/", {
+            "category_id": self.budget_cat_id,
+            "amount": 200.0,
+            "period": "weekly",
+            "start_date": start_date,
+        })
+        self.check(status == 422, "POST /budgets/ (period=weekly) → 422")
+
+        # ── VALIDAZIONE: amount negativo → 422 ───────────────────────────────
+        status, body = self.req("POST", "/api/v1/budgets/", {
+            "category_id": self.budget_cat_id,
+            "amount": -100.0,
+            "period": "monthly",
+            "start_date": start_date,
+        })
+        self.check(status == 422, "POST /budgets/ (amount negativo) → 422")
+
+        # ── CREATE valido ─────────────────────────────────────────────────────
+        status, body = self.req("POST", "/api/v1/budgets/", {
+            "category_id": self.budget_cat_id,
+            "amount": 200.0,
+            "period": "monthly",
+            "start_date": start_date,
+        })
+        if not self.check(status == 201, "POST /budgets/ → 201"):
+            info(f"body: {body}")
+            return
+        self.budget_id = body.get("id")
+        self.check(bool(self.budget_id), "id presente")
+        self.check(body.get("is_active") is True, "is_active = True")
+        self.check(float(body.get("amount", 0)) == 200.0, "amount = 200.0")
+        self.check(body.get("period") == "monthly", "period = monthly")
+        self.check(body.get("category_id") == self.budget_cat_id, "category_id corretto")
+
+        # ── VALIDAZIONE: duplicato attivo per stessa categoria → 400 ─────────
+        status, body = self.req("POST", "/api/v1/budgets/", {
+            "category_id": self.budget_cat_id,
+            "amount": 300.0,
+            "period": "monthly",
+            "start_date": start_date,
+        })
+        self.check(status == 400, "POST /budgets/ (duplicato attivo) → 400")
+        if status == 400:
+            info(f"  Dettaglio: {body.get('detail', '')}")
+
+        # ── LIST ──────────────────────────────────────────────────────────────
+        status, body = self.req("GET", "/api/v1/budgets/")
+        self.check(status == 200, "GET /budgets/ → 200")
+        self.check(isinstance(body, list) and len(body) >= 1, f"Lista contiene ≥ 1 budget ({len(body) if isinstance(body, list) else 0})")
+
+        # LIST filtro is_active=true
+        status, body = self.req("GET", "/api/v1/budgets/", params={"is_active": "true"})
+        self.check(status == 200, "GET /budgets/?is_active=true → 200")
+        if isinstance(body, list):
+            all_active = all(b.get("is_active") is True for b in body)
+            self.check(all_active, "Tutti i budget filtrati sono attivi")
+
+        # LIST filtro per category_id
+        status, body = self.req("GET", "/api/v1/budgets/", params={"category_id": self.budget_cat_id})
+        self.check(status == 200, "GET /budgets/?category_id=... → 200")
+        self.check(isinstance(body, list) and len(body) == 1, "Filtro category_id restituisce 1 budget")
+
+        # ── READ singolo ──────────────────────────────────────────────────────
+        status, body = self.req("GET", f"/api/v1/budgets/{self.budget_id}")
+        self.check(status == 200, "GET /budgets/{id} → 200")
+        self.check(body.get("id") == self.budget_id, "id corretto")
+
+        # READ 404 per id inesistente
+        status, _ = self.req("GET", "/api/v1/budgets/00000000-0000-0000-0000-000000000000")
+        self.check(status == 404, "GET /budgets/{id_inesistente} → 404")
+
+        # ── SUMMARY mese corrente ─────────────────────────────────────────────
+        status, body = self.req("GET", "/api/v1/budgets/summary")
+        if self.check(status == 200, "GET /budgets/summary → 200"):
+            self.check("month" in body, "summary.month presente")
+            self.check("budgets" in body, "summary.budgets presente")
+            self.check("totals" in body, "summary.totals presente")
+
+            # Verifica formato month YYYY-MM
+            month_val = body.get("month", "")
+            self.check(
+                len(month_val) == 7 and month_val[4] == "-",
+                f"month in formato YYYY-MM: '{month_val}'"
+            )
+
+            # Verifica struttura totals
+            totals = body.get("totals", {})
+            for key in ["total_budget", "total_spent", "total_remaining", "overall_percentage"]:
+                self.check(key in totals, f"totals.{key} presente")
+
+            # Verifica che il nostro budget sia nella lista con i campi di spending
+            budgets_list = body.get("budgets", [])
+            our_budget = next((b for b in budgets_list if b.get("id") == self.budget_id), None)
+            if self.check(our_budget is not None, "Budget creato presente nel summary"):
+                for field in ["spent", "remaining", "percentage", "status", "indicator", "color", "category_name"]:
+                    self.check(field in our_budget, f"summary budget.{field} presente")
+                self.check(
+                    our_budget.get("status") in ("ok", "warning", "danger", "exceeded", "orphan"),
+                    f"status valido: '{our_budget.get('status')}'"
+                )
+                self.check(
+                    float(our_budget.get("spent", -1)) >= 0,
+                    f"spent ≥ 0 (= {our_budget.get('spent')})"
+                )
+
+        # SUMMARY con year/month specifici
+        status, body = self.req(
+            "GET", "/api/v1/budgets/summary",
+            params={"year": today.year, "month": today.month}
+        )
+        self.check(status == 200, f"GET /budgets/summary?year={today.year}&month={today.month} → 200")
+
+        # ── SPENDING: crea transazioni e verifica calcolo spent/percentage ────
+        tx_id  = None
+        tx2_id = None
+        if self.account_id:
+            today_str = today.isoformat()
+            status, tx_body = self.req("POST", "/api/v1/transactions", {
+                "account_id":  self.account_id,
+                "category_id": self.budget_cat_id,
+                "amount":      150.0,
+                "date":        today_str,
+                "description": "Spesa budget test #1",
+            })
+            if self.check(status == 201, "POST /transactions (spending budget €150) → 201"):
+                tx_id = tx_body.get("id")
+
+            status, tx_body2 = self.req("POST", "/api/v1/transactions", {
+                "account_id":  self.account_id,
+                "category_id": self.budget_cat_id,
+                "amount":      30.0,
+                "date":        today_str,
+                "description": "Spesa budget test #2",
+            })
+            if self.check(status == 201, "POST /transactions (spending budget €30) → 201"):
+                tx2_id = tx_body2.get("id")
+
+            # Verifica summary con spending reale
+            status, body = self.req("GET", "/api/v1/budgets/summary")
+            if self.check(status == 200, "GET /budgets/summary (con spending) → 200"):
+                budgets_list = body.get("budgets", [])
+                our = next((b for b in budgets_list if b.get("id") == self.budget_id), None)
+                if our:
+                    spent = float(our.get("spent", -1))
+                    pct   = float(our.get("percentage", -1))
+                    self.check(spent == 180.0, f"spent = 180.0 (€150+€30) (trovato: {spent})")
+                    self.check(pct   == 90.0,  f"percentage = 90.0% (180/200) (trovata: {pct})")
+                    self.check(
+                        our.get("status") in ("warning", "danger"),
+                        f"status = warning/danger al 90% (trovato: '{our.get('status')}')"
+                    )
+                    self.check(
+                        our.get("indicator") in ("🟡", "🟠", "🔴"),
+                        f"indicator rosso/arancio al 90% (trovato: '{our.get('indicator')}')"
+                    )
+
+            # Cleanup transazioni spending
+            for tx in filter(None, [tx_id, tx2_id]):
+                self.req("DELETE", f"/api/v1/transactions/{tx}")
+        else:
+            info("Spending test saltato: account_id non disponibile (esegui la suite completa)")
+
+        # ── UPDATE amount ─────────────────────────────────────────────────────
+        status, body = self.req("PUT", f"/api/v1/budgets/{self.budget_id}", {
+            "amount": 250.0,
+        })
+        self.check(status == 200, "PUT /budgets/{id} (amount) → 200")
+        self.check(float(body.get("amount", 0)) == 250.0, "amount aggiornato a 250")
+
+        # UPDATE 404
+        status, _ = self.req("PUT", "/api/v1/budgets/00000000-0000-0000-0000-000000000000", {
+            "amount": 100.0,
+        })
+        self.check(status == 404, "PUT /budgets/{id_inesistente} → 404")
+
+        # ── DEATTIVAZIONE (is_active=false) ───────────────────────────────────
+        status, body = self.req("PUT", f"/api/v1/budgets/{self.budget_id}", {
+            "is_active": False,
+        })
+        self.check(status == 200, "PUT /budgets/{id} (is_active=False) → 200")
+        self.check(body.get("is_active") is False, "is_active = False dopo update")
+
+        # Ora si può creare un nuovo budget attivo per la stessa categoria
+        status, body = self.req("POST", "/api/v1/budgets/", {
+            "category_id": self.budget_cat_id,
+            "amount": 300.0,
+            "period": "monthly",
+            "start_date": start_date,
+        })
+        self.check(status == 201, "POST /budgets/ (dopo disattivazione) → 201 (no duplicato)")
+        if status == 201:
+            new_budget_id = body.get("id")
+            # Elimina subito il secondo budget per non inquinare il cleanup
+            self.req("DELETE", f"/api/v1/budgets/{new_budget_id}")
+
+        # Riattiva il budget originale per il DELETE finale
+        self.req("PUT", f"/api/v1/budgets/{self.budget_id}", {"is_active": True})
+
+        # ── ORPHAN: elimina categoria → budget diventa orfano ─────────────────
+        status, cat_body = self.req("POST", "/api/v1/categories", {
+            "name": "Categoria Orfana Test",
+            "type": "expense_extra",
+            "color": "#6B7280",
+        })
+        if self.check(status == 201, "POST /categories (per test orphan) → 201"):
+            orphan_cat_id = cat_body.get("id")
+
+            status, bud_body = self.req("POST", "/api/v1/budgets/", {
+                "category_id": orphan_cat_id,
+                "amount":      100.0,
+                "period":      "monthly",
+                "start_date":  start_date,
+            })
+            if self.check(status == 201, "POST /budgets/ (per test orphan) → 201"):
+                orphan_budget_id = bud_body.get("id")
+
+                # Elimina la categoria → ON DELETE SET NULL
+                status, _ = self.req("DELETE", f"/api/v1/categories/{orphan_cat_id}")
+                self.check(status == 204, "DELETE /categories/{id} (crea budget orfano) → 204")
+
+                # Verifica budget orfano nel summary
+                status, body = self.req("GET", "/api/v1/budgets/summary")
+                if self.check(status == 200, "GET /budgets/summary (con budget orfano) → 200"):
+                    budgets_list = body.get("budgets", [])
+                    orphan = next((b for b in budgets_list if b.get("id") == orphan_budget_id), None)
+                    if self.check(orphan is not None, "Budget orfano presente nel summary"):
+                        self.check(
+                            orphan.get("category_id") is None,
+                            f"orphan.category_id = null (trovato: {orphan.get('category_id')})"
+                        )
+                        self.check(
+                            orphan.get("category_name") == "Categoria Eliminata",
+                            f"orphan.category_name = 'Categoria Eliminata' (trovato: '{orphan.get('category_name')}')"
+                        )
+                        self.check(
+                            orphan.get("status") == "orphan",
+                            f"orphan.status = 'orphan' (trovato: '{orphan.get('status')}')"
+                        )
+                        self.check(
+                            orphan.get("indicator") == "⚠️",
+                            f"orphan.indicator = '⚠️' (trovato: '{orphan.get('indicator')}')"
+                        )
+
+                # Cleanup budget orfano
+                self.req("DELETE", f"/api/v1/budgets/{orphan_budget_id}")
+
+        # ── DELETE ────────────────────────────────────────────────────────────
+        status, _ = self.req("DELETE", f"/api/v1/budgets/{self.budget_id}")
+        self.check(status == 204, "DELETE /budgets/{id} → 204")
+        self.budget_id = None  # già eliminato, non serve nel cleanup
+
+        # DELETE 404 dopo eliminazione
+        status, _ = self.req("DELETE", "/api/v1/budgets/00000000-0000-0000-0000-000000000000")
+        self.check(status == 404, "DELETE /budgets/{id_inesistente} → 404")
+
+    # =========================================================================
     # CLEANUP
     # =========================================================================
 
@@ -796,6 +1097,10 @@ class Suite:
         if not self.do_cleanup:
             info("--no-cleanup specificato, dati lasciati nel DB")
             return
+
+        if self.budget_id:
+            s, _ = self.req("DELETE", f"/api/v1/budgets/{self.budget_id}")
+            ok("Budget eliminato") if s == 204 else info(f"Budget skip ({s})")
 
         for eid in self.vac_entry_ids:
             s, _ = self.req("DELETE", f"/api/v1/vacation/entries/{eid}")
@@ -852,6 +1157,7 @@ class Suite:
             "vacation_bulk":      self.test_vacation_bulk,
             "vacation_balance":   self.test_vacation_balance,
             "vacation_calendar":  self.test_vacation_calendar,
+            "budgets":            self.test_budgets,
         }
 
         if only_module:
@@ -861,6 +1167,9 @@ class Suite:
             # Per moduli non-auth abbiamo bisogno del token
             if only_module != "auth":
                 self.test_auth()
+            # Budgets richiede cat_income_id: esegui prima categories
+            if only_module == "budgets":
+                self.test_categories()
             modules[only_module]()
         else:
             for fn in modules.values():
@@ -907,7 +1216,7 @@ if __name__ == "__main__":
                         help="Esegui solo un modulo specifico: auth, accounts, categories, "
                              "transactions, transfers, analytics, custom_charts, "
                              "vacation_settings, vacation_entries, vacation_bulk, "
-                             "vacation_balance, vacation_calendar")
+                             "vacation_balance, vacation_calendar, budgets")
     args = parser.parse_args()
 
     suite = Suite(

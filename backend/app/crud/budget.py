@@ -182,13 +182,13 @@ def calculate_spent_for_month(
     end_date = date(year, month, last_day)
 
     # Query transactions for this category in this month
-    # Only expenses (amount < 0)
+    # Only expenses: filtro per tipo (le transazioni sono salvate con amount positivo)
     result = db.query(func.sum(Transaction.amount)).filter(
         Transaction.user_id == user_id,
         Transaction.category_id == category_id,
         Transaction.date >= start_date,
         Transaction.date <= end_date,
-        Transaction.amount < 0  # Only expenses
+        Transaction.type.in_(["expense_necessity", "expense_extra"])
     ).scalar()
 
     if result is None:

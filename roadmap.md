@@ -4894,7 +4894,7 @@ Implementare il backend completo per il sistema di budgeting mensile, permettend
 ## 🗄️ 3.9.1 - Database Models
 
 ### 3.9.1.1 - Crea model Budget
-- [ ] 📝 Crea `backend/app/models/budget.py`
+- [x] 📝 Crea `backend/app/models/budget.py`
 
 ```python
 """
@@ -5017,8 +5017,8 @@ class Budget(Base):
 ---
 
 ### 3.9.1.2 - Aggiorna User model
-- [ ] 📝 Apri `backend/app/models/user.py`
-- [ ] Aggiungi relationship budgets:
+- [x] 📝 Apri `backend/app/models/user.py`
+- [x] Aggiungi relationship budgets:
 
 ```python
 # In User model, nella sezione Relationships:
@@ -5033,8 +5033,8 @@ budgets: Mapped[List["Budget"]] = relationship(
 ---
 
 ### 3.9.1.3 - Aggiorna models __init__.py
-- [ ] 📝 Apri `backend/app/models/__init__.py`
-- [ ] Aggiungi import:
+- [x] 📝 Apri `backend/app/models/__init__.py`
+- [x] Aggiungi import:
 
 ```python
 from app.models.budget import Budget
@@ -5043,7 +5043,7 @@ from app.models.budget import Budget
 ---
 
 ### 3.9.1.4 - Crea migration
-- [ ] Terminal in `backend/`:
+- [x] Terminal in `backend/`:
 
 ```bash
 source venv/bin/activate
@@ -5060,13 +5060,13 @@ alembic revision --autogenerate -m "Add budgets table"
 ---
 
 ### 3.9.1.5 - Esegui migration
-- [ ] Terminal:
+- [x] Terminal:
 
 ```bash
 alembic upgrade head
 ```
 
-- [ ] Verifica in **pgAdmin**:
+- [x] Verifica in **pgAdmin**:
   - Tabella `budgets` creata
   - Colonne corrette (id, user_id, category_id, amount, period, start_date, is_active, created_at, updated_at)
   - Indexes presenti
@@ -5075,7 +5075,7 @@ alembic upgrade head
 ---
 
 ### 3.9.1.6 - Commit database models
-- [ ] In **GitHub Desktop**:
+- [x] In **GitHub Desktop**:
   - [x] Commit: `Add Budget model with monthly tracking support - Phase 3.9.1`
   - [x] Push
 
@@ -5084,7 +5084,7 @@ alembic upgrade head
 ## 📐 3.9.2 - Pydantic Schemas
 
 ### 3.9.2.1 - Crea budget schemas
-- [ ] 📝 Crea `backend/app/schemas/budget.py`
+- [x] 📝 Crea `backend/app/schemas/budget.py`
 
 ```python
 """
@@ -5223,8 +5223,8 @@ class BudgetSummaryResponse(BaseModel):
 ---
 
 ### 3.9.2.2 - Aggiorna schemas __init__.py
-- [ ] 📝 Apri `backend/app/schemas/__init__.py`
-- [ ] Aggiungi exports:
+- [x] 📝 Apri `backend/app/schemas/__init__.py`
+- [x] Aggiungi exports:
 
 ```python
 from app.schemas.budget import (
@@ -5240,15 +5240,15 @@ from app.schemas.budget import (
 ---
 
 ### 3.9.2.3 - Commit schemas
-- [ ] Commit: `Add Budget Pydantic schemas - Phase 3.9.2`
-- [ ] Push
+- [x] Commit: `Add Budget Pydantic schemas - Phase 3.9.2`
+- [x] Push
 
 ---
 
 ## 🔧 3.9.3 - CRUD Operations
 
 ### 3.9.3.1 - Crea budget CRUD
-- [ ] 📝 Crea `backend/app/crud/budget.py`
+- [x] 📝 Crea `backend/app/crud/budget.py`
 
 ```python
 """
@@ -5606,8 +5606,8 @@ def get_budgets_summary(
 ---
 
 ### 3.9.3.2 - Aggiorna CRUD __init__.py
-- [ ] 📝 Apri `backend/app/crud/__init__.py`
-- [ ] Aggiungi import:
+- [x] 📝 Apri `backend/app/crud/__init__.py`
+- [x] Aggiungi import:
 
 ```python
 from app.crud import budget
@@ -5616,15 +5616,15 @@ from app.crud import budget
 ---
 
 ### 3.9.3.3 - Commit CRUD
-- [ ] Commit: `Add Budget CRUD operations with real-time spending calc - Phase 3.9.3`
-- [ ] Push
+- [x] Commit: `Add Budget CRUD operations with real-time spending calc - Phase 3.9.3`
+- [x] Push
 
 ---
 
 ## 🛣️ 3.9.4 - API Router
 
 ### 3.9.4.1 - Crea budget router
-- [ ] 📝 Crea `backend/app/routers/budgets.py`
+- [x] 📝 Crea `backend/app/routers/budgets.py`
 
 ```python
 """
@@ -5838,8 +5838,8 @@ async def delete_budget(
 ---
 
 ### 3.9.4.2 - Registra router in main.py
-- [ ] 📝 Apri `backend/app/main.py`
-- [ ] Aggiungi import e registrazione:
+- [x] 📝 Apri `backend/app/main.py`
+- [x] Aggiungi import e registrazione:
 
 ```python
 from app.routers import budgets
@@ -5851,15 +5851,15 @@ app.include_router(budgets.router, prefix="/api/v1")
 ---
 
 ### 3.9.4.3 - Commit router
-- [ ] Commit: `Add Budget API router with summary endpoint - Phase 3.9.4`
-- [ ] Push
+- [x] Commit: `Add Budget API router with summary endpoint - Phase 3.9.4`
+- [x] Push
 
 ---
 
 ## 🧪 3.9.5 - Testing Manuale
 
 ### 3.9.5.1 - Avvia server
-- [ ] Terminal:
+- [x] Terminal:
 
 ```bash
 cd backend
@@ -5867,25 +5867,25 @@ source venv/bin/activate
 python run.py
 ```
 
-- [ ] Verifica: http://localhost:8000/docs
+- [x] Verifica: http://localhost:8000/docs
 
 ---
 
 ### 3.9.5.2 - Test workflow completo
 
 **1. Setup iniziale:**
-- [ ] POST /auth/register (crea utente)
-- [ ] POST /auth/login (ottieni token)
-- [ ] Authorize in Swagger con token
+- [x] POST /auth/register (crea utente)
+- [x] POST /auth/login (ottieni token)
+- [x] Authorize in Swagger con token
 
 **2. Crea categorie expense:**
-- [ ] POST /categories 
+- [x] POST /categories 
   - Crea "Ristoranti" (expense_extra)
   - Crea "Spesa" (expense_necessity)
   - Crea "Benzina" (expense_extra)
 
 **3. Crea budgets:**
-- [ ] POST /budgets
+- [x] POST /budgets
   ```json
   {
     "category_id": "[id-ristoranti]",
@@ -5894,23 +5894,23 @@ python run.py
     "start_date": "2025-01-01"
   }
   ```
-- [ ] POST /budgets (per "Spesa": €400)
-- [ ] POST /budgets (per "Benzina": €100)
+- [x] POST /budgets (per "Spesa": €400)
+- [x] POST /budgets (per "Benzina": €100)
 
 **4. Verifica constraint unicità:**
-- [ ] POST /budgets (stesso category_id di prima)
-- [ ] Aspettato: 400 Bad Request "An active budget already exists"
+- [x] POST /budgets (stesso category_id di prima)
+- [x] Aspettato: 400 Bad Request "An active budget already exists"
 
 **5. Crea transazioni:**
-- [ ] POST /transactions 
+- [x] POST /transactions 
   - Ristoranti: -€150 (date: oggi)
   - Ristoranti: -€30 (date: oggi)
   - Spesa: -€380 (date: oggi)
   - Benzina: -€45 (date: oggi)
 
 **6. Test summary endpoint:**
-- [ ] GET /budgets/summary
-- [ ] Verifica response:
+- [x] GET /budgets/summary
+- [x] Verifica response:
   ```json
   {
     "month": "2025-01",
@@ -5949,45 +5949,45 @@ python run.py
   ```
 
 **7. Test budget orfano:**
-- [ ] DELETE /categories/[id-ristoranti] (elimina categoria)
-- [ ] GET /budgets/summary
-- [ ] Verifica budget "Ristoranti" ora mostra:
+- [x] DELETE /categories/[id-ristoranti] (elimina categoria)
+- [x] GET /budgets/summary
+- [x] Verifica budget "Ristoranti" ora mostra:
   - category_id: null
   - category_name: "Categoria Eliminata"
   - status: "orphan"
   - indicator: "⚠️"
 
 **8. Test update budget:**
-- [ ] PUT /budgets/[id-spesa]
+- [x] PUT /budgets/[id-spesa]
   ```json
   {
     "amount": 500.00
   }
   ```
-- [ ] GET /budgets/summary
-- [ ] Verifica nuovo amount e percentage aggiornata
+- [x] GET /budgets/summary
+- [x] Verifica nuovo amount e percentage aggiornata
 
 **9. Test disattiva budget:**
-- [ ] PUT /budgets/[id-benzina]
+- [x] PUT /budgets/[id-benzina]
   ```json
   {
     "is_active": false
   }
   ```
-- [ ] GET /budgets/summary
-- [ ] Verifica budget "Benzina" non compare più
+- [x] GET /budgets/summary
+- [x] Verifica budget "Benzina" non compare più
 
 **10. Test delete:**
-- [ ] DELETE /budgets/[id-spesa]
-- [ ] GET /budgets
-- [ ] Verifica budget eliminato
+- [x] DELETE /budgets/[id-spesa]
+- [x] GET /budgets
+- [x] Verifica budget eliminato
 
 ---
 
 ### 3.9.5.3 - Verifica in pgAdmin
-- [ ] Apri pgAdmin
-- [ ] Query: `SELECT * FROM budgets;`
-- [ ] Verifica:
+- [x] Apri pgAdmin
+- [x] Query: `SELECT * FROM budgets;`
+- [x] Verifica:
   - Budget creati correttamente
   - category_id NULL per budget orfani
   - is_active correttamente gestito
@@ -5995,9 +5995,9 @@ python run.py
 ---
 
 ### 3.9.5.4 - Commit testing notes
-- [ ] 📝 Crea `backend/docs/TESTING_BUDGETS.md` con workflow sopra
-- [ ] Commit: `Add Budget testing documentation - Phase 3.9.5`
-- [ ] Push
+- [x] 📝 Crea `backend/docs/TESTING_BUDGETS.md` con workflow sopra
+- [x] Commit: `Add Budget testing documentation - Phase 3.9.5`
+- [x] Push
 
 ---
 
@@ -6006,47 +6006,47 @@ python run.py
 Prima di procedere, verifica:
 
 ### Database
-- [ ] ✅ Tabella `budgets` creata con tutte le colonne
-- [ ] ✅ Indexes presenti e funzionanti
-- [ ] ✅ Constraint UNIQUE parziale (is_active=true) funziona
-- [ ] ✅ Foreign keys con ON DELETE corretto
-- [ ] ✅ User model ha relationship budgets
+- [x] ✅ Tabella `budgets` creata con tutte le colonne
+- [x] ✅ Indexes presenti e funzionanti
+- [x] ✅ Constraint UNIQUE parziale (is_active=true) funziona
+- [x] ✅ Foreign keys con ON DELETE corretto
+- [x] ✅ User model ha relationship budgets
 
 ### Backend
-- [ ] ✅ Model Budget creato e funzionante
-- [ ] ✅ Schemas validano correttamente (amount > 0, period="monthly")
-- [ ] ✅ CRUD operations implementate
-- [ ] ✅ Calcolo spesa real-time funziona
-- [ ] ✅ get_budget_status restituisce indicatori corretti
-- [ ] ✅ Router registrato in main.py
+- [x] ✅ Model Budget creato e funzionante
+- [x] ✅ Schemas validano correttamente (amount > 0, period="monthly")
+- [x] ✅ CRUD operations implementate
+- [x] ✅ Calcolo spesa real-time funziona
+- [x] ✅ get_budget_status restituisce indicatori corretti
+- [x] ✅ Router registrato in main.py
 
 ### API Endpoints
-- [ ] ✅ GET /budgets (lista)
-- [ ] ✅ GET /budgets/summary (con spending data)
-- [ ] ✅ GET /budgets/{id} (dettaglio)
-- [ ] ✅ POST /budgets (crea con validazioni)
-- [ ] ✅ PUT /budgets/{id} (update)
-- [ ] ✅ DELETE /budgets/{id} (elimina)
+- [x] ✅ GET /budgets (lista)
+- [x] ✅ GET /budgets/summary (con spending data)
+- [x] ✅ GET /budgets/{id} (dettaglio)
+- [x] ✅ POST /budgets (crea con validazioni)
+- [x] ✅ PUT /budgets/{id} (update)
+- [x] ✅ DELETE /budgets/{id} (elimina)
 
 ### Validazioni
-- [ ] ✅ Solo expense categories accettate
-- [ ] ✅ Constraint unicità: un budget attivo per categoria
-- [ ] ✅ Budget orfani gestiti (category_id NULL)
-- [ ] ✅ Amount sempre positivo
-- [ ] ✅ Period validato ("monthly")
+- [x] ✅ Solo expense categories accettate
+- [x] ✅ Constraint unicità: un budget attivo per categoria
+- [x] ✅ Budget orfani gestiti (category_id NULL)
+- [x] ✅ Amount sempre positivo
+- [x] ✅ Period validato ("monthly")
 
 ### Test Completo
-- [ ] ✅ Crea budget → OK
-- [ ] ✅ Crea transazioni → Spesa calcolata correttamente
-- [ ] ✅ Summary mostra indicatori corretti
-- [ ] ✅ Elimina categoria → Budget diventa orfano
-- [ ] ✅ Update budget → Modifiche applicate
-- [ ] ✅ Disattiva budget → Non appare in summary
-- [ ] ✅ Delete budget → Rimosso da DB
+- [x] ✅ Crea budget → OK
+- [x] ✅ Crea transazioni → Spesa calcolata correttamente
+- [x] ✅ Summary mostra indicatori corretti
+- [x] ✅ Elimina categoria → Budget diventa orfano
+- [x] ✅ Update budget → Modifiche applicate
+- [x] ✅ Disattiva budget → Non appare in summary
+- [x] ✅ Delete budget → Rimosso da DB
 
 ### Documentazione
-- [ ] ✅ TESTING_BUDGETS.md creato
-- [ ] ✅ Tutti i commit pushati su GitHub
+- [x] ✅ TESTING_BUDGETS.md creato
+- [x] ✅ Tutti i commit pushati su GitHub
 
 ---
 
@@ -6061,10 +6061,6 @@ Prima di procedere, verifica:
 - ✅ Gestione budget orfani
 - ✅ Storico budget (via is_active)
 - ✅ Validazioni business complete
-
-**Pronto per:**
-- Fase 4.7 - Testing automatici con Pytest
-- Fase 5.10 - Frontend Budget UI
 
 **Sviluppi futuri (Fase 7):**
 - [ ] Period: weekly, yearly, custom ranges

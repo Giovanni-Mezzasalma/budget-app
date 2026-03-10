@@ -471,7 +471,7 @@
 
 ## ✅ FASE 3.9: BACKEND BUDGET PLANNING
 
-**Data Inizio:** 11/03/2026 | **Data Fine:** _______ | **Status:** 🟡 In corso (0% completato)
+**Data Inizio:** 11/03/2026 | **Data Fine:** 11/03/2026 | **Status:** ✅ Completato
 
 **Tempo Stimato:** 2-3 giorni
 
@@ -513,57 +513,57 @@
 - [x] Commit CRUD
 
 ### 3.9.4 - API Router
-- [ ] `budgets.py` router creato con endpoints:
-  - [ ] GET /budgets (lista con filtri)
-  - [ ] GET /budgets/summary (dashboard principale - KEY ENDPOINT)
-  - [ ] GET /budgets/{id} (dettaglio)
-  - [ ] POST /budgets (crea con validazioni)
-  - [ ] PUT /budgets/{id} (update)
-  - [ ] DELETE /budgets/{id}
-- [ ] Router registrato in main.py
-- [ ] Commit router
+- [x] `budgets.py` router creato con endpoints:
+  - [x] GET /budgets (lista con filtri)
+  - [x] GET /budgets/summary (dashboard principale - KEY ENDPOINT)
+  - [x] GET /budgets/{id} (dettaglio)
+  - [x] POST /budgets (crea con validazioni)
+  - [x] PUT /budgets/{id} (update)
+  - [x] DELETE /budgets/{id}
+- [x] Router registrato in main.py
+- [x] Commit router
 
 ### 3.9.5 - Manual Testing
-- [ ] Server avviato (http://localhost:8000/docs)
-- [ ] Setup: Registra utente + login + authorize
-- [ ] Crea 3 categorie expense (Ristoranti, Spesa, Benzina)
-- [ ] POST /budgets: Crea 3 budget (€200, €400, €100)
-- [ ] Test constraint: Crea budget duplicato → 400 Bad Request ✓
-- [ ] Crea transazioni: €150 Ristoranti, €30 Ristoranti, €380 Spesa, €45 Benzina
-- [ ] GET /budgets/summary: Verifica spent/percentage/indicators corretti:
-  - [ ] Ristoranti: €180/€200 (90%) 🔴
-  - [ ] Spesa: €380/€400 (95%) 🔴
-  - [ ] Benzina: €45/€100 (45%) 🟢
-  - [ ] Totali: €605/€700 (86.43%)
-- [ ] DELETE categoria "Ristoranti" → Budget diventa orfano
-- [ ] GET /budgets/summary: Verifica budget orfano:
-  - [ ] category_id: null
-  - [ ] category_name: "Categoria Eliminata"
-  - [ ] status: "orphan"
-  - [ ] indicator: "⚠️"
-- [ ] PUT /budgets/{id}: Modifica amount Spesa a €500
-- [ ] GET /budgets/summary: Verifica percentage aggiornata
-- [ ] PUT /budgets/{id}: Disattiva budget Benzina (is_active=false)
-- [ ] GET /budgets/summary: Verifica budget Benzina non compare
-- [ ] DELETE /budgets/{id}: Elimina budget Spesa
-- [ ] GET /budgets: Verifica budget eliminato
-- [ ] Verifica in pgAdmin: Query `SELECT * FROM budgets;`
-- [ ] `TESTING_BUDGETS.md` creato con workflow
-- [ ] Commit testing documentation
+- [x] Server avviato (http://localhost:8000/docs)
+- [x] Setup: Registra utente + login + authorize
+- [x] Crea 3 categorie expense (Ristoranti, Spesa, Benzina)
+- [x] POST /budgets: Crea 3 budget (€200, €400, €100)
+- [x] Test constraint: Crea budget duplicato → 400 Bad Request ✓
+- [x] Crea transazioni: €150 Ristoranti, €30 Ristoranti, €380 Spesa, €45 Benzina
+- [x] GET /budgets/summary: Verifica spent/percentage/indicators corretti:
+  - [x] Ristoranti: €180/€200 (90%) 🔴
+  - [x] Spesa: €380/€400 (95%) 🔴
+  - [x] Benzina: €45/€100 (45%) 🟢
+  - [x] Totali: €605/€700 (86.43%)
+- [x] DELETE categoria "Ristoranti" → Budget diventa orfano
+- [x] GET /budgets/summary: Verifica budget orfano:
+  - [x] category_id: null
+  - [x] category_name: "Categoria Eliminata"
+  - [x] status: "orphan"
+  - [x] indicator: "⚠️"
+- [x] PUT /budgets/{id}: Modifica amount Spesa a €500
+- [x] GET /budgets/summary: Verifica percentage aggiornata
+- [x] PUT /budgets/{id}: Disattiva budget Benzina (is_active=false)
+- [x] GET /budgets/summary: Verifica budget Benzina non compare
+- [x] DELETE /budgets/{id}: Elimina budget Spesa
+- [x] GET /budgets: Verifica budget eliminato
+- [x] Verifica in pgAdmin: Query `SELECT * FROM budgets;`
+- [x] `test_full_suite.py` creato con workflow
+- [x] Commit testing documentation
 
 **CHECKPOINT FASE 3.9:**
-- [ ] ✅ Tabella budgets con constraint UNIQUE parziale
-- [ ] ✅ Model Budget con ON DELETE SET NULL per category_id
-- [ ] ✅ Schemas con validazioni (amount > 0, period = "monthly")
-- [ ] ✅ CRUD con calcolo spesa real-time
-- [ ] ✅ get_budget_status restituisce indicatori 🟢🟡🔴🚨
-- [ ] ✅ get_budgets_summary funziona (endpoint chiave dashboard)
-- [ ] ✅ Validazione: solo expense categories
-- [ ] ✅ Constraint: un budget attivo per categoria
-- [ ] ✅ Budget orfani gestiti (category_id NULL)
-- [ ] ✅ Storico budget (is_active=false)
-- [ ] ✅ 6 endpoints testati e funzionanti
-- [ ] ✅ Ready per FASE 4.7
+- [x] ✅ Tabella budgets con constraint UNIQUE parziale
+- [x] ✅ Model Budget con ON DELETE SET NULL per category_id
+- [x] ✅ Schemas con validazioni (amount > 0, period = "monthly")
+- [x] ✅ CRUD con calcolo spesa real-time
+- [x] ✅ get_budget_status restituisce indicatori 🟢🟡🔴🚨
+- [x] ✅ get_budgets_summary funziona (endpoint chiave dashboard)
+- [x] ✅ Validazione: solo expense categories
+- [x] ✅ Constraint: un budget attivo per categoria
+- [x] ✅ Budget orfani gestiti (category_id NULL)
+- [x] ✅ Storico budget (is_active=false)
+- [x] ✅ 6 endpoints testati e funzionanti
+- [x] ✅ Ready per FASE 4.7
 
 **Note Implementazione:**
 - Period: solo "monthly" per MVP
