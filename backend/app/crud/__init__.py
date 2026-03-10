@@ -83,6 +83,7 @@ from app.crud import vacation_settings
 from app.crud import vacation_entry
 from app.crud import italian_holiday
 from app.crud import user_holiday
+from app.crud import budget
 
 __all__ = [
     # User CRUD
@@ -153,4 +154,6 @@ __all__ = [
     "vacation_entry",
     "italian_holiday",
     "user_holiday",
+    # Budget CRUD module
+    "budget",
 ]

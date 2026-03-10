@@ -476,41 +476,41 @@
 **Tempo Stimato:** 2-3 giorni
 
 ### 3.9.1 - Database Models
-- [ ] `budget.py` model creato con:
-  - [ ] Foreign keys: user_id, category_id (ON DELETE SET NULL)
-  - [ ] Fields: amount, period, start_date, is_active
-  - [ ] UniqueConstraint parziale (user_id, category_id, is_active WHERE is_active=true)
-  - [ ] Indexes: user_active, category, start_date
-- [ ] User model aggiornato con relationship budgets
-- [ ] Models __init__.py aggiornato
-- [ ] Migration creata ed eseguita
-- [ ] Tabella `budgets` verificata in pgAdmin
-- [ ] Commit database models
+- [x] `budget.py` model creato con:
+  - [x] Foreign keys: user_id, category_id (ON DELETE SET NULL)
+  - [x] Fields: amount, period, start_date, is_active
+  - [x] UniqueConstraint parziale (user_id, category_id, is_active WHERE is_active=true)
+  - [x] Indexes: user_active, category, start_date
+- [x] User model aggiornato con relationship budgets
+- [x] Models __init__.py aggiornato
+- [x] Migration creata ed eseguita
+- [x] Tabella `budgets` verificata in pgAdmin
+- [x] Commit database models
 
 ### 3.9.2 - Pydantic Schemas
-- [ ] `budget.py` schemas creato:
-  - [ ] BudgetBase con validazione amount > 0, period = "monthly"
-  - [ ] BudgetCreate, BudgetUpdate
-  - [ ] BudgetResponse
-  - [ ] CategoryInfo (minimal)
-  - [ ] BudgetWithStatus (con spent/remaining/percentage/status/indicator)
-  - [ ] BudgetSummaryResponse (con budgets list + totals)
-- [ ] Schemas __init__.py aggiornato
-- [ ] Commit schemas
+- [x] `budget.py` schemas creato:
+  - [x] BudgetBase con validazione amount > 0, period = "monthly"
+  - [x] BudgetCreate, BudgetUpdate
+  - [x] BudgetResponse
+  - [x] CategoryInfo (minimal)
+  - [x] BudgetWithStatus (con spent/remaining/percentage/status/indicator)
+  - [x] BudgetSummaryResponse (con budgets list + totals)
+- [x] Schemas __init__.py aggiornato
+- [x] Commit schemas
 
 ### 3.9.3 - CRUD Operations
-- [ ] `budget.py` CRUD creato con:
-  - [ ] get_budgets (con filtri is_active, category_id)
-  - [ ] get_budget (singolo con ownership)
-  - [ ] create_budget (con validazioni: category exists, is expense type, no duplicate)
-  - [ ] update_budget
-  - [ ] delete_budget
-  - [ ] calculate_spent_for_month (real-time da transactions)
-  - [ ] get_budget_status (🟢🟡🔴🚨 basato su percentage)
-  - [ ] get_budget_with_spending (arricchisce budget con dati spesa)
-  - [ ] get_budgets_summary (dashboard con tutti i budget + totali)
-- [ ] CRUD __init__.py aggiornato
-- [ ] Commit CRUD
+- [x] `budget.py` CRUD creato con:
+  - [x] get_budgets (con filtri is_active, category_id)
+  - [x] get_budget (singolo con ownership)
+  - [x] create_budget (con validazioni: category exists, is expense type, no duplicate)
+  - [x] update_budget
+  - [x] delete_budget
+  - [x] calculate_spent_for_month (real-time da transactions)
+  - [x] get_budget_status (🟢🟡🔴🚨 basato su percentage)
+  - [x] get_budget_with_spending (arricchisce budget con dati spesa)
+  - [x] get_budgets_summary (dashboard con tutti i budget + totali)
+- [x] CRUD __init__.py aggiornato
+- [x] Commit CRUD
 
 ### 3.9.4 - API Router
 - [ ] `budgets.py` router creato con endpoints:
