@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.vacation_settings import VacationSettings
     from app.models.vacation_entry import VacationEntry
     from app.models.user_holiday import UserHoliday
+    from app.models.budget import Budget
 class User(Base):
     """User model for authentication and user management."""
     
@@ -102,6 +103,13 @@ class User(Base):
 
     user_holidays: Mapped[List["UserHoliday"]] = relationship(
         "UserHoliday",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+    budgets: Mapped[List["Budget"]] = relationship(
+        "Budget",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin"

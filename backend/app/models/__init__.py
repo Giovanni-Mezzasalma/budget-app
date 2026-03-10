@@ -12,6 +12,7 @@ from app.models.vacation_settings import VacationSettings
 from app.models.vacation_entry import VacationEntry, VacationEntryType, VACATION_ENTRY_TYPE_LABELS, MANUAL_HOURS_TYPES
 from app.models.italian_holiday import ItalianHoliday, FIXED_ITALIAN_HOLIDAYS
 from app.models.user_holiday import UserHoliday
+from app.models.budget import Budget
 
 __all__ = [
     "User",
@@ -28,4 +29,5 @@ __all__ = [
     "ItalianHoliday",
     "FIXED_ITALIAN_HOLIDAYS",
     "UserHoliday",
+    "Budget",
 ]

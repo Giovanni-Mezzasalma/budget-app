@@ -198,7 +198,7 @@
 
 ## ✅ FASE 3: BACKEND API - CORE FEATURES
 
-**Data Inizio:** 21/11/2025 | **Data Fine:** ________ | **Status:** 🟡 In corso (90% completato)
+**Data Inizio:** 21/11/2025 | **Data Fine:** ________ | **Status:** 🟡 In corso (70% completato)
 
 ### 3.1 - Accounts CRUD & Router
 - [x] `backend/app/schemas/account.py` completato
@@ -410,7 +410,7 @@
   - [x] Totali aggregati (total_hours_available, total_days_available)
   - [x] Breakdown per tipo con hours_available
 - [x] Utils __init__.py aggiornato
-- [ ] Commit utilities
+- [x] Commit utilities
 
 ### 3.8.3 - Pydantic Schemas
 - [x] `vacation.py` schemas creato:
@@ -471,7 +471,7 @@
 
 ## ✅ FASE 3.9: BACKEND BUDGET PLANNING
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
+**Data Inizio:** 11/03/2026 | **Data Fine:** _______ | **Status:** 🟡 In corso (0% completato)
 
 **Tempo Stimato:** 2-3 giorni
 
