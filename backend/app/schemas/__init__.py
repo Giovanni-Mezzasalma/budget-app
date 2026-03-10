@@ -43,6 +43,15 @@ from app.schemas.transfer import (
     TransferWithDetails
 )
 
+from app.schemas.budget import (
+    BudgetCreate,
+    BudgetUpdate,
+    BudgetResponse,
+    BudgetWithStatus,
+    BudgetSummaryResponse,
+    CategoryInfo,
+)
+
 from app.schemas.vacation import (
     VacationSettingsBase,
     VacationSettingsCreate,
@@ -101,6 +110,14 @@ __all__ = [
     "TransferUpdate",
     "TransferResponse",
     "TransferWithDetails",
+
+    # Budget schemas
+    "BudgetCreate",
+    "BudgetUpdate",
+    "BudgetResponse",
+    "BudgetWithStatus",
+    "BudgetSummaryResponse",
+    "CategoryInfo",
 
     # Vacation schemas
     "VacationSettingsBase",
