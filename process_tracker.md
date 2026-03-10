@@ -385,8 +385,7 @@
 
 ## ✅ FASE 3.8: BACKEND VACATION PLANNING
 
-**Data Inizio:** _______ | **Data Fine:** _______ | **Status:** ⬜ Non iniziato
-
+**Data Inizio:** 10/03/2026 | **Data Fine:** 10/03/2026 | **Status:** ✅ Completato
 **Tempo Stimato:** 3-4 giorni
 
 ### 3.8.1 - Database Models
@@ -404,66 +403,65 @@
 
 ### 3.8.2 - Utility Functions
 - [x] `easter.py` creato (calcolo Pasqua con validazione year >= 1583)
-- [ ] `bridge_days.py` creato (calcolo ponti con validazione weekend/festività)
-- [ ] `vacation_balance.py` RISCRITTO con maturazione separata:
-  - [ ] Calcolo separato per tipo (Ferie/ROL/Permessi)
-  - [ ] Conversione automatica ferie giorni → ore
-  - [ ] Totali aggregati (total_hours_available, total_days_available)
-  - [ ] Breakdown per tipo con hours_available
-- [ ] Utils __init__.py aggiornato
+- [x] `bridge_days.py` creato (calcolo ponti con validazione weekend/festività)
+- [x] `vacation_balance.py` RISCRITTO con maturazione separata:
+  - [x] Calcolo separato per tipo (Ferie/ROL/Permessi)
+  - [x] Conversione automatica ferie giorni → ore
+  - [x] Totali aggregati (total_hours_available, total_days_available)
+  - [x] Breakdown per tipo con hours_available
+- [x] Utils __init__.py aggiornato
 - [ ] Commit utilities
 
 ### 3.8.3 - Pydantic Schemas
-- [ ] `vacation.py` schemas creato:
-  - [ ] VacationSettingsBase con nuovi campi (ferie_days_per_month, etc.)
-  - [ ] BreakdownItem con hours_available, days_available
-  - [ ] VacationBalanceResponse con totali aggregati
-  - [ ] NO riferimenti a "malattia"
-- [ ] Schemas __init__.py aggiornato
-- [ ] Commit schemas
+- [x] `vacation.py` schemas creato:
+  - [x] VacationSettingsBase con nuovi campi (ferie_days_per_month, etc.)
+  - [x] BreakdownItem con hours_available, days_available
+  - [x] VacationBalanceResponse con totali aggregati
+  - [x] NO riferimenti a "malattia"
+- [x] Schemas __init__.py aggiornato
+- [x] Commit schemas
 
 ### 3.8.4 - CRUD Operations
-- [ ] `vacation_settings.py` CRUD creato
-- [ ] `vacation_entry.py` CRUD creato con validazioni:
-  - [ ] Blocco inserimento weekend
-  - [ ] Blocco inserimento festività nazionali
-  - [ ] Blocco inserimento festività custom utente
-- [ ] `italian_holiday.py` CRUD creato
-- [ ] `user_holiday.py` CRUD creato con validazione date (es. 31 Feb)
-- [ ] CRUD __init__.py aggiornato
-- [ ] Commit CRUD
+- [x] `vacation_settings.py` CRUD creato
+- [x] `vacation_entry.py` CRUD creato con validazioni:
+  - [x] Blocco inserimento weekend
+  - [x] Blocco inserimento festività nazionali
+  - [x] Blocco inserimento festività custom utente
+- [x] `italian_holiday.py` CRUD creato
+- [x] `user_holiday.py` CRUD creato con validazione date (es. 31 Feb)
+- [x] CRUD __init__.py aggiornato
+- [x] Commit CRUD
 
 ### 3.8.5 - API Router
-- [ ] `vacation.py` router creato con endpoint:
-  - [ ] GET/PUT /vacation/settings (nuovi campi)
-  - [ ] POST/GET/PUT/DELETE /vacation/entries (con validazione festività)
-  - [ ] POST /vacation/entries/bulk (FIX validazione hours_per_day + skip festività)
-  - [ ] GET /vacation/balance (con breakdown completo + totali)
-  - [ ] GET /vacation/calendar (OTTIMIZZATO: 1 query invece di 4)
-  - [ ] GET /vacation/holidays
-  - [ ] GET /vacation/bridges
-  - [ ] POST/GET/DELETE /vacation/user-holidays
-- [ ] Router registrato in main.py
-- [ ] Commit router
+- [x] `vacation.py` router creato con endpoint:
+  - [x] GET/PUT /vacation/settings (nuovi campi)
+  - [x] POST/GET/PUT/DELETE /vacation/entries (con validazione festività)
+  - [x] POST /vacation/entries/bulk (FIX validazione hours_per_day + skip festività)
+  - [x] GET /vacation/balance (con breakdown completo + totali)
+  - [x] GET /vacation/calendar (OTTIMIZZATO: 1 query invece di 4)
+  - [x] GET /vacation/holidays
+  - [x] GET /vacation/bridges
+  - [x] POST/GET/DELETE /vacation/user-holidays
+- [x] Router registrato in main.py
+- [x] Commit router
 
 ### 3.8.6 - Manual Testing
-- [ ] GET/PUT /vacation/settings testato (maturazione separata)
-- [ ] POST /vacation/entries testato (validazione weekend PASS)
-- [ ] POST /vacation/entries testato (validazione festività PASS)
-- [ ] POST /vacation/entries/bulk testato (skip festività PASS)
-- [ ] GET /vacation/balance testato (totali aggregati corretti)
-- [ ] GET /vacation/calendar testato (festività custom visibili)
-- [ ] Commit test results
+- [x] GET/PUT /vacation/settings testato (maturazione separata)
+- [x] POST /vacation/entries testato (validazione weekend PASS)
+- [x] POST /vacation/entries testato (validazione festività PASS)
+- [x] POST /vacation/entries/bulk testato (skip festività PASS)
+- [x] GET /vacation/balance testato (totali aggregati corretti)
+- [x] GET /vacation/calendar testato (festività custom visibili)
+- [x] Commit test results
 
 **CHECKPOINT FASE 3.8:**
-- [ ] ✅ Models con maturazione separata (Ferie/ROL/Permessi)
-- [ ] ✅ Tracking start date funzionante
-- [ ] ✅ Validazione weekend + festività attiva
-- [ ] ✅ Balance con totali aggregati corretto
-- [ ] ✅ NO malattia in sistema
-- [ ] ✅ Calcolo Pasqua corretto
-- [ ] ✅ Calcolo ponti corretto
-- [ ] ✅ Ready per FASE 4
+- [x] ✅ Models con maturazione separata (Ferie/ROL/Permessi)
+- [x] ✅ Tracking start date funzionante
+- [x] ✅ Validazione weekend + festività attiva
+- [x] ✅ Balance con totali aggregati corretto
+- [x] ✅ NO malattia in sistema
+- [x] ✅ Calcolo Pasqua corretto
+- [x] ✅ Calcolo ponti corretto
 
 **Note Implementazione:**
 - Ferie: 1.83 giorni/mese = 22 giorni/anno

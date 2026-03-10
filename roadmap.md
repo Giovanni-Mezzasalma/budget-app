@@ -4143,7 +4143,7 @@ Continua nel prossimo messaggio...
 ## 📝 3.8.3 - Pydantic Schemas (AGGIORNATI)
 
 ### 3.8.3.1 - Crea vacation schemas
-- [ ] 📝 Crea `backend/app/schemas/vacation.py`
+- [x] 📝 Crea `backend/app/schemas/vacation.py`
 
 **MODIFICHE PRINCIPALI:**
 - VacationSettingsBase: nuovi campi per maturazione separata
@@ -4486,7 +4486,7 @@ class BridgeOpportunityResponse(BaseModel):
 ```
 
 ### 3.8.3.2 - Update Schemas __init__.py
-- [ ] 📝 Modifica `backend/app/schemas/__init__.py`
+- [x] 📝 Modifica `backend/app/schemas/__init__.py`
 
 ```python
 # Add these imports (same as before, schemas are backward compatible):
@@ -4514,7 +4514,7 @@ from app.schemas.vacation import (
 ```
 
 ### 3.8.3.3 - Commit schemas
-- [ ] Commit: `Update vacation schemas with separate accrual and aggregated totals`
+- [x] Commit: `Update vacation schemas with separate accrual and aggregated totals`
 
 ---
 
