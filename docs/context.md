@@ -54,12 +54,15 @@ budget-app/
 │   ├── app/
 │   │   ├── crud/          # account, category, transaction, transfer,
 │   │   │                  # analytics, vacation_entry, vacation_settings,
-│   │   │                  # italian_holiday, user_holiday
-│   │   ├── models/        # SQLAlchemy models (stessi moduli di crud)
+│   │   │                  # italian_holiday, user_holiday, budget,
+│   │   │                  # csv_import (parser), export
+│   │   ├── models/        # SQLAlchemy models (stessi moduli di crud + budget)
 │   │   ├── routers/       # auth, accounts, categories, transactions,
-│   │   │                  # transfers, analytics, vacation
-│   │   ├── schemas/       # Pydantic schemas
-│   │   └── utils/         # security, easter, bridge_days, vacation_balance
+│   │   │                  # transfers, analytics, vacation, budgets,
+│   │   │                  # csv_import, export
+│   │   ├── schemas/       # Pydantic schemas (incl. budget, csv_import, export)
+│   │   └── utils/         # security, easter, bridge_days, vacation_balance,
+│   │                      # csv_parser
 │   ├── tests/             # conftest + test per ogni modulo
 │   └── requirements.txt
 ├── frontend/src/
@@ -77,7 +80,7 @@ budget-app/
 
 ---
 
-## 📊 Stato Avanzamento (~80% MVP)
+## 📊 Stato Avanzamento (~75% backend completato · Frontend da iniziare)
 
 ### ✅ Completato
 
@@ -89,23 +92,33 @@ budget-app/
   - Categories CRUD + `seed_default_categories()` (Income / Expense Necessity / Expense Extra)
   - Transactions CRUD con aggiornamento balance automatico
   - Transfers CRUD con doppio aggiornamento balance
-  - Analytics: `/summary`, `/monthly-trend`
+  - Analytics: `/summary`, `/monthly-trend`, `/category-breakdown`
   - Custom Charts
   - Code review: UUID types, enum alignment, path fixes, commenti → English
-- **Fase 3.8** — Vacation module backend completo:
+- **Fase 3.8** — Vacation module backend (10/03/2026):
   - Maturazione separata (ferie/ROL/permessi), saldo iniziale, `tracking_start_date`
   - 10 festività fisse + Pasquetta dinamica
   - Validazioni: no weekend, no festività, no duplicati
   - Bulk entry con skip weekend/festività
   - Balance aggregato + breakdown per tipo
   - Calendario mensile, bridge opportunities, festività custom utente
+- **Fase 3.9** — Budget Planning backend (11/03/2026):
+  - Budget mensili per sotto-categoria, calcolo spesa real-time
+  - Indicatori visivi a semaforo (🟢🟡🔴🚨), gestione budget orfani
+- **Fase 3.10** — CSV Import backend:
+  - Parser con fuzzy matching categorie (threshold 0.7), rilevamento duplicati
+  - Preview interattiva con status per riga; template scaricabile
+- **Fase 3.11** — Excel Export backend:
+  - Endpoint aggregazione dati; generazione file .xlsx client-side via SheetJS
+- **Fase 4.7** — Testing Budget module (>80% coverage)
+- **Fase 4.8** — Testing CSV Import module
+- **Fase 4.9** — Testing Excel Export backend
 
 ### 🔲 Da Completare
 
-- **Fase 4** — Pytest completo (priorità: vacation module, target ≥70% coverage)
-- **Fase 3.9** — CSV import / Excel export (documentazione già scritta)
-- **Fase 5** — Frontend React (auth → dashboard → moduli → vacation UI)
-- **Fase 6** — Deployment (VPS, Docker Compose, HTTPS)
+- **Fase 4.6** — Testing Vacation module (target ≥70% coverage) ← priorità immediata
+- **Fase 5** — Frontend React (auth → dashboard → tutti i moduli: vacation, budget, CSV, Excel)
+- **Fase 6** — Deployment (Render.com backend, Vercel frontend, CI/CD)
 
 ---
 
@@ -142,8 +155,11 @@ budget-app/
 | Categories | `GET/POST /categories`, `PUT/DELETE /categories/{id}` |
 | Transactions | `GET/POST /transactions`, `PUT/DELETE /transactions/{id}` |
 | Transfers | `GET/POST /transfers`, `DELETE /transfers/{id}` |
-| Analytics | `GET /analytics/summary`, `GET /analytics/monthly-trend` |
-| Vacation | `/vacation/settings`, `/vacation/entries`, `/vacation/entries/bulk`, `/vacation/balance`, `/vacation/calendar/{year}/{month}`, `/vacation/bridges/{year}`, `/vacation/holidays/{year}` |
+| Analytics | `GET /analytics/summary`, `/monthly-trend`, `/category-breakdown` |
+| Vacation | `GET/PUT /vacation/settings`, `GET/POST /vacation/entries`, `POST /vacation/entries/bulk`, `GET /vacation/balance`, `GET /vacation/calendar/{year}/{month}`, `GET /vacation/bridges/{year}`, `GET /vacation/holidays/{year}`, `GET/POST/DELETE /vacation/user-holidays` |
+| Budgets | `GET /budgets`, `GET /budgets/summary`, `GET/PUT/DELETE /budgets/{id}`, `POST /budgets` |
+| CSV Import | `GET /csv-import/template`, `POST /csv-import/preview`, `POST /csv-import/confirm` |
+| Excel Export | `GET /export/data`, `GET /export/info` |
 
 ---
 

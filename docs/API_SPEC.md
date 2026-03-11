@@ -18,8 +18,12 @@
 6. [Endpoints - Transactions](#endpoints---transactions)
 7. [Endpoints - Transfers](#endpoints---transfers)
 8. [Endpoints - Analytics](#endpoints---analytics)
-9. [Error Responses](#error-responses)
-10. [Rate Limiting](#rate-limiting)
+9. [Endpoints - Vacation Planning](#endpoints---vacation-planning)
+10. [Endpoints - Budget Planning](#endpoints---budget-planning)
+11. [Endpoints - CSV Import](#endpoints---csv-import)
+12. [Endpoints - Excel Export](#endpoints---excel-export)
+13. [Error Responses](#error-responses)
+14. [Rate Limiting](#rate-limiting)
 
 ---
 
@@ -659,6 +663,401 @@ Breakdown spese per categoria (periodo).
 
 ---
 
+## 🏖️ Endpoints - Vacation Planning
+
+> Modulo per la gestione di ferie, ROL e permessi con maturazione separata per tipo, festività italiane e calcolo automatico ponti. **Implementato in Fase 3.8.**
+
+### GET `/vacation/settings`
+
+Recupera la configurazione ferie dell'utente (maturazione mensile, saldo iniziale, data inizio tracking).
+
+**Response:** `200 OK`
+```json
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "work_hours_per_day": 8.0,
+  "ferie_days_per_month": 1.83,
+  "rol_hours_per_month": 2.67,
+  "permessi_hours_per_month": 8.67,
+  "tracking_start_date": "2026-01-01",
+  "initial_ferie_days": 0.0,
+  "initial_rol_hours": 0.0,
+  "initial_permessi_hours": 0.0
+}
+```
+
+---
+
+### PUT `/vacation/settings`
+
+Aggiorna configurazione ferie. Supporta preset CCNL (Commercio, Metalmeccanico).
+
+**Request:**
+```json
+{
+  "ferie_days_per_month": 1.83,
+  "rol_hours_per_month": 2.67,
+  "permessi_hours_per_month": 8.67,
+  "tracking_start_date": "2026-01-01"
+}
+```
+
+---
+
+### GET `/vacation/entries`
+
+Lista tutte le entry ferie/ROL/permessi dell'utente.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "date": "2026-03-15",
+    "entry_type": "ferie",
+    "hours": 8.0,
+    "notes": "Vacanza pasquale"
+  }
+]
+```
+
+---
+
+### POST `/vacation/entries`
+
+Crea una singola entry. Validazioni: no weekend, no festività nazionali/custom, no duplicati.
+
+**Request:**
+```json
+{
+  "date": "2026-03-15",
+  "entry_type": "ferie",
+  "notes": "Vacanza"
+}
+```
+
+**Entry types:** `ferie` (ore auto da settings) · `rol` (ore manuali) · `permesso` (ore manuali)
+
+**Errors:**
+- `400`: Giorno festivo, weekend o duplicato
+
+---
+
+### POST `/vacation/entries/bulk`
+
+Crea entry per un range di date, saltando automaticamente weekend e festività.
+
+**Request:**
+```json
+{
+  "start_date": "2026-07-14",
+  "end_date": "2026-07-18",
+  "entry_type": "ferie",
+  "skip_weekends": true,
+  "skip_holidays": true
+}
+```
+
+---
+
+### PUT `/vacation/entries/{entry_id}`
+
+Modifica una entry esistente. Solo `notes` e `hours` (per ROL/permessi) sono modificabili.
+
+---
+
+### DELETE `/vacation/entries/{entry_id}`
+
+Elimina una entry.
+
+---
+
+### GET `/vacation/balance`
+
+Calcola il saldo disponibile con breakdown per tipo.
+
+**Response:** `200 OK`
+```json
+{
+  "total_hours_available": 196.0,
+  "total_days_available": 24.5,
+  "breakdown": {
+    "ferie": {
+      "accrued_hours": 176.0, "used_hours": 64.0, "available_hours": 112.0, "available_days": 14.0
+    },
+    "rol": {
+      "accrued_hours": 32.0, "used_hours": 12.0, "available_hours": 20.0, "available_days": 2.5
+    },
+    "permessi": {
+      "accrued_hours": 104.0, "used_hours": 40.0, "available_hours": 64.0, "available_days": 8.0
+    }
+  }
+}
+```
+
+---
+
+### GET `/vacation/calendar/{year}/{month}`
+
+Restituisce il calendario mensile con entry, festività nazionali e custom evidenziate.
+
+---
+
+### GET `/vacation/holidays/{year}`
+
+Lista festività nazionali italiane per anno (include Pasqua e Pasquetta calcolati dinamicamente).
+
+---
+
+### GET `/vacation/bridges/{year}`
+
+Calcola le opportunità di ponte ottimali per l'anno.
+
+---
+
+### GET `/vacation/user-holidays`
+
+Lista festività custom dell'utente (patrono locale, chiusure aziendali).
+
+---
+
+### POST `/vacation/user-holidays`
+
+Aggiunge una festività custom. Supporta ricorrenza annuale.
+
+**Request:**
+```json
+{
+  "name": "Patrono locale",
+  "month": 12,
+  "day": 7,
+  "recurring": true
+}
+```
+
+---
+
+### DELETE `/vacation/user-holidays/{holiday_id}`
+
+Rimuove una festività custom.
+
+---
+
+## 💹 Endpoints - Budget Planning
+
+> Modulo per la creazione e il monitoraggio di budget mensili per sotto-categoria, con calcolo spesa real-time e indicatori visivi. **Implementato in Fase 3.9.**
+
+### GET `/budgets`
+
+Lista budget dell'utente con filtri.
+
+**Query Parameters:**
+- `is_active` (bool): Filtra per budget attivi/inattivi
+- `category_id` (uuid): Filtra per categoria
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "category_id": "uuid",
+    "category_name": "Ristoranti",
+    "amount": 200.00,
+    "period": "monthly",
+    "is_active": true,
+    "start_date": "2026-01-01"
+  }
+]
+```
+
+---
+
+### GET `/budgets/summary`
+
+Dashboard principale budget: lista tutti i budget attivi con spesa corrente del mese, percentuale utilizzo e indicatore status.
+
+**Response:** `200 OK`
+```json
+{
+  "budgets": [
+    {
+      "id": "uuid",
+      "category_name": "Ristoranti",
+      "amount": 200.00,
+      "spent": 150.00,
+      "remaining": 50.00,
+      "percentage": 75.0,
+      "status": "warning",
+      "indicator": "🟡"
+    }
+  ],
+  "totals": {
+    "total_budgeted": 700.00,
+    "total_spent": 605.00,
+    "total_remaining": 95.00,
+    "overall_percentage": 86.4
+  }
+}
+```
+
+**Status indicators:** `🟢` <70% · `🟡` 70–90% · `🔴` 90–100% · `🚨` >100% · `⚠️` budget orfano
+
+---
+
+### GET `/budgets/{budget_id}`
+
+Dettaglio singolo budget con spending data.
+
+---
+
+### POST `/budgets`
+
+Crea un nuovo budget mensile per una sotto-categoria.
+
+**Request:**
+```json
+{
+  "category_id": "uuid",
+  "amount": 200.00,
+  "period": "monthly"
+}
+```
+
+**Validations:**
+- Solo categorie `expense` accettate
+- Un solo budget attivo per categoria (constraint unicità)
+- `amount` > 0
+
+**Errors:**
+- `400`: Budget già esistente per questa categoria, o categoria non expense
+
+---
+
+### PUT `/budgets/{budget_id}`
+
+Modifica un budget esistente (amount, is_active).
+
+---
+
+### DELETE `/budgets/{budget_id}`
+
+Elimina un budget. Budget orfani (categoria eliminata) vengono gestiti con `category_id: null`.
+
+---
+
+## 📥 Endpoints - CSV Import
+
+> Importazione massiva di transazioni da file CSV con preview interattiva, fuzzy matching categorie e rilevamento duplicati. **Implementato in Fase 3.10.**
+
+### GET `/csv-import/template`
+
+Scarica il template CSV standard.
+
+**Response:** File `template_transazioni.csv`
+
+**Formato CSV:**
+```csv
+date,description,amount,category_name,notes
+2026-01-15,Spesa Supermercato,-45.50,Spesa,Settimanale
+2026-01-16,Stipendio,2500.00,Stipendio,Gennaio 2026
+```
+
+---
+
+### POST `/csv-import/preview`
+
+Carica un file CSV e restituisce la preview con validazione riga per riga.
+
+**Request:** `multipart/form-data` con file CSV (max 1000 righe, UTF-8)
+
+**Response:** `200 OK`
+```json
+{
+  "total_rows": 50,
+  "valid": 45,
+  "warnings": 3,
+  "errors": 1,
+  "duplicates": 1,
+  "rows": [
+    {
+      "row_number": 1,
+      "status": "valid",
+      "date": "2026-01-15",
+      "description": "Spesa",
+      "amount": -45.50,
+      "category_name": "Spesa",
+      "category_suggestion": null
+    },
+    {
+      "row_number": 2,
+      "status": "warning",
+      "category_suggestion": "Ristorazione"
+    }
+  ]
+}
+```
+
+**Row status:** `valid` 🟢 · `warning` 🟡 · `error` 🔴 · `duplicate` 🟣
+
+---
+
+### POST `/csv-import/confirm`
+
+Conferma e importa le righe selezionate dalla preview.
+
+**Request:**
+```json
+{
+  "account_id": "uuid",
+  "row_numbers": [1, 2, 3, 45]
+}
+```
+
+---
+
+## 📊 Endpoints - Excel Export
+
+> Generazione client-side di report Excel multi-sheet. Il backend aggrega i dati, il frontend genera il file `.xlsx` tramite SheetJS. **Implementato in Fase 3.11.**
+
+### GET `/export/data`
+
+Restituisce i dati aggregati per il periodo selezionato, pronti per la generazione Excel lato client.
+
+**Query Parameters:**
+- `start_date` (YYYY-MM-DD): Inizio periodo
+- `end_date` (YYYY-MM-DD): Fine periodo
+- `account_id` (uuid, opzionale): Filtra per account
+
+**Response:** `200 OK`
+```json
+{
+  "period": { "start": "2026-01-01", "end": "2026-01-31" },
+  "summary": { "total_income": 3000.00, "total_expense": 1500.00, "net": 1500.00 },
+  "transactions": [...],
+  "by_category": [...],
+  "by_account": [...],
+  "transfers": [...]
+}
+```
+
+**Fogli Excel generati (client-side):**
+1. Riepilogo — statistiche periodo
+2. Transazioni — lista completa con auto-filter
+3. Per Categoria — aggregazione con percentuali
+4. Per Account — breakdown movimenti
+5. Trasferimenti — lista trasferimenti
+
+---
+
+### GET `/export/info`
+
+Restituisce le opzioni disponibili per l'export (preset periodi, account disponibili).
+
+---
+
 ## ❌ Error Responses
 
 ### Standard Error Format
@@ -746,8 +1145,8 @@ curl -X GET http://localhost:8000/api/v1/accounts \
 
 ---
 
-**Documento creato:** Novembre 2025  
-**Ultima modifica:** Novembre 2025  
-**Versione:** 1.0  
+**Documento creato:** Novembre 2025
+**Ultima modifica:** Marzo 2026
+**Versione:** 2.0
 **Formato:** JSON  
 **Authentication:** JWT Bearer Token

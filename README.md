@@ -664,82 +664,53 @@ budget-app-saas/
 ## 🗺️ Roadmap
 
 ### ✅ Fase 0: Setup Progetto (Completata)
-- [x] Repository GitHub
-- [x] Struttura cartelle
-- [x] Frontend React prototipo
-- [x] Backend Python setup
-- [x] Database PostgreSQL
+- [x] Repository GitHub, struttura cartelle, Docker, documentazione base
 
 ### ✅ Fase 1: Database Foundation (Completata)
-- [x] Schema database completo
-- [x] SQLAlchemy models
-- [x] Alembic migrations
+- [x] Schema PostgreSQL, SQLAlchemy models, Alembic migrations
 
 ### ✅ Fase 2: Backend API - Autenticazione (Completata)
-- [x] JWT authentication
-- [x] User registration/login
-- [x] Protected endpoints
+- [x] JWT authentication, user registration/login, protected endpoints
 
 ### ✅ Fase 3: Backend API - Core Features (Completata)
-- [x] Accounts CRUD
-- [x] Transactions CRUD
-- [x] Categories CRUD
-- [x] Transfers CRUD
-- [x] Analytics endpoints
+- [x] Accounts, Transactions, Categories, Transfers CRUD
+- [x] Analytics endpoints (`/summary`, `/monthly-trend`, `/category-breakdown`)
+- [x] Code review & bug fixing (Fase 3.7)
 
-### 🆕 Fase 3.8: Backend Vacation Planning (In corso)
-- [ ] Models con maturazione separata (Ferie/ROL/Permessi)
-- [ ] Tracking start date + initial balance
-- [ ] Calcolo automatico Pasqua/Pasquetta
-- [ ] Validazione weekend + festività
-- [ ] Balance con totali aggregati
-- [ ] Bulk entry endpoint
-- [ ] Bridge calculator
+### ✅ Fase 3.8: Backend Vacation Planning (Completata)
+- [x] Maturazione separata Ferie/ROL/Permessi, saldo iniziale, tracking_start_date
+- [x] Festività italiane + Pasqua/Pasquetta dinamici, festività custom utente
+- [x] Validazioni: no weekend, no festività, no duplicati; bulk entry con skip
+- [x] Balance aggregato + breakdown per tipo, calendario, ponti
 
-### 📅 Fase 4: Testing & Debug
-- [ ] Pytest suite completa finanza
-- [ ] Pytest suite completa ferie
-- [ ] Coverage >70%
-- [ ] Bug fixing
+### ✅ Fase 3.9: Backend Budget Planning (Completata)
+- [x] Budget mensili per sotto-categoria con calcolo spesa real-time
+- [x] Indicatori visivi a semaforo (🟢🟡🔴🚨), gestione budget orfani
 
-### 📅 Fase 4.6: Testing Vacation Module
-- [ ] Test settings con maturazione separata
-- [ ] Test validazione weekend/festività
-- [ ] Test balance aggregato
-- [ ] Test bulk entries
-- [ ] Test user holidays
+### ✅ Fase 3.10: Backend CSV Import (Completata)
+- [x] Parser CSV con fuzzy matching categorie e rilevamento duplicati
+- [x] Preview interattiva con status per riga (valid/warning/error/duplicate)
+
+### ✅ Fase 3.11: Backend Excel Export (Completata)
+- [x] Endpoint aggregazione dati; generazione file Excel client-side (SheetJS)
+
+### ✅ Fase 4: Testing & Debug (Parzialmente completata)
+- [x] Test suite Budget, CSV Import, Excel Export (Fasi 4.7, 4.8, 4.9)
+- [ ] **Fase 4.6:** Testing Vacation Module (coverage ≥70%)
 
 ### 📅 Fase 5: Frontend Integration
-- [ ] Connessione API backend
-- [ ] Rimozione localStorage
-- [ ] User authentication flow
-- [ ] Real-time data sync
-
-### 📅 Fase 5.9: Frontend Vacation Module
-- [ ] VacationSettings (form con preset CCNL)
-- [ ] VacationBalance (totali aggregati prominenti)
-- [ ] VacationCalendar (con festività)
-- [ ] BulkEntryModal (inserimento multiplo)
-- [ ] BridgeOpportunities
-- [ ] UserHolidaysManager
-- [ ] Responsive design
+- [ ] Connessione API backend, auth flow, dashboard, tutti i moduli
+- [ ] Vacation UI (5.9), Budget UI (5.10), CSV Import UI (5.11), Excel Export (5.12)
 
 ### 📅 Fase 6: Deployment
-- [ ] Backend deployment (Render.com)
-- [ ] Frontend deployment (Vercel)
-- [ ] Database production
-- [ ] CI/CD setup
+- [ ] Backend (Render.com), Frontend (Vercel), Database production, CI/CD
 
 ### 🔮 Fase 7: Sviluppi Futuri
-- [ ] Recurring transactions
-- [ ] Budget planning
-- [ ] Multi-currency
-- [ ] Receipt scanning
-- [ ] Export iCal ferie
-- [ ] Mobile app
+- [ ] Mobile app (React Native), bank sync (Plaid/Tink), recurring transactions
+- [ ] Multi-currency, receipt scanning OCR, export iCal ferie, AI insights
+- [ ] Freelance tier: fatturazione XML SDI, clienti, time tracking
 
-**Timeline:** 8-10 settimane  
-**Vedi**: [roadmap.md](roadmap.md) per dettagli completi
+**Timeline totale:** ~16 settimane (avviato Novembre 2025) · **Vedi**: [roadmap.md](roadmap.md) per dettagli completi
 
 ---
 

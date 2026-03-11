@@ -15,12 +15,25 @@
 - [FASE 1: Database Foundation](#fase-1-database-foundation-2-3-giorni)
 - [FASE 2: Backend API - Autenticazione](#fase-2-backend-api-autenticazione-3-4-giorni)
 - [FASE 3: Backend API - Core Features](#fase-3-backend-api-core-features-4-5-giorni)
-- [FASE 4: Testing & Debug](#fase-4-testing-debug-2-giorni)
+  - [FASE 3.7: Code Review & Bug Fixing](#fase-37-code-review--bug-fixing)
+  - [FASE 3.8: Backend Vacation Planning](#fase-38-backend-api---vacation-planning-3-4-giorni) ✅
+  - [FASE 3.9: Backend Budget Planning](#fase-39-backend-api---budget-planning-2-3-giorni) ✅
+  - [FASE 3.10: Backend CSV Import](#fase-310-backend-api---csv-import-1-giorno) ✅
+  - [FASE 3.11: Backend Excel Export](#fase-311-backend-excel-export-05-giorni) ✅
+- [FASE 4: Testing & Debug](#fase-4-testing--debug-2-giorni)
+  - [FASE 4.6: Testing Vacation Module](#fase-46-testing-vacation-module-1-2-giorni)
+  - [FASE 4.7: Testing Budget Module](#fase-47-testing-budget-module-1-giorno) ✅
+  - [FASE 4.8: Testing CSV Import Module](#fase-48-testing-csv-import-module-05-giorni) ✅
+  - [FASE 4.9: Testing Excel Export Backend](#fase-49-testing-excel-export-backend-025-giorni) ✅
 - [FASE 5: Frontend Integration](#fase-5-frontend-integration-5-7-giorni)
+  - [FASE 5.9: Frontend Vacation Module](#fase-59-frontend-vacation-module-3-4-giorni)
+  - [FASE 5.10: Frontend Budget Module](#fase-510-frontend-budget-module-2-3-giorni) ✅
+  - [FASE 5.11: Frontend CSV Import UI](#fase-511-frontend-csv-import-ui-1-giorno) ✅
+  - [FASE 5.12: Frontend Excel Generation](#fase-512-frontend-excel-generation-1-giorno) ✅
 - [FASE 6: Deployment](#fase-6-deployment-3-4-giorni)
 - [FASE 7: Sviluppi Futuri](#fase-7-sviluppi-futuri)
 
-**Timeline Totale:** 6-8 settimane lavorando part-time (10-15h/settimana)
+**Timeline Totale:** ~16 settimane lavorando part-time (10-15h/settimana) · *Avviato Novembre 2025*
 
 ---
 
@@ -3078,6 +3091,16 @@ Dopo le correzioni, verificare:
 
 ---
 
+## ⚠️ BUG APERTO — Da risolvere prima del deploy
+
+> **Identificato in FASE 3.7 (process_tracker):** È possibile effettuare transazioni e trasferimenti per somme superiori al balance dell'account. Manca validazione lato backend.
+>
+> **Impatto:** 🔴 Alto — può portare a saldi negativi non voluti
+> **Priorità:** Da risolvere in FASE 4 (Testing & Debug) o FASE 5 (Frontend Integration) al più tardi
+> **Fix suggerito:** Aggiungere controllo in `crud/transaction.py` e `crud/transfer.py` che blocchi se `amount > account.current_balance` per le spese
+
+---
+
 ## 🎯 CHECKPOINT FASE 3 (AGGIORNATO)
 
 Verifica che tutti questi endpoint funzionino E che le correzioni 3.7 siano applicate:
@@ -4799,31 +4822,35 @@ Stesso testing del documento originale, con aggiunta:
 ## 🎯 CHECKPOINT FASE 3.8
 
 **Database:**
-- [ ] ✅ Tabella `vacation_settings` con campi separati (ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
-- [ ] ✅ Tabella `vacation_entries` (con UniqueConstraint, NO malattia)
-- [ ] ✅ Tabella `italian_holidays`
-- [ ] ✅ Tabella `user_holidays`
+- [x] ✅ Tabella `vacation_settings` con campi separati (ferie_days_per_month, rol_hours_per_month, permessi_hours_per_month)
+- [x] ✅ Tabella `vacation_entries` (con UniqueConstraint, NO malattia)
+- [x] ✅ Tabella `italian_holidays`
+- [x] ✅ Tabella `user_holidays`
 
 **Models:**
-- [ ] ✅ VacationSettings con maturazione separata
-- [ ] ✅ VacationEntry senza malattia
-- [ ] ✅ UserHoliday con validazione date
+- [x] ✅ VacationSettings con maturazione separata
+- [x] ✅ VacationEntry senza malattia
+- [x] ✅ UserHoliday con validazione date
 
 **Business Logic:**
-- [ ] ✅ Ferie: giorni/mese → ore (conversione automatica)
-- [ ] ✅ ROL/Permessi: ore/mese dirette
-- [ ] ✅ Balance calculator con totali aggregati
-- [ ] ✅ Validazione weekend + festività in create/bulk
+- [x] ✅ Ferie: giorni/mese → ore (conversione automatica)
+- [x] ✅ ROL/Permessi: ore/mese dirette
+- [x] ✅ Balance calculator con totali aggregati
+- [x] ✅ Validazione weekend + festività in create/bulk
 
 **API Endpoints:**
-- [ ] ✅ GET/PUT /vacation/settings (nuovi campi)
-- [ ] ✅ GET/POST /vacation/entries (con validazione festività)
-- [ ] ✅ POST /vacation/entries/bulk (con fix validazione + skip festività)
-- [ ] ✅ GET /vacation/balance (con breakdown completo + totali)
-- [ ] ✅ GET /vacation/calendar (con ottimizzazione query)
+- [x] ✅ GET/PUT /vacation/settings (nuovi campi)
+- [x] ✅ GET/POST /vacation/entries (con validazione festività)
+- [x] ✅ POST /vacation/entries/bulk (con fix validazione + skip festività)
+- [x] ✅ GET /vacation/balance (con breakdown completo + totali)
+- [x] ✅ GET /vacation/calendar (con ottimizzazione query)
 
-**Tempo stimato:** 3-4 giorni  
+**Tempo effettivo:** 1 giorno (10/03/2026) · *Completato in anticipo rispetto alla stima di 3-4 giorni*
 **Prossimo:** FASE 4.6 - Testing Vacation Module
+
+---
+
+**FASE 3.8 COMPLETATA! 🎉**
 
 ---
 
