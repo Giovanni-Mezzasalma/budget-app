@@ -688,14 +688,14 @@ budget-app-saas/
 - [x] Indicatori visivi a semaforo (🟢🟡🔴🚨), gestione budget orfani
 
 ### ✅ Fase 3.10: Backend CSV Import (Completata)
-- [x] Parser CSV con fuzzy matching categorie e rilevamento duplicati
-- [x] Preview interattiva con status per riga (valid/warning/error/duplicate)
+- [ ] Parser CSV con fuzzy matching categorie e rilevamento duplicati
+- [ ] Preview interattiva con status per riga (valid/warning/error/duplicate)
 
 ### ✅ Fase 3.11: Backend Excel Export (Completata)
-- [x] Endpoint aggregazione dati; generazione file Excel client-side (SheetJS)
+- [ ] Endpoint aggregazione dati; generazione file Excel client-side (SheetJS)
 
 ### ✅ Fase 4: Testing & Debug (Parzialmente completata)
-- [x] Test suite Budget, CSV Import, Excel Export (Fasi 4.7, 4.8, 4.9)
+- [ ] Test suite Budget, CSV Import, Excel Export (Fasi 4.7, 4.8, 4.9)
 - [ ] **Fase 4.6:** Testing Vacation Module (coverage ≥70%)
 
 ### 📅 Fase 5: Frontend Integration
