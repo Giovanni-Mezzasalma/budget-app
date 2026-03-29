@@ -86,8 +86,6 @@ Dashboard con:
 - bilancio mensile (entrate - uscite)
 - andamento delle spese per categoria
 - confronto tra mesi
-- export Excel dei dati (per chi vuole lavorarci ulteriormente)
-
 ### 3.6 Vacation & Leave Planning (killer feature)
 
 Questo è il modulo che differenzia BudgetApp da qualsiasi competitor. Nell'MVP supporta i dipendenti e copre:
@@ -186,8 +184,8 @@ Il progetto è in sviluppo dal novembre 2025, part-time come unico sviluppatore.
 | 0–3 | Backend core: auth, multi-account, transazioni, categorie, analytics | ✅ Completato |
 | 3.8 | Vacation module: ferie/ROL/permessi, festività italiane, ponti | ✅ Completato |
 | 3.9 | Budget planning: budget mensili per categoria con tracking real-time | ✅ Completato |
-| 3.10–3.11 | CSV import + Excel export | ✅ Completato |
-| 4.7–4.9 | Suite Pytest: Budget, CSV, Excel export (coverage >80%) | ✅ Completato |
+| 3.10 | CSV import | ✅ Completato |
+| 4.7–4.8 | Suite Pytest: Budget, CSV (coverage >80%) | ✅ Completato |
 | 4.6 | Testing Vacation module | 🔄 In corso |
 | 5 | Frontend React — UI completa | ⏳ Pianificato |
 | 6 | Deploy produzione (Render + Vercel) | ⏳ Pianificato |

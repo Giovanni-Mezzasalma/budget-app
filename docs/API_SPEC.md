@@ -21,7 +21,6 @@
 9. [Endpoints - Vacation Planning](#endpoints---vacation-planning)
 10. [Endpoints - Budget Planning](#endpoints---budget-planning)
 11. [Endpoints - CSV Import](#endpoints---csv-import)
-12. [Endpoints - Excel Export](#endpoints---excel-export)
 13. [Error Responses](#error-responses)
 14. [Rate Limiting](#rate-limiting)
 
@@ -1015,46 +1014,6 @@ Conferma e importa le righe selezionate dalla preview.
   "row_numbers": [1, 2, 3, 45]
 }
 ```
-
----
-
-## 📊 Endpoints - Excel Export
-
-> Generazione client-side di report Excel multi-sheet. Il backend aggrega i dati, il frontend genera il file `.xlsx` tramite SheetJS. **Implementato in Fase 3.11.**
-
-### GET `/export/data`
-
-Restituisce i dati aggregati per il periodo selezionato, pronti per la generazione Excel lato client.
-
-**Query Parameters:**
-- `start_date` (YYYY-MM-DD): Inizio periodo
-- `end_date` (YYYY-MM-DD): Fine periodo
-- `account_id` (uuid, opzionale): Filtra per account
-
-**Response:** `200 OK`
-```json
-{
-  "period": { "start": "2026-01-01", "end": "2026-01-31" },
-  "summary": { "total_income": 3000.00, "total_expense": 1500.00, "net": 1500.00 },
-  "transactions": [...],
-  "by_category": [...],
-  "by_account": [...],
-  "transfers": [...]
-}
-```
-
-**Fogli Excel generati (client-side):**
-1. Riepilogo — statistiche periodo
-2. Transazioni — lista completa con auto-filter
-3. Per Categoria — aggregazione con percentuali
-4. Per Account — breakdown movimenti
-5. Trasferimenti — lista trasferimenti
-
----
-
-### GET `/export/info`
-
-Restituisce le opzioni disponibili per l'export (preset periodi, account disponibili).
 
 ---
 

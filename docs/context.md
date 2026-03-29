@@ -55,12 +55,12 @@ budget-app/
 │   │   ├── crud/          # account, category, transaction, transfer,
 │   │   │                  # analytics, vacation_entry, vacation_settings,
 │   │   │                  # italian_holiday, user_holiday, budget,
-│   │   │                  # csv_import (parser), export
+│   │   │                  # csv_import (parser)
 │   │   ├── models/        # SQLAlchemy models (stessi moduli di crud + budget)
 │   │   ├── routers/       # auth, accounts, categories, transactions,
 │   │   │                  # transfers, analytics, vacation, budgets,
-│   │   │                  # csv_import, export
-│   │   ├── schemas/       # Pydantic schemas (incl. budget, csv_import, export)
+│   │   │                  # csv_import
+│   │   ├── schemas/       # Pydantic schemas (incl. budget, csv_import)
 │   │   └── utils/         # security, easter, bridge_days, vacation_balance,
 │   │                      # csv_parser
 │   ├── tests/             # conftest + test per ogni modulo
@@ -108,16 +108,13 @@ budget-app/
 - **Fase 3.10** — CSV Import backend:
   - Parser con fuzzy matching categorie (threshold 0.7), rilevamento duplicati
   - Preview interattiva con status per riga; template scaricabile
-- **Fase 3.11** — Excel Export backend:
-  - Endpoint aggregazione dati; generazione file .xlsx client-side via SheetJS
 - **Fase 4.7** — Testing Budget module (>80% coverage)
 - **Fase 4.8** — Testing CSV Import module
-- **Fase 4.9** — Testing Excel Export backend
 
 ### 🔲 Da Completare
 
 - **Fase 4.6** — Testing Vacation module (target ≥70% coverage) ← priorità immediata
-- **Fase 5** — Frontend React (auth → dashboard → tutti i moduli: vacation, budget, CSV, Excel)
+- **Fase 5** — Frontend React (auth → dashboard → tutti i moduli: vacation, budget, CSV)
 - **Fase 6** — Deployment (Render.com backend, Vercel frontend, CI/CD)
 
 ---
@@ -159,7 +156,6 @@ budget-app/
 | Vacation | `GET/PUT /vacation/settings`, `GET/POST /vacation/entries`, `POST /vacation/entries/bulk`, `GET /vacation/balance`, `GET /vacation/calendar/{year}/{month}`, `GET /vacation/bridges/{year}`, `GET /vacation/holidays/{year}`, `GET/POST/DELETE /vacation/user-holidays` |
 | Budgets | `GET /budgets`, `GET /budgets/summary`, `GET/PUT/DELETE /budgets/{id}`, `POST /budgets` |
 | CSV Import | `GET /csv-import/template`, `POST /csv-import/preview`, `POST /csv-import/confirm` |
-| Excel Export | `GET /export/data`, `GET /export/info` |
 
 ---
 
